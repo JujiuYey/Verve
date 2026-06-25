@@ -1,0 +1,77 @@
+# ===== 通用 =====
+.DS_Store
+.env
+.env.local
+.env.*.local
+*.log
+
+# ===== Go 后端 =====
+# 二进制文件
+server/bin/
+server/tmp/
+server/*.exe
+server/*.exe~
+server/*.dll
+server/*.so
+server/*.dylib
+
+# 测试覆盖率
+server/*.out
+server/coverage.txt
+
+# Go 工作区文件
+server/go.work
+server/go.work.sum
+
+# 依赖缓存
+server/vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ===== 前端 =====
+# 依赖
+web/node_modules/
+web/.pnpm-store/
+
+# 构建产物
+web/dist/
+web/dist-ssr/
+web/.vite/
+
+# 日志
+web/*.log
+web/npm-debug.log*
+web/yarn-debug.log*
+web/yarn-error.log*
+web/pnpm-debug.log*
+web/lerna-debug.log*
+
+# 编辑器
+web/.vscode/*
+!web/.vscode/extensions.json
+web/.idea
+web/*.suo
+web/*.ntvs*
+web/*.njsproj
+web/*.sln
+web/*.sw?
+web/*.local
+
+# 测试
+web/coverage/
+web/.nyc_output/
+
+# 其他
+web/.specstory/
+web/.cursorindexingignore
+
+# ===== Claude 配置 =====
+.claude/settings.local.json
+
+# ===== Git Worktrees =====
+.worktrees/

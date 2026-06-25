@@ -1,0 +1,22 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "ignorePatterns": ["dist"],
+  "sortImports": {
+    "customGroups": [
+      {
+        "groupName": "internal-alias",
+        "selector": "import",
+        "elementNamePattern": ["@/**"]
+      }
+    ],
+    "groups": [
+      "builtin",
+      "external",
+      "internal-alias",
+      ["internal", "subpath"],
+      ["parent", "sibling", "index"],
+      "style",
+      "unknown"
+    ]
+  }
+}

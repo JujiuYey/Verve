@@ -1,0 +1,18 @@
+version: "3"
+
+tasks:
+  dev:
+    desc: Run server with hot reload
+    cmd: air
+
+  run:
+    desc: Run server without hot reload
+    cmd: go run main.go
+
+  build:
+    desc: Build server binary
+    cmd: go build -o ./bin/server .
+
+  tidy:
+    desc: Tidy go modules
+    cmd: go mod tidy

@@ -1,0 +1,29 @@
+{
+  "extends": ["stylelint-config-standard"],
+  "plugins": ["stylelint-order"],
+  "rules": {
+    "at-rule-no-unknown": [
+      true,
+      {
+        "ignoreAtRules": [
+          "tailwind",
+          "apply",
+          "layer",
+          "config",
+          "custom-variant",
+          "variant",
+          "theme",
+          "source",
+          "utility",
+          "plugin"
+        ]
+      }
+    ],
+    "order/properties-alphabetical-order": true,
+    "selector-class-pattern": null,
+    "no-empty-source": null,
+    "declaration-empty-line-before": "never",
+    "no-descending-specificity": null,
+    "import-notation": "string"
+  }
+}

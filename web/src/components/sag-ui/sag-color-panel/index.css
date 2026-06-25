@@ -1,0 +1,10 @@
+.sag-color-panel-picker .react-colorful__pointer {
+  width: 20px !important;
+  height: 20px !important;
+  border-width: 1px !important;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 18%) !important;
+}
+
+.sag-color-panel-picker .react-colorful__interactive:focus .react-colorful__pointer {
+  transform: translate(-50%, -50%) scale(1.05);
+}
