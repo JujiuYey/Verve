@@ -26,9 +26,9 @@ export function LayoutComponent() {
   }, [accessToken, user, setUser]);
 
   return (
-    <SidebarProvider defaultOpen>
+    <SidebarProvider defaultOpen className="[background-image:none] bg-background">
       <AppSidebar />
-      <SidebarInset>
+      <SidebarInset className="md:py-3 md:pr-3">
         <Outlet />
       </SidebarInset>
     </SidebarProvider>
