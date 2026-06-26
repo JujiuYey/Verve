@@ -1,12 +1,13 @@
 import { MoonIcon, SunIcon } from "lucide-react";
 
-import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
+import { SidebarMenuButton, SidebarMenuItem, useSidebar } from "@/components/ui/sidebar";
 import { useAppStore } from "@/stores/app";
 
 export function ThemeToggle() {
   const theme = useAppStore((s) => s.settings.theme);
   const updateSettings = useAppStore((s) => s.updateSettings);
   const isDark = theme === "dark";
+  const { state } = useSidebar();
 
   return (
     <SidebarMenuItem>
@@ -15,7 +16,7 @@ export function ThemeToggle() {
         onClick={() => updateSettings({ theme: isDark ? "light" : "dark" })}
       >
         {isDark ? <MoonIcon /> : <SunIcon />}
-        <span>{isDark ? "深色" : "浅色"}</span>
+        {state !== "collapsed" && <span>{isDark ? "深色" : "浅色"}</span>}
       </SidebarMenuButton>
     </SidebarMenuItem>
   );

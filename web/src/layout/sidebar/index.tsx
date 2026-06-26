@@ -1,13 +1,16 @@
 import * as React from "react";
 
-import { Sidebar, SidebarFooter, SidebarMenu } from "@/components/ui/sidebar";
+import { Sidebar, SidebarFooter, SidebarMenu, useSidebar } from "@/components/ui/sidebar";
 
 import { Logo } from "./logo";
 import { NavSystem } from "./nav-system";
+import { SideToggle } from "./side-toggle";
 import { ThemeToggle } from "./theme-toggle";
 import { User } from "./user";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { state, toggleSidebar } = useSidebar();
+
   return (
     <Sidebar variant="floating" collapsible="icon" {...props}>
       <Logo />
@@ -18,6 +21,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarMenu>
           <ThemeToggle />
         </SidebarMenu>
+        {state === "collapsed" && (
+          <SidebarMenu>
+            <SideToggle toggleSidebar={toggleSidebar} />
+          </SidebarMenu>
+        )}
         <User />
       </SidebarFooter>
     </Sidebar>

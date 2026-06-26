@@ -1,8 +1,10 @@
-import { IconDotsVertical, IconLogout, IconSettings, IconUserCircle } from "@tabler/icons-react";
+import { IconLogout, IconSettings, IconUserCircle } from "@tabler/icons-react";
 import { Link, useNavigate } from "@tanstack/react-router";
+import { PanelLeftCloseIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,7 +19,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useAuthStore } from "@/stores/auth";
 
 export function User() {
-  const { isMobile, state } = useSidebar();
+  const { isMobile, state, toggleSidebar } = useSidebar();
   const isCollapsed = state === "collapsed";
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
@@ -42,72 +44,81 @@ export function User() {
     </Avatar>
   );
 
+  const triggerClass =
+    "bg-sidebar-accent ring-sidebar-border/60 hover:bg-sidebar-accent/80 focus-visible:ring-sidebar-ring flex w-full items-center justify-between gap-2 rounded-lg p-2 ring-1 shadow-[0_4px_14px_rgb(15_23_42/0.06),0_1px_2px_rgb(15_23_42/0.04)] transition-colors focus-visible:ring-2 focus-visible:outline-none group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:shadow-none group-data-[collapsible=icon]:ring-0 group-data-[collapsible=icon]:hover:bg-transparent data-[state=open]:bg-sidebar-accent/80";
+
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          aria-label={isCollapsed ? name : undefined}
-          className="bg-sidebar-accent ring-sidebar-border/60 hover:bg-sidebar-accent/80 focus-visible:ring-sidebar-ring flex items-center gap-3 rounded-lg p-2 ring-1 shadow-[0_4px_14px_rgb(15_23_42/0.06),0_1px_2px_rgb(15_23_42/0.04)] transition-colors focus-visible:ring-2 focus-visible:outline-none group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:shadow-none group-data-[collapsible=icon]:ring-0 group-data-[collapsible=icon]:hover:bg-transparent data-[state=open]:bg-sidebar-accent/80"
+    <div className={`flex items-center gap-2 ${triggerClass}`}>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <div aria-label={isCollapsed ? name : undefined} className="flex items-center gap-3">
+            {isCollapsed ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="flex">{avatar}</span>
+                </TooltipTrigger>
+                <TooltipContent side="right">{name}</TooltipContent>
+              </Tooltip>
+            ) : (
+              avatar
+            )}
+            <div className="flex flex-1 items-center gap-2 group-data-[collapsible=icon]:hidden">
+              <div className="grid flex-1 text-left leading-tight">
+                <span className="truncate text-sm font-medium">{name}</span>
+                <span className="text-muted-foreground truncate text-xs">{subtitle}</span>
+              </div>
+            </div>
+          </div>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
+          side={isMobile ? "bottom" : "right"}
+          align="end"
+          sideOffset={4}
         >
-          {isCollapsed ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="flex">{avatar}</span>
-              </TooltipTrigger>
-              <TooltipContent side="right">{name}</TooltipContent>
-            </Tooltip>
-          ) : (
-            avatar
-          )}
-          <div className="flex flex-1 items-center gap-2 group-data-[collapsible=icon]:hidden">
-            <div className="grid flex-1 text-left leading-tight">
-              <span className="truncate text-sm font-medium">{name}</span>
-              <span className="text-muted-foreground truncate text-xs">{subtitle}</span>
+          <DropdownMenuLabel className="p-0 font-normal">
+            <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
+              <Avatar className="size-8 rounded-md">
+                <AvatarImage src={avatarUrl} alt={name} />
+                <AvatarFallback className="rounded-md">{getFallback()}</AvatarFallback>
+              </Avatar>
+              <div className="grid flex-1 text-left text-sm leading-tight">
+                <span className="truncate font-medium">{name}</span>
+                <span className="text-muted-foreground truncate text-xs">{subtitle}</span>
+              </div>
             </div>
-            <IconDotsVertical className="text-muted-foreground size-4 shrink-0" />
-          </div>
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
-        side={isMobile ? "bottom" : "right"}
-        align="end"
-        sideOffset={4}
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuGroup>
+            <DropdownMenuItem asChild>
+              <Link to="/account">
+                <IconUserCircle />
+                个人中心
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to="/app-setting">
+                <IconSettings />
+                应用设置
+              </Link>
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={handleLogout}>
+            <IconLogout />
+            退出登录
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="text-muted-foreground hover:text-foreground size-7 shrink-0 group-data-[collapsible=icon]:hidden"
+        onClick={toggleSidebar}
+        aria-label="折叠侧边栏"
       >
-        <DropdownMenuLabel className="p-0 font-normal">
-          <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-            <Avatar className="size-8 rounded-md">
-              <AvatarImage src={avatarUrl} alt={name} />
-              <AvatarFallback className="rounded-md">{getFallback()}</AvatarFallback>
-            </Avatar>
-            <div className="grid flex-1 text-left text-sm leading-tight">
-              <span className="truncate font-medium">{name}</span>
-              <span className="text-muted-foreground truncate text-xs">{subtitle}</span>
-            </div>
-          </div>
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuGroup>
-          <DropdownMenuItem asChild>
-            <Link to="/account">
-              <IconUserCircle />
-              个人中心
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link to="/app-setting">
-              <IconSettings />
-              应用设置
-            </Link>
-          </DropdownMenuItem>
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleLogout}>
-          <IconLogout />
-          退出登录
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+        <PanelLeftCloseIcon className="size-4" />
+      </Button>
+    </div>
   );
 }
