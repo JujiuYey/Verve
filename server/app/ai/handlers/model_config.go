@@ -148,6 +148,9 @@ func (h *ModelConfigHandler) CreatePlatform(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return response.BadRequestCtx(c)
 	}
+	if !isSupportedProviderType(req.ProviderType) {
+		return response.BadRequestCtx(c, "当前仅支持 OpenAI 兼容接口")
+	}
 	if strings.TrimSpace(req.Name) == "" {
 		return response.BadRequestCtx(c, "平台名称不能为空")
 	}
@@ -291,4 +294,8 @@ func (h *ModelConfigHandler) DeleteModel(c *fiber.Ctx) error {
 
 func isValidModelType(modelType string) bool {
 	return modelType == db.ModelTypeChat || modelType == db.ModelTypeEmbedding || modelType == "rerank"
+}
+
+func isSupportedProviderType(providerType string) bool {
+	return providerType == "" || providerType == "openai_compatible"
 }

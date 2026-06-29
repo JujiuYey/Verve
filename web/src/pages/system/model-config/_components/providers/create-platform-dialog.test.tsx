@@ -57,4 +57,12 @@ describe("CreatePlatformDialog", () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
     expect(onCreated).toHaveBeenCalledWith("platform-1");
   });
+
+  it("presents the platform as OpenAI-compatible only", () => {
+    render(<CreatePlatformDialog open onOpenChange={vi.fn()} />);
+
+    expect(screen.queryByText("接口类型")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "自定义" })).not.toBeInTheDocument();
+    expect(screen.getByText("添加 OpenAI 兼容模型平台，用于 Eino 模型调用。")).toBeInTheDocument();
+  });
 });

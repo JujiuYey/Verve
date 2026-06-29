@@ -20,22 +20,15 @@ interface CreatePlatformDialogProps {
   onCreated?: (platformId: string) => void;
 }
 
-const PROVIDER_TYPES = [
-  { value: "openai_compatible", label: "OpenAI 兼容" },
-  { value: "custom", label: "自定义" },
-] as const;
-
 export function CreatePlatformDialog({ open, onOpenChange, onCreated }: CreatePlatformDialogProps) {
   const createPlatformMutation = useCreateAIPlatform();
   const [name, setName] = useState("");
-  const [providerType, setProviderType] = useState<string>("openai_compatible");
   const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [docsUrl, setDocsUrl] = useState("");
 
   const reset = () => {
     setName("");
-    setProviderType("openai_compatible");
     setBaseUrl("");
     setApiKey("");
     setDocsUrl("");
@@ -54,7 +47,7 @@ export function CreatePlatformDialog({ open, onOpenChange, onCreated }: CreatePl
 
     const payload: CreateAIPlatformRequest = {
       name: trimmedName,
-      provider_type: providerType,
+      provider_type: "openai_compatible",
       default_base_url: trimmedBaseUrl,
       base_url: trimmedBaseUrl,
       api_key: trimmedApiKey,
@@ -78,7 +71,7 @@ export function CreatePlatformDialog({ open, onOpenChange, onCreated }: CreatePl
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>新增平台</DialogTitle>
-          <DialogDescription>添加一个自定义模型平台，支持 OpenAI 兼容接口。</DialogDescription>
+          <DialogDescription>添加 OpenAI 兼容模型平台，用于 Eino 模型调用。</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -99,27 +92,7 @@ export function CreatePlatformDialog({ open, onOpenChange, onCreated }: CreatePl
           </div>
 
           <div className="space-y-2">
-            <Label>接口类型</Label>
-            <div className="grid grid-cols-2 gap-2">
-              {PROVIDER_TYPES.map((type) => (
-                <button
-                  key={type.value}
-                  type="button"
-                  onClick={() => setProviderType(type.value)}
-                  className={`rounded-md border py-2 text-sm font-medium transition-colors ${
-                    providerType === type.value
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border text-muted-foreground hover:border-primary/50"
-                  }`}
-                >
-                  {type.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>API 地址</Label>
+            <Label>OpenAI 兼容接口地址</Label>
             <Input
               id="new-model-platform-base-url"
               name="new-model-platform-base-url"
