@@ -3,7 +3,6 @@ import { useEffect } from "react";
 
 import type { CreateUserRequest, UpdateUserRequest, User } from "@/api/system/user";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -24,22 +23,10 @@ import {
 
 import { createUserFormSchema, updateUserFormSchema } from "../_shared/form-schema";
 
-interface DepartmentOption {
-  label: string;
-  value: string;
-}
-
-interface RoleOption {
-  id: string;
-  name: string;
-}
-
 interface Props {
   open?: boolean;
   mode?: "create" | "edit";
   user?: User | null;
-  departmentOptions?: DepartmentOption[];
-  roleOptions?: RoleOption[];
   loading?: boolean;
   onOpenChange?: (open: boolean) => void;
   onSubmit?: (data: CreateUserRequest | UpdateUserRequest) => void;
@@ -68,8 +55,6 @@ export function UserFormModal({
   open,
   mode = "create",
   user,
-  departmentOptions = [],
-  roleOptions = [],
   loading = false,
   onOpenChange,
   onSubmit,
@@ -84,8 +69,6 @@ export function UserFormModal({
       password: "",
       full_name: "",
       status: "active",
-      primary_department_id: undefined as string | undefined,
-      role_ids: [] as string[],
     },
     validators: {
       onSubmit: schema as never,
@@ -98,8 +81,6 @@ export function UserFormModal({
           email: value.email,
           password: value.password || undefined,
           full_name: value.full_name || undefined,
-          primary_department_id: value.primary_department_id || undefined,
-          role_ids: value.role_ids.length > 0 ? value.role_ids : undefined,
         });
       } else {
         onSubmit({
@@ -107,8 +88,6 @@ export function UserFormModal({
           email: value.email,
           full_name: value.full_name || undefined,
           status: value.status,
-          primary_department_id: value.primary_department_id || undefined,
-          role_ids: value.role_ids.length > 0 ? value.role_ids : undefined,
         });
       }
     },
@@ -121,8 +100,6 @@ export function UserFormModal({
         form.setFieldValue("email", user.email);
         form.setFieldValue("full_name", user.full_name || "");
         form.setFieldValue("status", user.status);
-        form.setFieldValue("primary_department_id", user.primary_department_id);
-        form.setFieldValue("role_ids", user.roles?.map((r) => r.id) || []);
       }
     }
   }, [open, mode, user, form]);
@@ -264,64 +241,6 @@ export function UserFormModal({
                 )}
               </form.Field>
             )}
-
-            {/* 所属部门 */}
-            <form.Field name="primary_department_id">
-              {(field) => (
-                <div className="flex flex-col gap-3">
-                  <Label htmlFor="primary_department_id">所属部门</Label>
-                  <Select
-                    value={field.state.value || "none"}
-                    onValueChange={(value) =>
-                      field.handleChange(value === "none" ? undefined : value)
-                    }
-                  >
-                    <SelectTrigger id="primary_department_id" className="w-full">
-                      <SelectValue placeholder="请选择部门（可选）" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">无</SelectItem>
-                      {departmentOptions.map((dept) => (
-                        <SelectItem key={dept.value} value={dept.value}>
-                          {dept.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-            </form.Field>
-
-            {/* 角色 */}
-            <form.Field name="role_ids">
-              {(field) => (
-                <div className="flex flex-col gap-3">
-                  <Label>角色</Label>
-                  <div className="flex flex-col gap-2">
-                    {roleOptions.length > 0 ? (
-                      roleOptions.map((role) => (
-                        <label key={role.id} className="flex items-center gap-2 cursor-pointer">
-                          <Checkbox
-                            checked={field.state.value?.includes(role.id)}
-                            onCheckedChange={(checked) => {
-                              const current = field.state.value || [];
-                              if (checked) {
-                                field.handleChange([...current, role.id]);
-                              } else {
-                                field.handleChange(current.filter((id) => id !== role.id));
-                              }
-                            }}
-                          />
-                          <span className="text-sm">{role.name}</span>
-                        </label>
-                      ))
-                    ) : (
-                      <span className="text-muted-foreground text-xs">暂无可选角色</span>
-                    )}
-                  </div>
-                </div>
-              )}
-            </form.Field>
           </div>
           <DialogFooter>
             <Button type="submit" disabled={loading}>

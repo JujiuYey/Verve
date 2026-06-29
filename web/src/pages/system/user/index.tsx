@@ -2,8 +2,6 @@ import { IconPlus, IconSearch } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import { departmentApi, type Option } from "@/api/system/department";
-import { type Role, roleApi } from "@/api/system/role";
 import {
   type CreateUserRequest,
   type UpdateUserRequest,
@@ -32,10 +30,6 @@ export function UserPage() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // 下拉选项
-  const [departmentOptions, setDepartmentOptions] = useState<Option[]>([]);
-  const [roleOptions, setRoleOptions] = useState<Role[]>([]);
-
   // 确认弹窗状态
   const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
   const [resetPasswordTarget, setResetPasswordTarget] = useState<User | null>(null);
@@ -55,27 +49,9 @@ export function UserPage() {
     }
   };
 
-  // 加载部门和角色选项
-  const loadOptions = async () => {
-    try {
-      const [deptOpts, roleRes] = await Promise.all([
-        departmentApi.findOptions(),
-        roleApi.page(1, 100),
-      ]);
-      setDepartmentOptions(deptOpts || []);
-      setRoleOptions(roleRes.data || []);
-    } catch (error) {
-      console.error("加载选项失败:", error);
-    }
-  };
-
   useEffect(() => {
     loadUsers();
   }, [page, pageSize]);
-
-  useEffect(() => {
-    loadOptions();
-  }, []);
 
   // 搜索（回车或输入变化时重新加载）
   const handleSearch = () => {
@@ -200,8 +176,6 @@ export function UserPage() {
         open={formOpen}
         mode={formMode}
         user={selectedUser}
-        departmentOptions={departmentOptions}
-        roleOptions={roleOptions}
         loading={submitting}
         onOpenChange={setFormOpen}
         onSubmit={handleSubmit}

@@ -57,23 +57,6 @@ export function DataTable({
         cell: ({ row }) => <span className="text-muted-foreground">{row.original.email}</span>,
       },
       {
-        accessorKey: "roles",
-        header: "角色",
-        cell: ({ row }) => {
-          const roles = row.original.roles;
-          if (!roles || roles.length === 0) return <span className="text-muted-foreground">-</span>;
-          return (
-            <div className="flex gap-1 flex-wrap">
-              {roles.map((role) => (
-                <Badge key={role.id} variant="outline" className="text-xs">
-                  {role.name}
-                </Badge>
-              ))}
-            </div>
-          );
-        },
-      },
-      {
         accessorKey: "status",
         header: "状态",
         cell: ({ row }) => {
