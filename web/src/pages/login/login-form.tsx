@@ -37,7 +37,7 @@ export function LoginForm() {
   };
   return (
     <div className="flex flex-col gap-6">
-      <Card className="border-white/60 bg-white/88 shadow-[0_24px_80px_rgb(15_23_42/0.12)] backdrop-blur dark:border-white/10 dark:bg-card/92">
+      <Card className="border-white/95 bg-white/96 shadow-[0_1px_0_rgb(255_255_255/0.9)_inset,0_8px_18px_rgb(15_23_42/0.2),0_26px_64px_rgb(15_23_42/0.2),0_56px_140px_rgb(24_144_255/0.18)] backdrop-blur-xl dark:border-white/15 dark:bg-card/96 dark:shadow-[0_1px_0_rgb(255_255_255/0.1)_inset,0_10px_24px_rgb(0_0_0/0.42),0_34px_90px_rgb(0_0_0/0.48)]">
         <CardHeader className="space-y-1">
           <CardTitle>欢迎登录</CardTitle>
           <CardDescription>请输入账号密码，进入知识运营工作台</CardDescription>
