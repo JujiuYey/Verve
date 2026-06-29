@@ -106,7 +106,7 @@ export function UserFormModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader className="gap-1">
           <DialogTitle>{isCreate ? "创建用户" : "编辑用户"}</DialogTitle>
           <DialogDescription>

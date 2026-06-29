@@ -14,8 +14,7 @@ import { Route as LayoutRouteImport } from './routes/_layout'
 import { Route as LayoutIndexRouteImport } from './routes/_layout/index'
 import { Route as LayoutWikiTiptapEditorRouteImport } from './routes/_layout/wiki/tiptap-editor'
 import { Route as LayoutSystemUserRouteImport } from './routes/_layout/system/user'
-import { Route as LayoutSystemQueueRouteImport } from './routes/_layout/system/queue'
-import { Route as LayoutSystemAgentRouteImport } from './routes/_layout/system/agent'
+import { Route as LayoutSystemModelConfigRouteImport } from './routes/_layout/system/model-config'
 import { Route as LayoutLearnJournalRouteImport } from './routes/_layout/learn/journal'
 import { Route as LayoutCommonRagChatRouteImport } from './routes/_layout/common/rag-chat'
 import { Route as LayoutCommonModelConfigRouteImport } from './routes/_layout/common/model-config'
@@ -49,14 +48,9 @@ const LayoutSystemUserRoute = LayoutSystemUserRouteImport.update({
   path: '/system/user',
   getParentRoute: () => LayoutRoute,
 } as any)
-const LayoutSystemQueueRoute = LayoutSystemQueueRouteImport.update({
-  id: '/system/queue',
-  path: '/system/queue',
-  getParentRoute: () => LayoutRoute,
-} as any)
-const LayoutSystemAgentRoute = LayoutSystemAgentRouteImport.update({
-  id: '/system/agent',
-  path: '/system/agent',
+const LayoutSystemModelConfigRoute = LayoutSystemModelConfigRouteImport.update({
+  id: '/system/model-config',
+  path: '/system/model-config',
   getParentRoute: () => LayoutRoute,
 } as any)
 const LayoutLearnJournalRoute = LayoutLearnJournalRouteImport.update({
@@ -110,8 +104,7 @@ export interface FileRoutesByFullPath {
   '/common/model-config': typeof LayoutCommonModelConfigRoute
   '/common/rag-chat': typeof LayoutCommonRagChatRoute
   '/learn/journal': typeof LayoutLearnJournalRoute
-  '/system/agent': typeof LayoutSystemAgentRoute
-  '/system/queue': typeof LayoutSystemQueueRoute
+  '/system/model-config': typeof LayoutSystemModelConfigRoute
   '/system/user': typeof LayoutSystemUserRoute
   '/wiki/tiptap-editor': typeof LayoutWikiTiptapEditorRoute
   '/learn/goal/$goalId': typeof LayoutLearnGoalGoalIdRoute
@@ -126,8 +119,7 @@ export interface FileRoutesByTo {
   '/common/model-config': typeof LayoutCommonModelConfigRoute
   '/common/rag-chat': typeof LayoutCommonRagChatRoute
   '/learn/journal': typeof LayoutLearnJournalRoute
-  '/system/agent': typeof LayoutSystemAgentRoute
-  '/system/queue': typeof LayoutSystemQueueRoute
+  '/system/model-config': typeof LayoutSystemModelConfigRoute
   '/system/user': typeof LayoutSystemUserRoute
   '/wiki/tiptap-editor': typeof LayoutWikiTiptapEditorRoute
   '/learn/goal/$goalId': typeof LayoutLearnGoalGoalIdRoute
@@ -144,8 +136,7 @@ export interface FileRoutesById {
   '/_layout/common/model-config': typeof LayoutCommonModelConfigRoute
   '/_layout/common/rag-chat': typeof LayoutCommonRagChatRoute
   '/_layout/learn/journal': typeof LayoutLearnJournalRoute
-  '/_layout/system/agent': typeof LayoutSystemAgentRoute
-  '/_layout/system/queue': typeof LayoutSystemQueueRoute
+  '/_layout/system/model-config': typeof LayoutSystemModelConfigRoute
   '/_layout/system/user': typeof LayoutSystemUserRoute
   '/_layout/wiki/tiptap-editor': typeof LayoutWikiTiptapEditorRoute
   '/_layout/learn/goal/$goalId': typeof LayoutLearnGoalGoalIdRoute
@@ -162,8 +153,7 @@ export interface FileRouteTypes {
     | '/common/model-config'
     | '/common/rag-chat'
     | '/learn/journal'
-    | '/system/agent'
-    | '/system/queue'
+    | '/system/model-config'
     | '/system/user'
     | '/wiki/tiptap-editor'
     | '/learn/goal/$goalId'
@@ -178,8 +168,7 @@ export interface FileRouteTypes {
     | '/common/model-config'
     | '/common/rag-chat'
     | '/learn/journal'
-    | '/system/agent'
-    | '/system/queue'
+    | '/system/model-config'
     | '/system/user'
     | '/wiki/tiptap-editor'
     | '/learn/goal/$goalId'
@@ -195,8 +184,7 @@ export interface FileRouteTypes {
     | '/_layout/common/model-config'
     | '/_layout/common/rag-chat'
     | '/_layout/learn/journal'
-    | '/_layout/system/agent'
-    | '/_layout/system/queue'
+    | '/_layout/system/model-config'
     | '/_layout/system/user'
     | '/_layout/wiki/tiptap-editor'
     | '/_layout/learn/goal/$goalId'
@@ -245,18 +233,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutSystemUserRouteImport
       parentRoute: typeof LayoutRoute
     }
-    '/_layout/system/queue': {
-      id: '/_layout/system/queue'
-      path: '/system/queue'
-      fullPath: '/system/queue'
-      preLoaderRoute: typeof LayoutSystemQueueRouteImport
-      parentRoute: typeof LayoutRoute
-    }
-    '/_layout/system/agent': {
-      id: '/_layout/system/agent'
-      path: '/system/agent'
-      fullPath: '/system/agent'
-      preLoaderRoute: typeof LayoutSystemAgentRouteImport
+    '/_layout/system/model-config': {
+      id: '/_layout/system/model-config'
+      path: '/system/model-config'
+      fullPath: '/system/model-config'
+      preLoaderRoute: typeof LayoutSystemModelConfigRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/learn/journal': {
@@ -326,8 +307,7 @@ interface LayoutRouteChildren {
   LayoutCommonModelConfigRoute: typeof LayoutCommonModelConfigRoute
   LayoutCommonRagChatRoute: typeof LayoutCommonRagChatRoute
   LayoutLearnJournalRoute: typeof LayoutLearnJournalRoute
-  LayoutSystemAgentRoute: typeof LayoutSystemAgentRoute
-  LayoutSystemQueueRoute: typeof LayoutSystemQueueRoute
+  LayoutSystemModelConfigRoute: typeof LayoutSystemModelConfigRoute
   LayoutSystemUserRoute: typeof LayoutSystemUserRoute
   LayoutWikiTiptapEditorRoute: typeof LayoutWikiTiptapEditorRoute
   LayoutLearnGoalGoalIdRoute: typeof LayoutLearnGoalGoalIdRoute
@@ -342,8 +322,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutCommonModelConfigRoute: LayoutCommonModelConfigRoute,
   LayoutCommonRagChatRoute: LayoutCommonRagChatRoute,
   LayoutLearnJournalRoute: LayoutLearnJournalRoute,
-  LayoutSystemAgentRoute: LayoutSystemAgentRoute,
-  LayoutSystemQueueRoute: LayoutSystemQueueRoute,
+  LayoutSystemModelConfigRoute: LayoutSystemModelConfigRoute,
   LayoutSystemUserRoute: LayoutSystemUserRoute,
   LayoutWikiTiptapEditorRoute: LayoutWikiTiptapEditorRoute,
   LayoutLearnGoalGoalIdRoute: LayoutLearnGoalGoalIdRoute,

@@ -30,10 +30,7 @@ export const knowledgeNav: NavItem[] = [
   { title: "新建文档", url: "/wiki/tiptap-editor", icon: ComposeIcon },
 ];
 
-export const configNav: NavItem[] = [
-  { title: "模型配置", url: "/model-config", icon: ModelConfigIcon },
-];
-
 export const systemNav: NavItem[] = [
   { title: "用户管理", url: "/system/user", icon: UserManageIcon },
+  { title: "模型配置", url: "/system/model-config", icon: ModelConfigIcon },
 ];
