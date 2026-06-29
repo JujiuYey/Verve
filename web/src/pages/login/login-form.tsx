@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { authApi } from "@/api/auth/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { useAuthStore } from "@/stores/auth";
 
@@ -40,7 +40,7 @@ export function LoginForm() {
       <Card className="border-white/95 bg-white/96 shadow-[0_1px_0_rgb(255_255_255/0.9)_inset,0_8px_18px_rgb(15_23_42/0.2),0_26px_64px_rgb(15_23_42/0.2),0_56px_140px_rgb(24_144_255/0.18)] backdrop-blur-xl dark:border-white/15 dark:bg-card/96 dark:shadow-[0_1px_0_rgb(255_255_255/0.1)_inset,0_10px_24px_rgb(0_0_0/0.42),0_34px_90px_rgb(0_0_0/0.48)]">
         <CardHeader className="space-y-1">
           <CardTitle>欢迎登录</CardTitle>
-          <CardDescription>请输入账号密码，进入知识运营工作台</CardDescription>
+          <CardDescription>请输入账号密码，继续你的学习</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit}>
@@ -77,9 +77,6 @@ export function LoginForm() {
                 <Button type="submit" disabled={isLoading}>
                   {isLoading ? "登录中..." : "登录"}
                 </Button>
-                <FieldDescription className="text-center">
-                  使用统一账号登录，登录后可进入知识库、RAG 对话与系统管理。
-                </FieldDescription>
               </Field>
             </FieldGroup>
           </form>

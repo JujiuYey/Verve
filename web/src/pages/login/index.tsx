@@ -46,10 +46,10 @@ export function LoginPage() {
       <div className="relative z-10 flex min-h-screen w-full items-center justify-center px-6 py-10 sm:px-8">
         <section className="w-full max-w-sm">
           <div className="mb-6 flex items-center gap-3">
-            <img src={logo} alt="SAG Wiki" className="size-10 shrink-0 rounded-lg object-contain" />
+            <img src={logo} alt="Verve" className="size-10 shrink-0 rounded-lg object-contain" />
             <div>
-              <h1 className="text-foreground text-xl font-bold">SAG Wiki</h1>
-              <p className="text-muted-foreground text-xs">智能知识运营中枢</p>
+              <h1 className="text-foreground text-xl font-bold">Verve</h1>
+              <p className="text-muted-foreground text-xs">你的 AI 私教，陪你真正学会</p>
             </div>
           </div>
 

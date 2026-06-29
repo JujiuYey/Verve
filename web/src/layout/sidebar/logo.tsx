@@ -10,8 +10,8 @@ export function Logo() {
         </div>
         <div className="flex flex-1 items-center gap-2 group-data-[collapsible=icon]:hidden">
           <div className="grid flex-1 text-left leading-tight">
-            <span className="truncate text-[15px] font-semibold tracking-tight">SAG Wiki</span>
-            <span className="text-muted-foreground truncate text-xs">智能知识运营中枢</span>
+            <span className="truncate text-[15px] font-semibold tracking-tight">Verve</span>
+            <span className="text-muted-foreground truncate text-xs">你的 AI 私教</span>
           </div>
         </div>
       </div>
