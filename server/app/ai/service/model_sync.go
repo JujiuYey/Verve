@@ -1,0 +1,167 @@
+package service
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
+	"time"
+
+	ai_db "sag-wiki/app/ai/models/db"
+)
+
+var ErrModelPlatformNotFound = errors.New("model platform not found")
+
+type SyncModelsResult struct {
+	Synced  int      `json:"synced"`
+	Skipped int      `json:"skipped"`
+	Errors  []string `json:"errors"`
+}
+
+type ModelSyncRepository interface {
+	FindPlatform(ctx context.Context, id string) (*ai_db.SysModelPlatform, error)
+	ModelExistsByPlatformAndName(ctx context.Context, platformID, modelName string) (bool, error)
+	CreateModel(ctx context.Context, model *ai_db.SysModel) error
+	UpdatePlatformLastModelSyncAt(ctx context.Context, platformID string, syncedAt time.Time) error
+}
+
+type ModelSyncService struct {
+	repo       ModelSyncRepository
+	httpClient *http.Client
+}
+
+type openAIModelListResponse struct {
+	Data []struct {
+		ID string `json:"id"`
+	} `json:"data"`
+}
+
+func NewModelSyncService(repo ModelSyncRepository) *ModelSyncService {
+	return &ModelSyncService{
+		repo:       repo,
+		httpClient: &http.Client{Timeout: 30 * time.Second},
+	}
+}
+
+func (s *ModelSyncService) SyncModels(ctx context.Context, platformID string) (*SyncModelsResult, error) {
+	platform, err := s.repo.FindPlatform(ctx, platformID)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrModelPlatformNotFound, err)
+	}
+
+	apiKey := strings.TrimSpace(platform.APIKeyCiphertext)
+	if apiKey == "" {
+		return nil, errors.New("平台 API Key 未配置")
+	}
+
+	models, err := s.fetchModels(ctx, platform, apiKey)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now()
+	result := &SyncModelsResult{Errors: []string{}}
+	for _, remoteModel := range models.Data {
+		modelName := strings.TrimSpace(remoteModel.ID)
+		if modelName == "" {
+			result.Skipped++
+			continue
+		}
+
+		exists, err := s.repo.ModelExistsByPlatformAndName(ctx, platform.ID, modelName)
+		if err != nil {
+			result.Errors = append(result.Errors, fmt.Sprintf("检查模型 %s 失败: %v", modelName, err))
+			continue
+		}
+		if exists {
+			result.Skipped++
+			continue
+		}
+
+		if err := s.repo.CreateModel(ctx, &ai_db.SysModel{
+			PlatformID:   platform.ID,
+			ModelName:    modelName,
+			DisplayName:  modelName,
+			ModelType:    ai_db.ModelTypeChat,
+			Capabilities: []string{},
+			Source:       "remote",
+			Status:       "active",
+			LastSyncedAt: &now,
+		}); err != nil {
+			result.Errors = append(result.Errors, fmt.Sprintf("创建模型 %s 失败: %v", modelName, err))
+			continue
+		}
+		result.Synced++
+	}
+
+	if err := s.repo.UpdatePlatformLastModelSyncAt(ctx, platform.ID, now); err != nil {
+		result.Errors = append(result.Errors, fmt.Sprintf("更新平台同步时间失败: %v", err))
+	}
+
+	return result, nil
+}
+
+func (s *ModelSyncService) fetchModels(ctx context.Context, platform *ai_db.SysModelPlatform, apiKey string) (*openAIModelListResponse, error) {
+	baseURL := strings.TrimRight(strings.TrimSpace(platform.BaseURL), "/")
+	if baseURL == "" {
+		baseURL = strings.TrimRight(strings.TrimSpace(platform.DefaultBaseURL), "/")
+	}
+	if baseURL == "" {
+		return nil, errors.New("平台 API 地址未配置")
+	}
+
+	modelListPath := strings.TrimSpace(platform.ModelListPath)
+	if modelListPath == "" {
+		modelListPath = "/models"
+	}
+	if !strings.HasPrefix(modelListPath, "/") {
+		modelListPath = "/" + modelListPath
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+modelListPath, nil)
+	if err != nil {
+		return nil, fmt.Errorf("创建模型同步请求失败: %w", err)
+	}
+
+	switch platform.AuthScheme {
+	case "x_api_key":
+		req.Header.Set("x-api-key", apiKey)
+	case "both":
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+		req.Header.Set("x-api-key", apiKey)
+	default:
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+	}
+
+	for key, value := range platform.ExtraHeaders {
+		if strings.TrimSpace(key) == "" {
+			continue
+		}
+		switch v := value.(type) {
+		case string:
+			req.Header.Set(key, v)
+		default:
+			req.Header.Set(key, fmt.Sprint(v))
+		}
+	}
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("请求模型列表失败: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("模型提供方返回 %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+
+	var result openAIModelListResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("解析模型列表失败: %w", err)
+	}
+	return &result, nil
+}

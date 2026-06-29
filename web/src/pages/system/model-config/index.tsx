@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { useAIModels, useDeleteAIPlatform, useModelPlatforms } from "@/api/ai/model-config";
+import { useAIModels, useDeleteAIPlatform, useModelPlatforms } from "@/api/system/model-config";
 import { ConfirmDialog, SagPage } from "@/components/sag-ui";
 import { Spinner } from "@/components/ui/spinner";
 

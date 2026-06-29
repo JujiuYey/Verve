@@ -1,7 +1,7 @@
 import { useState } from "react";
 
-import type { CreateAIPlatformRequest } from "@/api/ai/model-config";
-import { useCreateAIPlatform } from "@/api/ai/model-config";
+import type { CreateAIPlatformRequest } from "@/api/system/model-config";
+import { useCreateAIPlatform } from "@/api/system/model-config";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,

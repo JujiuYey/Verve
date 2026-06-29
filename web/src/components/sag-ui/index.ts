@@ -4,3 +4,4 @@ export { DataTable } from "./data-table";
 export { Pagination } from "./pagination";
 export { Tree } from "./tree";
 export { TreeSelect } from "./tree-select";
+export { SagPage } from "./sag-page";

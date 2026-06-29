@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { request } from "@/utils/request";
 
 // 模型类型
-export type ModelType = "chat" | "embedding";
+export type ModelType = "chat" | "embedding" | "rerank";
 
 // 模型配置接口定义
 export interface ModelConfig {

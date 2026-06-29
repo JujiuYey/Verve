@@ -5,7 +5,7 @@ import { CreatePlatformDialog } from "./create-platform-dialog";
 
 const mutateAsync = vi.fn();
 
-vi.mock("@/api/ai/model-config", () => ({
+vi.mock("@/api/system/model-config", () => ({
   useCreateAIPlatform: () => ({
     mutateAsync,
     isPending: false,
@@ -19,9 +19,7 @@ describe("CreatePlatformDialog", () => {
 
     mutateAsync.mockResolvedValueOnce({ id: "platform-1" });
 
-    render(
-      <CreatePlatformDialog open onOpenChange={onOpenChange} onCreated={onCreated} />,
-    );
+    render(<CreatePlatformDialog open onOpenChange={onOpenChange} onCreated={onCreated} />);
 
     const createButton = screen.getByRole("button", { name: "创建" });
     expect(createButton).toBeDisabled();

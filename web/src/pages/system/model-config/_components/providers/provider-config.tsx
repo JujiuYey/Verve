@@ -2,12 +2,12 @@ import { IconExternalLink, IconEye, IconEyeOff, IconTrash } from "@tabler/icons-
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import type { AIPlatform } from "@/api/ai/model-config";
-import { useUpdateAIPlatformConfig } from "@/api/ai/model-config";
+import type { AIPlatform } from "@/api/system/model-config";
+import { useUpdateAIPlatformConfig } from "@/api/system/model-config";
+import { ConfirmDialog } from "@/components/sag-ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ConfirmDialog } from "@/components/sag-ui/confirm-dialog";
 
 interface ProviderConfigProps {
   platform: AIPlatform;
