@@ -12,20 +12,18 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LayoutRouteImport } from './routes/_layout'
 import { Route as LayoutIndexRouteImport } from './routes/_layout/index'
-import { Route as LayoutRagChatRouteImport } from './routes/_layout/rag-chat'
-import { Route as LayoutModelConfigRouteImport } from './routes/_layout/model-config'
-import { Route as LayoutCollectionRouteImport } from './routes/_layout/collection'
-import { Route as LayoutAppSettingRouteImport } from './routes/_layout/app-setting'
-import { Route as LayoutAccountRouteImport } from './routes/_layout/account'
 import { Route as LayoutWikiTiptapEditorRouteImport } from './routes/_layout/wiki/tiptap-editor'
 import { Route as LayoutWikiFoldersRouteImport } from './routes/_layout/wiki/folders'
 import { Route as LayoutWikiDocumentsRouteImport } from './routes/_layout/wiki/documents'
 import { Route as LayoutSystemUserRouteImport } from './routes/_layout/system/user'
-import { Route as LayoutSystemRoleRouteImport } from './routes/_layout/system/role'
 import { Route as LayoutSystemQueueRouteImport } from './routes/_layout/system/queue'
-import { Route as LayoutSystemDepartmentRouteImport } from './routes/_layout/system/department'
 import { Route as LayoutSystemAgentRouteImport } from './routes/_layout/system/agent'
 import { Route as LayoutLearnJournalRouteImport } from './routes/_layout/learn/journal'
+import { Route as LayoutCommonRagChatRouteImport } from './routes/_layout/common/rag-chat'
+import { Route as LayoutCommonModelConfigRouteImport } from './routes/_layout/common/model-config'
+import { Route as LayoutCommonCollectionRouteImport } from './routes/_layout/common/collection'
+import { Route as LayoutCommonAppSettingRouteImport } from './routes/_layout/common/app-setting'
+import { Route as LayoutCommonAccountRouteImport } from './routes/_layout/common/account'
 import { Route as LayoutLearnSessionSessionIdRouteImport } from './routes/_layout/learn/session/$sessionId'
 import { Route as LayoutLearnGoalGoalIdRouteImport } from './routes/_layout/learn/goal/$goalId'
 
@@ -41,31 +39,6 @@ const LayoutRoute = LayoutRouteImport.update({
 const LayoutIndexRoute = LayoutIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => LayoutRoute,
-} as any)
-const LayoutRagChatRoute = LayoutRagChatRouteImport.update({
-  id: '/rag-chat',
-  path: '/rag-chat',
-  getParentRoute: () => LayoutRoute,
-} as any)
-const LayoutModelConfigRoute = LayoutModelConfigRouteImport.update({
-  id: '/model-config',
-  path: '/model-config',
-  getParentRoute: () => LayoutRoute,
-} as any)
-const LayoutCollectionRoute = LayoutCollectionRouteImport.update({
-  id: '/collection',
-  path: '/collection',
-  getParentRoute: () => LayoutRoute,
-} as any)
-const LayoutAppSettingRoute = LayoutAppSettingRouteImport.update({
-  id: '/app-setting',
-  path: '/app-setting',
-  getParentRoute: () => LayoutRoute,
-} as any)
-const LayoutAccountRoute = LayoutAccountRouteImport.update({
-  id: '/account',
-  path: '/account',
   getParentRoute: () => LayoutRoute,
 } as any)
 const LayoutWikiTiptapEditorRoute = LayoutWikiTiptapEditorRouteImport.update({
@@ -88,19 +61,9 @@ const LayoutSystemUserRoute = LayoutSystemUserRouteImport.update({
   path: '/system/user',
   getParentRoute: () => LayoutRoute,
 } as any)
-const LayoutSystemRoleRoute = LayoutSystemRoleRouteImport.update({
-  id: '/system/role',
-  path: '/system/role',
-  getParentRoute: () => LayoutRoute,
-} as any)
 const LayoutSystemQueueRoute = LayoutSystemQueueRouteImport.update({
   id: '/system/queue',
   path: '/system/queue',
-  getParentRoute: () => LayoutRoute,
-} as any)
-const LayoutSystemDepartmentRoute = LayoutSystemDepartmentRouteImport.update({
-  id: '/system/department',
-  path: '/system/department',
   getParentRoute: () => LayoutRoute,
 } as any)
 const LayoutSystemAgentRoute = LayoutSystemAgentRouteImport.update({
@@ -111,6 +74,31 @@ const LayoutSystemAgentRoute = LayoutSystemAgentRouteImport.update({
 const LayoutLearnJournalRoute = LayoutLearnJournalRouteImport.update({
   id: '/learn/journal',
   path: '/learn/journal',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutCommonRagChatRoute = LayoutCommonRagChatRouteImport.update({
+  id: '/common/rag-chat',
+  path: '/common/rag-chat',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutCommonModelConfigRoute = LayoutCommonModelConfigRouteImport.update({
+  id: '/common/model-config',
+  path: '/common/model-config',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutCommonCollectionRoute = LayoutCommonCollectionRouteImport.update({
+  id: '/common/collection',
+  path: '/common/collection',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutCommonAppSettingRoute = LayoutCommonAppSettingRouteImport.update({
+  id: '/common/app-setting',
+  path: '/common/app-setting',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutCommonAccountRoute = LayoutCommonAccountRouteImport.update({
+  id: '/common/account',
+  path: '/common/account',
   getParentRoute: () => LayoutRoute,
 } as any)
 const LayoutLearnSessionSessionIdRoute =
@@ -128,16 +116,14 @@ const LayoutLearnGoalGoalIdRoute = LayoutLearnGoalGoalIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof LayoutIndexRoute
   '/login': typeof LoginRoute
-  '/account': typeof LayoutAccountRoute
-  '/app-setting': typeof LayoutAppSettingRoute
-  '/collection': typeof LayoutCollectionRoute
-  '/model-config': typeof LayoutModelConfigRoute
-  '/rag-chat': typeof LayoutRagChatRoute
+  '/common/account': typeof LayoutCommonAccountRoute
+  '/common/app-setting': typeof LayoutCommonAppSettingRoute
+  '/common/collection': typeof LayoutCommonCollectionRoute
+  '/common/model-config': typeof LayoutCommonModelConfigRoute
+  '/common/rag-chat': typeof LayoutCommonRagChatRoute
   '/learn/journal': typeof LayoutLearnJournalRoute
   '/system/agent': typeof LayoutSystemAgentRoute
-  '/system/department': typeof LayoutSystemDepartmentRoute
   '/system/queue': typeof LayoutSystemQueueRoute
-  '/system/role': typeof LayoutSystemRoleRoute
   '/system/user': typeof LayoutSystemUserRoute
   '/wiki/documents': typeof LayoutWikiDocumentsRoute
   '/wiki/folders': typeof LayoutWikiFoldersRoute
@@ -147,17 +133,15 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
-  '/account': typeof LayoutAccountRoute
-  '/app-setting': typeof LayoutAppSettingRoute
-  '/collection': typeof LayoutCollectionRoute
-  '/model-config': typeof LayoutModelConfigRoute
-  '/rag-chat': typeof LayoutRagChatRoute
   '/': typeof LayoutIndexRoute
+  '/common/account': typeof LayoutCommonAccountRoute
+  '/common/app-setting': typeof LayoutCommonAppSettingRoute
+  '/common/collection': typeof LayoutCommonCollectionRoute
+  '/common/model-config': typeof LayoutCommonModelConfigRoute
+  '/common/rag-chat': typeof LayoutCommonRagChatRoute
   '/learn/journal': typeof LayoutLearnJournalRoute
   '/system/agent': typeof LayoutSystemAgentRoute
-  '/system/department': typeof LayoutSystemDepartmentRoute
   '/system/queue': typeof LayoutSystemQueueRoute
-  '/system/role': typeof LayoutSystemRoleRoute
   '/system/user': typeof LayoutSystemUserRoute
   '/wiki/documents': typeof LayoutWikiDocumentsRoute
   '/wiki/folders': typeof LayoutWikiFoldersRoute
@@ -169,17 +153,15 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_layout': typeof LayoutRouteWithChildren
   '/login': typeof LoginRoute
-  '/_layout/account': typeof LayoutAccountRoute
-  '/_layout/app-setting': typeof LayoutAppSettingRoute
-  '/_layout/collection': typeof LayoutCollectionRoute
-  '/_layout/model-config': typeof LayoutModelConfigRoute
-  '/_layout/rag-chat': typeof LayoutRagChatRoute
   '/_layout/': typeof LayoutIndexRoute
+  '/_layout/common/account': typeof LayoutCommonAccountRoute
+  '/_layout/common/app-setting': typeof LayoutCommonAppSettingRoute
+  '/_layout/common/collection': typeof LayoutCommonCollectionRoute
+  '/_layout/common/model-config': typeof LayoutCommonModelConfigRoute
+  '/_layout/common/rag-chat': typeof LayoutCommonRagChatRoute
   '/_layout/learn/journal': typeof LayoutLearnJournalRoute
   '/_layout/system/agent': typeof LayoutSystemAgentRoute
-  '/_layout/system/department': typeof LayoutSystemDepartmentRoute
   '/_layout/system/queue': typeof LayoutSystemQueueRoute
-  '/_layout/system/role': typeof LayoutSystemRoleRoute
   '/_layout/system/user': typeof LayoutSystemUserRoute
   '/_layout/wiki/documents': typeof LayoutWikiDocumentsRoute
   '/_layout/wiki/folders': typeof LayoutWikiFoldersRoute
@@ -192,16 +174,14 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
-    | '/account'
-    | '/app-setting'
-    | '/collection'
-    | '/model-config'
-    | '/rag-chat'
+    | '/common/account'
+    | '/common/app-setting'
+    | '/common/collection'
+    | '/common/model-config'
+    | '/common/rag-chat'
     | '/learn/journal'
     | '/system/agent'
-    | '/system/department'
     | '/system/queue'
-    | '/system/role'
     | '/system/user'
     | '/wiki/documents'
     | '/wiki/folders'
@@ -211,17 +191,15 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
-    | '/account'
-    | '/app-setting'
-    | '/collection'
-    | '/model-config'
-    | '/rag-chat'
     | '/'
+    | '/common/account'
+    | '/common/app-setting'
+    | '/common/collection'
+    | '/common/model-config'
+    | '/common/rag-chat'
     | '/learn/journal'
     | '/system/agent'
-    | '/system/department'
     | '/system/queue'
-    | '/system/role'
     | '/system/user'
     | '/wiki/documents'
     | '/wiki/folders'
@@ -232,17 +210,15 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_layout'
     | '/login'
-    | '/_layout/account'
-    | '/_layout/app-setting'
-    | '/_layout/collection'
-    | '/_layout/model-config'
-    | '/_layout/rag-chat'
     | '/_layout/'
+    | '/_layout/common/account'
+    | '/_layout/common/app-setting'
+    | '/_layout/common/collection'
+    | '/_layout/common/model-config'
+    | '/_layout/common/rag-chat'
     | '/_layout/learn/journal'
     | '/_layout/system/agent'
-    | '/_layout/system/department'
     | '/_layout/system/queue'
-    | '/_layout/system/role'
     | '/_layout/system/user'
     | '/_layout/wiki/documents'
     | '/_layout/wiki/folders'
@@ -279,41 +255,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutIndexRouteImport
       parentRoute: typeof LayoutRoute
     }
-    '/_layout/rag-chat': {
-      id: '/_layout/rag-chat'
-      path: '/rag-chat'
-      fullPath: '/rag-chat'
-      preLoaderRoute: typeof LayoutRagChatRouteImport
-      parentRoute: typeof LayoutRoute
-    }
-    '/_layout/model-config': {
-      id: '/_layout/model-config'
-      path: '/model-config'
-      fullPath: '/model-config'
-      preLoaderRoute: typeof LayoutModelConfigRouteImport
-      parentRoute: typeof LayoutRoute
-    }
-    '/_layout/collection': {
-      id: '/_layout/collection'
-      path: '/collection'
-      fullPath: '/collection'
-      preLoaderRoute: typeof LayoutCollectionRouteImport
-      parentRoute: typeof LayoutRoute
-    }
-    '/_layout/app-setting': {
-      id: '/_layout/app-setting'
-      path: '/app-setting'
-      fullPath: '/app-setting'
-      preLoaderRoute: typeof LayoutAppSettingRouteImport
-      parentRoute: typeof LayoutRoute
-    }
-    '/_layout/account': {
-      id: '/_layout/account'
-      path: '/account'
-      fullPath: '/account'
-      preLoaderRoute: typeof LayoutAccountRouteImport
-      parentRoute: typeof LayoutRoute
-    }
     '/_layout/wiki/tiptap-editor': {
       id: '/_layout/wiki/tiptap-editor'
       path: '/wiki/tiptap-editor'
@@ -342,25 +283,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutSystemUserRouteImport
       parentRoute: typeof LayoutRoute
     }
-    '/_layout/system/role': {
-      id: '/_layout/system/role'
-      path: '/system/role'
-      fullPath: '/system/role'
-      preLoaderRoute: typeof LayoutSystemRoleRouteImport
-      parentRoute: typeof LayoutRoute
-    }
     '/_layout/system/queue': {
       id: '/_layout/system/queue'
       path: '/system/queue'
       fullPath: '/system/queue'
       preLoaderRoute: typeof LayoutSystemQueueRouteImport
-      parentRoute: typeof LayoutRoute
-    }
-    '/_layout/system/department': {
-      id: '/_layout/system/department'
-      path: '/system/department'
-      fullPath: '/system/department'
-      preLoaderRoute: typeof LayoutSystemDepartmentRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/system/agent': {
@@ -375,6 +302,41 @@ declare module '@tanstack/react-router' {
       path: '/learn/journal'
       fullPath: '/learn/journal'
       preLoaderRoute: typeof LayoutLearnJournalRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/common/rag-chat': {
+      id: '/_layout/common/rag-chat'
+      path: '/common/rag-chat'
+      fullPath: '/common/rag-chat'
+      preLoaderRoute: typeof LayoutCommonRagChatRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/common/model-config': {
+      id: '/_layout/common/model-config'
+      path: '/common/model-config'
+      fullPath: '/common/model-config'
+      preLoaderRoute: typeof LayoutCommonModelConfigRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/common/collection': {
+      id: '/_layout/common/collection'
+      path: '/common/collection'
+      fullPath: '/common/collection'
+      preLoaderRoute: typeof LayoutCommonCollectionRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/common/app-setting': {
+      id: '/_layout/common/app-setting'
+      path: '/common/app-setting'
+      fullPath: '/common/app-setting'
+      preLoaderRoute: typeof LayoutCommonAppSettingRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/common/account': {
+      id: '/_layout/common/account'
+      path: '/common/account'
+      fullPath: '/common/account'
+      preLoaderRoute: typeof LayoutCommonAccountRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/learn/session/$sessionId': {
@@ -395,17 +357,15 @@ declare module '@tanstack/react-router' {
 }
 
 interface LayoutRouteChildren {
-  LayoutAccountRoute: typeof LayoutAccountRoute
-  LayoutAppSettingRoute: typeof LayoutAppSettingRoute
-  LayoutCollectionRoute: typeof LayoutCollectionRoute
-  LayoutModelConfigRoute: typeof LayoutModelConfigRoute
-  LayoutRagChatRoute: typeof LayoutRagChatRoute
   LayoutIndexRoute: typeof LayoutIndexRoute
+  LayoutCommonAccountRoute: typeof LayoutCommonAccountRoute
+  LayoutCommonAppSettingRoute: typeof LayoutCommonAppSettingRoute
+  LayoutCommonCollectionRoute: typeof LayoutCommonCollectionRoute
+  LayoutCommonModelConfigRoute: typeof LayoutCommonModelConfigRoute
+  LayoutCommonRagChatRoute: typeof LayoutCommonRagChatRoute
   LayoutLearnJournalRoute: typeof LayoutLearnJournalRoute
   LayoutSystemAgentRoute: typeof LayoutSystemAgentRoute
-  LayoutSystemDepartmentRoute: typeof LayoutSystemDepartmentRoute
   LayoutSystemQueueRoute: typeof LayoutSystemQueueRoute
-  LayoutSystemRoleRoute: typeof LayoutSystemRoleRoute
   LayoutSystemUserRoute: typeof LayoutSystemUserRoute
   LayoutWikiDocumentsRoute: typeof LayoutWikiDocumentsRoute
   LayoutWikiFoldersRoute: typeof LayoutWikiFoldersRoute
@@ -415,17 +375,15 @@ interface LayoutRouteChildren {
 }
 
 const LayoutRouteChildren: LayoutRouteChildren = {
-  LayoutAccountRoute: LayoutAccountRoute,
-  LayoutAppSettingRoute: LayoutAppSettingRoute,
-  LayoutCollectionRoute: LayoutCollectionRoute,
-  LayoutModelConfigRoute: LayoutModelConfigRoute,
-  LayoutRagChatRoute: LayoutRagChatRoute,
   LayoutIndexRoute: LayoutIndexRoute,
+  LayoutCommonAccountRoute: LayoutCommonAccountRoute,
+  LayoutCommonAppSettingRoute: LayoutCommonAppSettingRoute,
+  LayoutCommonCollectionRoute: LayoutCommonCollectionRoute,
+  LayoutCommonModelConfigRoute: LayoutCommonModelConfigRoute,
+  LayoutCommonRagChatRoute: LayoutCommonRagChatRoute,
   LayoutLearnJournalRoute: LayoutLearnJournalRoute,
   LayoutSystemAgentRoute: LayoutSystemAgentRoute,
-  LayoutSystemDepartmentRoute: LayoutSystemDepartmentRoute,
   LayoutSystemQueueRoute: LayoutSystemQueueRoute,
-  LayoutSystemRoleRoute: LayoutSystemRoleRoute,
   LayoutSystemUserRoute: LayoutSystemUserRoute,
   LayoutWikiDocumentsRoute: LayoutWikiDocumentsRoute,
   LayoutWikiFoldersRoute: LayoutWikiFoldersRoute,

@@ -4,11 +4,9 @@ import {
   CollectionIcon,
   ComposeIcon,
   DashboardIcon,
-  DepartmentIcon,
   DocumentIcon,
   FolderIcon,
   ModelConfigIcon,
-  RoleIcon,
   UserManageIcon,
   type SidebarNavIcon,
 } from "./nav-icons";
@@ -37,7 +35,5 @@ export const configNav: NavItem[] = [
 ];
 
 export const systemNav: NavItem[] = [
-  { title: "部门管理", url: "/system/department", icon: DepartmentIcon },
-  { title: "角色管理", url: "/system/role", icon: RoleIcon },
   { title: "用户管理", url: "/system/user", icon: UserManageIcon },
 ];
