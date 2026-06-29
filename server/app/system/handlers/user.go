@@ -42,7 +42,6 @@ func (h *UserHandler) FindPage(c *fiber.Ctx) error {
 
 	req.Validate()
 	offset := req.GetOffset()
-
 	search := c.Query("search")
 
 	users, total, err := h.repo.FindPage(c.Context(), offset, req.PageSize, search)
@@ -50,29 +49,8 @@ func (h *UserHandler) FindPage(c *fiber.Ctx) error {
 		return response.InternalServerCtx(c, "Failed to fetch users")
 	}
 
-	// 不返回密码，并添加部门和角色信息
-	userResponses := make([]map[string]interface{}, len(users))
-	for i, user := range users {
-		// 获取用户的部门和角色
-		departments, primaryDepartmentID, _ := h.repo.GetUserDepartments(c.Context(), user.ID)
-		roles, _ := h.repo.GetUserRolesWithDetails(c.Context(), user.ID)
-
-		userResponses[i] = map[string]interface{}{
-			"id":                    user.ID,
-			"username":              user.Username,
-			"email":                 user.Email,
-			"full_name":             user.FullName,
-			"avatar":                user.Avatar,
-			"status":                user.Status,
-			"created_at":            user.CreatedAt,
-			"updated_at":            user.UpdatedAt,
-			"departments":           departments,
-			"roles":                 roles,
-			"primary_department_id": primaryDepartmentID,
-		}
-	}
-
-	return response.PaginateCtx(c, userResponses, total, req.Page, req.PageSize)
+	// User 的 Password 字段 json:"-"，不会返回
+	return response.PaginateCtx(c, users, total, req.Page, req.PageSize)
 }
 
 // 获取用户详情
@@ -84,33 +62,13 @@ func (h *UserHandler) FindOne(c *fiber.Ctx) error {
 		return response.NotFoundCtx(c, "User not found")
 	}
 
-	// 获取用户的部门和角色
-	_, primaryDepartmentID, err := h.repo.GetUserDepartments(c.Context(), user.ID)
-	if err != nil {
-		return response.InternalServerCtx(c, "Failed to fetch user departments")
-	}
-
-	roles, err := h.repo.GetUserRolesWithDetails(c.Context(), user.ID)
-	if err != nil {
-		return response.InternalServerCtx(c, "Failed to fetch user roles")
-	}
-
-	// 🔑 从 roles 中提取 roleIDs
-	var roleIDs []string
-	for _, role := range roles {
-		roleIDs = append(roleIDs, role.ID)
-	}
-
-	// 不返回密码
 	userResponse := system_payload.UserInfo{
-		ID:                  user.ID,
-		Username:            user.Username,
-		Email:               user.Email,
-		FullName:            user.FullName,
-		Avatar:              user.Avatar,
-		Status:              user.Status,
-		Roles:               roleIDs,
-		PrimaryDepartmentID: primaryDepartmentID,
+		ID:       user.ID,
+		Username: user.Username,
+		Email:    user.Email,
+		FullName: user.FullName,
+		Avatar:   user.Avatar,
+		Status:   user.Status,
 	}
 
 	return response.SuccessCtx(c, userResponse)
@@ -156,33 +114,8 @@ func (h *UserHandler) Create(c *fiber.Ctx) error {
 		Status:   "active",
 	}
 
-	// 开始事务
-	tx, err := h.repo.GetDB().BeginTx(c.Context(), nil)
-	if err != nil {
-		return response.InternalServerCtx(c, "开始事务失败")
-	}
-	defer tx.Rollback()
-
-	// 创建用户
 	if err := h.repo.Create(c.Context(), user); err != nil {
 		return response.InternalServerCtx(c, "创建用户失败")
-	}
-
-	// 设置默认部门
-	if err := h.repo.SetDefaultDepartment(c.Context(), user.ID, req.PrimaryDepartmentID); err != nil {
-		return response.InternalServerCtx(c, "设置默认部门失败")
-	}
-
-	// 创建用户角色关联
-	if len(req.RoleIDs) > 0 {
-		if err := h.repo.CreateUserRoles(c.Context(), user.ID, req.RoleIDs); err != nil {
-			return response.InternalServerCtx(c, "创建用户角色失败")
-		}
-	}
-
-	// 提交事务
-	if err := tx.Commit(); err != nil {
-		return response.InternalServerCtx(c, "提交事务失败")
 	}
 
 	return response.SuccessMsgCtx(c, "用户创建成功")
@@ -208,42 +141,8 @@ func (h *UserHandler) Update(c *fiber.Ctx) error {
 	user.Avatar = req.Avatar
 	user.Status = req.Status
 
-	// 开始事务
-	tx, err := h.repo.GetDB().BeginTx(c.Context(), nil)
-	if err != nil {
-		return response.InternalServerCtx(c, "Failed to start transaction")
-	}
-	defer tx.Rollback()
-
-	// 更新用户基本信息
 	if err := h.repo.Update(c.Context(), user); err != nil {
 		return response.InternalServerCtx(c, "Failed to update user")
-	}
-
-	// 更新默认部门
-	if req.PrimaryDepartmentID != "" {
-		if err := h.repo.SetDefaultDepartment(c.Context(), user.ID, req.PrimaryDepartmentID); err != nil {
-			return response.InternalServerCtx(c, "Failed to set default department")
-		}
-	}
-
-	// 更新角色关联
-	if req.RoleIDs != nil {
-		// 删除旧的角色关联
-		if err := h.repo.DeleteUserRoles(c.Context(), user.ID); err != nil {
-			return response.InternalServerCtx(c, "Failed to delete old roles")
-		}
-		// 创建新的角色关联
-		if len(req.RoleIDs) > 0 {
-			if err := h.repo.CreateUserRoles(c.Context(), user.ID, req.RoleIDs); err != nil {
-				return response.InternalServerCtx(c, "Failed to create user roles")
-			}
-		}
-	}
-
-	// 提交事务
-	if err := tx.Commit(); err != nil {
-		return response.InternalServerCtx(c, "Failed to commit transaction")
 	}
 
 	return response.SuccessMsgCtx(c, "User updated successfully")

@@ -15,14 +15,12 @@ type LoginResponse struct {
 
 // 用户信息
 type UserInfo struct {
-	ID                  string   `json:"id"`
-	Username            string   `json:"username"`
-	Email               string   `json:"email"`
-	FullName            *string  `json:"full_name"`
-	Avatar              *string  `json:"avatar"`
-	Status              string   `json:"status"`
-	Roles               []string `json:"roles"`
-	PrimaryDepartmentID string   `json:"primary_department_id"`
+	ID       string  `json:"id"`
+	Username string  `json:"username"`
+	Email    string  `json:"email"`
+	FullName *string `json:"full_name"`
+	Avatar   *string `json:"avatar"`
+	Status   string  `json:"status"`
 }
 
 // 刷新 token 请求

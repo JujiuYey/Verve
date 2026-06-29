@@ -6,7 +6,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"golang.org/x/crypto/bcrypt"
 
-	system_db "sag-wiki/app/system/models/db"
 	system_payload "sag-wiki/app/system/models/payload"
 	system_repo "sag-wiki/app/system/repository"
 	"sag-wiki/common/response"
@@ -35,11 +34,7 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 
 	ctx := c.Context()
 
-	var user *system_db.User
-	var err error
-
-	user, err = h.userRepo.FindByUsername(ctx, req.Username)
-
+	user, err := h.userRepo.FindByUsername(ctx, req.Username)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return response.FailWithCodeCtx(c, 401, "用户不存在")
@@ -57,13 +52,9 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		return response.FailWithCodeCtx(c, 403, "用户账号已禁用")
 	}
 
-	// 获取用户角色
-	roles, err := h.userRepo.GetUserRoles(ctx, user.ID)
-	if err != nil {
-		return response.InternalServerCtx(c, "获取用户角色失败")
-	}
+	// to C 个人订阅,无角色体系(jwt 保留 roles 字段,传空)
+	roles := []string{}
 
-	// 生成 token
 	accessToken, err := utils.GenerateAccessToken(user.ID, user.Username, user.Email, roles)
 	if err != nil {
 		return response.InternalServerCtx(c, "生成访问令牌失败")
@@ -85,7 +76,6 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 			FullName: user.FullName,
 			Avatar:   user.Avatar,
 			Status:   user.Status,
-			Roles:    roles,
 		},
 	})
 }
@@ -116,10 +106,7 @@ func (h *AuthHandler) RefreshToken(c *fiber.Ctx) error {
 		return response.FailWithCodeCtx(c, 403, "用户账号已禁用")
 	}
 
-	roles, err := h.userRepo.GetUserRoles(ctx, user.ID)
-	if err != nil {
-		return response.InternalServerCtx(c, "获取用户角色失败")
-	}
+	roles := []string{}
 
 	accessToken, err := utils.GenerateAccessToken(user.ID, user.Username, user.Email, roles)
 	if err != nil {

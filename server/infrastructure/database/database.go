@@ -13,6 +13,8 @@ import (
 
 	ai_db "sag-wiki/app/ai/models/db"
 	ai_repo "sag-wiki/app/ai/repository"
+	learning_db "sag-wiki/app/learning/models/db"
+	learning_repo "sag-wiki/app/learning/repository"
 	system_db "sag-wiki/app/system/models/db"
 	system_repo "sag-wiki/app/system/repository"
 	wiki_db "sag-wiki/app/wiki/models/db"
@@ -38,6 +40,16 @@ type DatabaseService struct {
 	Users       *system_repo.UserRepository
 	Roles       system_repo.RoleRepository
 	Departments system_repo.DepartmentRepository
+
+	// Learning Repositories
+	Goals      *learning_repo.GoalRepository
+	Paths      *learning_repo.PathRepository
+	Objectives *learning_repo.ObjectiveRepository
+	Sessions   *learning_repo.SessionRepository
+	Messages   *learning_repo.MessageRepository
+	Exercises  *learning_repo.ExerciseRepository
+	Profiles   *learning_repo.ProfileRepository
+	Journals   *learning_repo.JournalRepository
 }
 
 // 创建数据库服务
@@ -67,6 +79,14 @@ func NewDatabaseService(dsn string) (*DatabaseService, error) {
 	db.RegisterModel((*system_db.Department)(nil))
 	db.RegisterModel((*system_db.UserRole)(nil))
 	db.RegisterModel((*system_db.UserDepartment)(nil))
+	db.RegisterModel((*learning_db.LearningGoal)(nil))
+	db.RegisterModel((*learning_db.LearningPath)(nil))
+	db.RegisterModel((*learning_db.LearningObjective)(nil))
+	db.RegisterModel((*learning_db.LearningSession)(nil))
+	db.RegisterModel((*learning_db.LearningMessage)(nil))
+	db.RegisterModel((*learning_db.LearningExercise)(nil))
+	db.RegisterModel((*learning_db.LearningProfile)(nil))
+	db.RegisterModel((*learning_db.LearningJournal)(nil))
 
 	// 添加查询钩子（开发环境下打印 SQL）
 	db.AddQueryHook(bundebug.NewQueryHook(
@@ -101,6 +121,16 @@ func NewDatabaseService(dsn string) (*DatabaseService, error) {
 		Users:       system_repo.NewUserRepository(db),
 		Roles:       system_repo.NewRoleRepository(db),
 		Departments: system_repo.NewDepartmentRepository(db),
+
+		// Learning Repositories
+		Goals:      learning_repo.NewGoalRepository(db),
+		Paths:      learning_repo.NewPathRepository(db),
+		Objectives: learning_repo.NewObjectiveRepository(db),
+		Sessions:   learning_repo.NewSessionRepository(db),
+		Messages:   learning_repo.NewMessageRepository(db),
+		Exercises:  learning_repo.NewExerciseRepository(db),
+		Profiles:   learning_repo.NewProfileRepository(db),
+		Journals:   learning_repo.NewJournalRepository(db),
 	}, nil
 }
 

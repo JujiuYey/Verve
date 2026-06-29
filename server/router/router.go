@@ -9,6 +9,7 @@ import (
 	ai_router "sag-wiki/app/ai/router"
 	ai_service "sag-wiki/app/ai/service"
 	file_router "sag-wiki/app/file/router"
+	learning_router "sag-wiki/app/learning/router"
 	system_router "sag-wiki/app/system/router"
 	wiki_router "sag-wiki/app/wiki/router"
 	"sag-wiki/infrastructure/database"
@@ -60,12 +61,6 @@ func SetupRouter(
 		// 队列监控路由
 		system_router.SetupQueueRoutes(protected.Group("/"), taskQueue)
 
-		// 部门管理路由
-		system_router.SetupDepartmentRoutes(protected.Group("/"), dbService)
-
-		// 角色管理路由
-		system_router.SetupRoleRoutes(protected.Group("/"), dbService)
-
 		// 用户管理路由
 		system_router.SetupUserRoutes(protected.Group("/"), dbService, minioService)
 
@@ -80,14 +75,9 @@ func SetupRouter(
 
 		// 聊天路由
 		ai_router.SetupChatRoutes(protected.Group("/"), dbService, retrievalService)
-	}
 
-	// 管理员路由（需要 admin 角色）
-	admin := api.Group("/admin")
-	admin.Use(middleware.AuthMiddleware(), middleware.RoleMiddleware("admin"))
-	{
-		// 这里可以添加管理员专用的路由
-		// 例如：用户管理、系统配置等
+		// 学习平台路由
+		learning_router.SetupLearningRoutes(protected.Group("/"), dbService)
 	}
 
 	return app

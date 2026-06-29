@@ -25,6 +25,9 @@ import { Route as LayoutSystemRoleRouteImport } from './routes/_layout/system/ro
 import { Route as LayoutSystemQueueRouteImport } from './routes/_layout/system/queue'
 import { Route as LayoutSystemDepartmentRouteImport } from './routes/_layout/system/department'
 import { Route as LayoutSystemAgentRouteImport } from './routes/_layout/system/agent'
+import { Route as LayoutLearnJournalRouteImport } from './routes/_layout/learn/journal'
+import { Route as LayoutLearnSessionSessionIdRouteImport } from './routes/_layout/learn/session/$sessionId'
+import { Route as LayoutLearnGoalGoalIdRouteImport } from './routes/_layout/learn/goal/$goalId'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -105,6 +108,22 @@ const LayoutSystemAgentRoute = LayoutSystemAgentRouteImport.update({
   path: '/system/agent',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutLearnJournalRoute = LayoutLearnJournalRouteImport.update({
+  id: '/learn/journal',
+  path: '/learn/journal',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutLearnSessionSessionIdRoute =
+  LayoutLearnSessionSessionIdRouteImport.update({
+    id: '/learn/session/$sessionId',
+    path: '/learn/session/$sessionId',
+    getParentRoute: () => LayoutRoute,
+  } as any)
+const LayoutLearnGoalGoalIdRoute = LayoutLearnGoalGoalIdRouteImport.update({
+  id: '/learn/goal/$goalId',
+  path: '/learn/goal/$goalId',
+  getParentRoute: () => LayoutRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof LayoutIndexRoute
@@ -114,6 +133,7 @@ export interface FileRoutesByFullPath {
   '/collection': typeof LayoutCollectionRoute
   '/model-config': typeof LayoutModelConfigRoute
   '/rag-chat': typeof LayoutRagChatRoute
+  '/learn/journal': typeof LayoutLearnJournalRoute
   '/system/agent': typeof LayoutSystemAgentRoute
   '/system/department': typeof LayoutSystemDepartmentRoute
   '/system/queue': typeof LayoutSystemQueueRoute
@@ -122,6 +142,8 @@ export interface FileRoutesByFullPath {
   '/wiki/documents': typeof LayoutWikiDocumentsRoute
   '/wiki/folders': typeof LayoutWikiFoldersRoute
   '/wiki/tiptap-editor': typeof LayoutWikiTiptapEditorRoute
+  '/learn/goal/$goalId': typeof LayoutLearnGoalGoalIdRoute
+  '/learn/session/$sessionId': typeof LayoutLearnSessionSessionIdRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
@@ -131,6 +153,7 @@ export interface FileRoutesByTo {
   '/model-config': typeof LayoutModelConfigRoute
   '/rag-chat': typeof LayoutRagChatRoute
   '/': typeof LayoutIndexRoute
+  '/learn/journal': typeof LayoutLearnJournalRoute
   '/system/agent': typeof LayoutSystemAgentRoute
   '/system/department': typeof LayoutSystemDepartmentRoute
   '/system/queue': typeof LayoutSystemQueueRoute
@@ -139,6 +162,8 @@ export interface FileRoutesByTo {
   '/wiki/documents': typeof LayoutWikiDocumentsRoute
   '/wiki/folders': typeof LayoutWikiFoldersRoute
   '/wiki/tiptap-editor': typeof LayoutWikiTiptapEditorRoute
+  '/learn/goal/$goalId': typeof LayoutLearnGoalGoalIdRoute
+  '/learn/session/$sessionId': typeof LayoutLearnSessionSessionIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -150,6 +175,7 @@ export interface FileRoutesById {
   '/_layout/model-config': typeof LayoutModelConfigRoute
   '/_layout/rag-chat': typeof LayoutRagChatRoute
   '/_layout/': typeof LayoutIndexRoute
+  '/_layout/learn/journal': typeof LayoutLearnJournalRoute
   '/_layout/system/agent': typeof LayoutSystemAgentRoute
   '/_layout/system/department': typeof LayoutSystemDepartmentRoute
   '/_layout/system/queue': typeof LayoutSystemQueueRoute
@@ -158,6 +184,8 @@ export interface FileRoutesById {
   '/_layout/wiki/documents': typeof LayoutWikiDocumentsRoute
   '/_layout/wiki/folders': typeof LayoutWikiFoldersRoute
   '/_layout/wiki/tiptap-editor': typeof LayoutWikiTiptapEditorRoute
+  '/_layout/learn/goal/$goalId': typeof LayoutLearnGoalGoalIdRoute
+  '/_layout/learn/session/$sessionId': typeof LayoutLearnSessionSessionIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -169,6 +197,7 @@ export interface FileRouteTypes {
     | '/collection'
     | '/model-config'
     | '/rag-chat'
+    | '/learn/journal'
     | '/system/agent'
     | '/system/department'
     | '/system/queue'
@@ -177,6 +206,8 @@ export interface FileRouteTypes {
     | '/wiki/documents'
     | '/wiki/folders'
     | '/wiki/tiptap-editor'
+    | '/learn/goal/$goalId'
+    | '/learn/session/$sessionId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
@@ -186,6 +217,7 @@ export interface FileRouteTypes {
     | '/model-config'
     | '/rag-chat'
     | '/'
+    | '/learn/journal'
     | '/system/agent'
     | '/system/department'
     | '/system/queue'
@@ -194,6 +226,8 @@ export interface FileRouteTypes {
     | '/wiki/documents'
     | '/wiki/folders'
     | '/wiki/tiptap-editor'
+    | '/learn/goal/$goalId'
+    | '/learn/session/$sessionId'
   id:
     | '__root__'
     | '/_layout'
@@ -204,6 +238,7 @@ export interface FileRouteTypes {
     | '/_layout/model-config'
     | '/_layout/rag-chat'
     | '/_layout/'
+    | '/_layout/learn/journal'
     | '/_layout/system/agent'
     | '/_layout/system/department'
     | '/_layout/system/queue'
@@ -212,6 +247,8 @@ export interface FileRouteTypes {
     | '/_layout/wiki/documents'
     | '/_layout/wiki/folders'
     | '/_layout/wiki/tiptap-editor'
+    | '/_layout/learn/goal/$goalId'
+    | '/_layout/learn/session/$sessionId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -333,6 +370,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutSystemAgentRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/learn/journal': {
+      id: '/_layout/learn/journal'
+      path: '/learn/journal'
+      fullPath: '/learn/journal'
+      preLoaderRoute: typeof LayoutLearnJournalRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/learn/session/$sessionId': {
+      id: '/_layout/learn/session/$sessionId'
+      path: '/learn/session/$sessionId'
+      fullPath: '/learn/session/$sessionId'
+      preLoaderRoute: typeof LayoutLearnSessionSessionIdRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/learn/goal/$goalId': {
+      id: '/_layout/learn/goal/$goalId'
+      path: '/learn/goal/$goalId'
+      fullPath: '/learn/goal/$goalId'
+      preLoaderRoute: typeof LayoutLearnGoalGoalIdRouteImport
+      parentRoute: typeof LayoutRoute
+    }
   }
 }
 
@@ -343,6 +401,7 @@ interface LayoutRouteChildren {
   LayoutModelConfigRoute: typeof LayoutModelConfigRoute
   LayoutRagChatRoute: typeof LayoutRagChatRoute
   LayoutIndexRoute: typeof LayoutIndexRoute
+  LayoutLearnJournalRoute: typeof LayoutLearnJournalRoute
   LayoutSystemAgentRoute: typeof LayoutSystemAgentRoute
   LayoutSystemDepartmentRoute: typeof LayoutSystemDepartmentRoute
   LayoutSystemQueueRoute: typeof LayoutSystemQueueRoute
@@ -351,6 +410,8 @@ interface LayoutRouteChildren {
   LayoutWikiDocumentsRoute: typeof LayoutWikiDocumentsRoute
   LayoutWikiFoldersRoute: typeof LayoutWikiFoldersRoute
   LayoutWikiTiptapEditorRoute: typeof LayoutWikiTiptapEditorRoute
+  LayoutLearnGoalGoalIdRoute: typeof LayoutLearnGoalGoalIdRoute
+  LayoutLearnSessionSessionIdRoute: typeof LayoutLearnSessionSessionIdRoute
 }
 
 const LayoutRouteChildren: LayoutRouteChildren = {
@@ -360,6 +421,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutModelConfigRoute: LayoutModelConfigRoute,
   LayoutRagChatRoute: LayoutRagChatRoute,
   LayoutIndexRoute: LayoutIndexRoute,
+  LayoutLearnJournalRoute: LayoutLearnJournalRoute,
   LayoutSystemAgentRoute: LayoutSystemAgentRoute,
   LayoutSystemDepartmentRoute: LayoutSystemDepartmentRoute,
   LayoutSystemQueueRoute: LayoutSystemQueueRoute,
@@ -368,6 +430,8 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutWikiDocumentsRoute: LayoutWikiDocumentsRoute,
   LayoutWikiFoldersRoute: LayoutWikiFoldersRoute,
   LayoutWikiTiptapEditorRoute: LayoutWikiTiptapEditorRoute,
+  LayoutLearnGoalGoalIdRoute: LayoutLearnGoalGoalIdRoute,
+  LayoutLearnSessionSessionIdRoute: LayoutLearnSessionSessionIdRoute,
 }
 
 const LayoutRouteWithChildren =
