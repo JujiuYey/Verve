@@ -1,6 +1,5 @@
 package payload
 
-// 创建模型配置请求载体
 type CreateModelConfigRequest struct {
 	Name        string  `bun:"name,notnull" json:"name"`
 	Vendor      string  `bun:"vendor,notnull" json:"vendor"`
@@ -16,7 +15,6 @@ type CreateModelConfigRequest struct {
 	IsDefault   bool    `bun:"is_default,notnull" json:"is_default"`
 }
 
-// 更新模型配置请求载体
 type UpdateModelConfigRequest struct {
 	ID          string  `bun:"id,notnull" json:"id"`
 	Vendor      string  `bun:"vendor,notnull" json:"vendor"`

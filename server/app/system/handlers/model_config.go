@@ -5,10 +5,10 @@ import (
 	"log"
 	"strings"
 
-	"sag-wiki/app/ai/models/db"
-	"sag-wiki/app/ai/models/payload"
-	"sag-wiki/app/ai/repository"
-	"sag-wiki/app/ai/service"
+	ai_service "sag-wiki/app/ai/service"
+	system_db "sag-wiki/app/system/models/db"
+	system_payload "sag-wiki/app/system/models/payload"
+	system_repository "sag-wiki/app/system/repository"
 	"sag-wiki/common/response"
 	"sag-wiki/infrastructure/database"
 
@@ -16,42 +16,36 @@ import (
 )
 
 type ModelConfigHandler struct {
-	repo    repository.ModelConfigRepository
-	syncSvc *service.ModelSyncService
+	repo    system_repository.ModelConfigRepository
+	syncSvc *ai_service.ModelSyncService
 }
 
 func NewModelConfigHandler(dbService *database.DatabaseService) *ModelConfigHandler {
-	repo := repository.NewModelConfigRepository(dbService.GetDB())
+	repo := system_repository.NewModelConfigRepository(dbService.GetDB())
 	return &ModelConfigHandler{
 		repo:    repo,
-		syncSvc: service.NewModelSyncService(repo),
+		syncSvc: ai_service.NewModelSyncService(repo),
 	}
 }
 
-// 获取模型配置列表
 func (h *ModelConfigHandler) FindList(c *fiber.Ctx) error {
 	configs, err := h.repo.FindList(c.Context())
 	if err != nil {
 		return response.InternalServerCtx(c, "Failed to fetch model configs")
 	}
-
 	return response.SuccessCtx(c, configs)
 }
 
-// 创建模型配置
 func (h *ModelConfigHandler) Create(c *fiber.Ctx) error {
-	var req payload.CreateModelConfigRequest
-
+	var req system_payload.CreateModelConfigRequest
 	if err := c.BodyParser(&req); err != nil {
 		return response.BadRequestCtx(c)
 	}
-
-	// 验证模型类型
 	if !isValidModelType(req.ModelType) {
 		return response.BadRequestCtx(c, "Invalid model_type, must be 'chat', 'embedding' or 'rerank'")
 	}
 
-	modelConfig := &db.ModelConfig{
+	modelConfig := &system_db.ModelConfig{
 		Vendor:      req.Vendor,
 		Name:        req.Name,
 		APIKey:      req.APIKey,
@@ -69,14 +63,11 @@ func (h *ModelConfigHandler) Create(c *fiber.Ctx) error {
 	if err := h.repo.Create(c.Context(), modelConfig); err != nil {
 		return response.InternalServerCtx(c, "Failed to create model config")
 	}
-
 	return response.SuccessCtx(c, modelConfig)
 }
 
-// 更新模型配置
 func (h *ModelConfigHandler) Update(c *fiber.Ctx) error {
-	var req payload.UpdateModelConfigRequest
-
+	var req system_payload.UpdateModelConfigRequest
 	if err := c.BodyParser(&req); err != nil {
 		return response.BadRequestCtx(c)
 	}
@@ -85,8 +76,6 @@ func (h *ModelConfigHandler) Update(c *fiber.Ctx) error {
 	if err != nil {
 		return response.NotFoundCtx(c, "Model config not found")
 	}
-
-	// 验证模型类型
 	if !isValidModelType(req.ModelType) {
 		return response.BadRequestCtx(c, "Invalid model_type, must be 'chat', 'embedding' or 'rerank'")
 	}
@@ -107,31 +96,23 @@ func (h *ModelConfigHandler) Update(c *fiber.Ctx) error {
 	if err := h.repo.Update(c.Context(), existingConfig); err != nil {
 		return response.InternalServerCtx(c, "Failed to update model config")
 	}
-
 	return response.SuccessCtx(c, existingConfig)
 }
 
-// 删除模型配置
 func (h *ModelConfigHandler) Delete(c *fiber.Ctx) error {
 	id := c.Params("id")
-
 	if err := h.repo.Delete(c.Context(), id); err != nil {
 		return response.InternalServerCtx(c, "Failed to delete model config")
 	}
-
 	return response.SuccessCtx(c, "Model config deleted successfully")
 }
 
-// 设置默认模型配置
 func (h *ModelConfigHandler) SetDefault(c *fiber.Ctx) error {
 	id := c.Params("id")
-
 	if err := h.repo.SetDefault(c.Context(), id); err != nil {
 		log.Printf("SetDefault error: %v", err)
-		return response.InternalServerCtx(c,
-			fmt.Sprintf("设置默认模型配置失败: %v", err))
+		return response.InternalServerCtx(c, fmt.Sprintf("设置默认模型配置失败: %v", err))
 	}
-
 	return response.SuccessCtx(c, "Default model config set successfully")
 }
 
@@ -144,7 +125,7 @@ func (h *ModelConfigHandler) FindPlatforms(c *fiber.Ctx) error {
 }
 
 func (h *ModelConfigHandler) CreatePlatform(c *fiber.Ctx) error {
-	var req payload.CreateAIPlatformRequest
+	var req system_payload.CreateAIPlatformRequest
 	if err := c.BodyParser(&req); err != nil {
 		return response.BadRequestCtx(c)
 	}
@@ -161,7 +142,7 @@ func (h *ModelConfigHandler) CreatePlatform(c *fiber.Ctx) error {
 		return response.BadRequestCtx(c, "API Key 不能为空")
 	}
 
-	platform := &db.SysModelPlatform{
+	platform := &system_db.SysModelPlatform{
 		Name:             strings.TrimSpace(req.Name),
 		ProviderType:     req.ProviderType,
 		DefaultBaseURL:   strings.TrimSpace(req.DefaultBaseURL),
@@ -184,7 +165,7 @@ func (h *ModelConfigHandler) CreatePlatform(c *fiber.Ctx) error {
 
 func (h *ModelConfigHandler) UpdatePlatformConfig(c *fiber.Ctx) error {
 	id := c.Params("id")
-	var req payload.UpdateAIPlatformConfigRequest
+	var req system_payload.UpdateAIPlatformConfigRequest
 	if err := c.BodyParser(&req); err != nil {
 		return response.BadRequestCtx(c)
 	}
@@ -192,13 +173,7 @@ func (h *ModelConfigHandler) UpdatePlatformConfig(c *fiber.Ctx) error {
 		return response.BadRequestCtx(c, "API 地址不能为空")
 	}
 
-	platform, err := h.repo.UpdatePlatformConfig(
-		c.Context(),
-		id,
-		strings.TrimSpace(req.BaseURL),
-		req.APIKey,
-		req.ClearAPIKey,
-	)
+	platform, err := h.repo.UpdatePlatformConfig(c.Context(), id, strings.TrimSpace(req.BaseURL), req.APIKey, req.ClearAPIKey)
 	if err != nil {
 		return response.InternalServerCtx(c, "保存模型平台配置失败")
 	}
@@ -231,7 +206,7 @@ func (h *ModelConfigHandler) FindModels(c *fiber.Ctx) error {
 }
 
 func (h *ModelConfigHandler) CreateModel(c *fiber.Ctx) error {
-	var req payload.CreateAIModelRequest
+	var req system_payload.CreateAIModelRequest
 	if err := c.BodyParser(&req); err != nil {
 		return response.BadRequestCtx(c)
 	}
@@ -242,7 +217,7 @@ func (h *ModelConfigHandler) CreateModel(c *fiber.Ctx) error {
 		return response.BadRequestCtx(c, "Invalid model_type, must be 'chat', 'embedding' or 'rerank'")
 	}
 
-	model := &db.SysModel{
+	model := &system_db.SysModel{
 		PlatformID:   strings.TrimSpace(req.PlatformID),
 		ModelName:    strings.TrimSpace(req.ModelName),
 		DisplayName:  strings.TrimSpace(req.DisplayName),
@@ -265,7 +240,7 @@ func (h *ModelConfigHandler) CreateModel(c *fiber.Ctx) error {
 
 func (h *ModelConfigHandler) UpdateModel(c *fiber.Ctx) error {
 	id := c.Params("id")
-	var req payload.UpdateAIModelRequest
+	var req system_payload.UpdateAIModelRequest
 	if err := c.BodyParser(&req); err != nil {
 		return response.BadRequestCtx(c)
 	}
@@ -273,7 +248,7 @@ func (h *ModelConfigHandler) UpdateModel(c *fiber.Ctx) error {
 		return response.BadRequestCtx(c, "Invalid status, must be 'active' or 'inactive'")
 	}
 
-	model, err := h.repo.UpdateModel(c.Context(), id, repository.ModelUpdate{
+	model, err := h.repo.UpdateModel(c.Context(), id, system_repository.ModelUpdate{
 		Status:       req.Status,
 		DisplayName:  req.DisplayName,
 		Capabilities: req.Capabilities,
@@ -293,7 +268,7 @@ func (h *ModelConfigHandler) DeleteModel(c *fiber.Ctx) error {
 }
 
 func isValidModelType(modelType string) bool {
-	return modelType == db.ModelTypeChat || modelType == db.ModelTypeEmbedding || modelType == "rerank"
+	return modelType == system_db.ModelTypeChat || modelType == system_db.ModelTypeEmbedding || modelType == "rerank"
 }
 
 func isSupportedProviderType(providerType string) bool {

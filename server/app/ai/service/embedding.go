@@ -8,16 +8,16 @@ import (
 	"net/http"
 	"time"
 
-	ai_db "sag-wiki/app/ai/models/db"
-	"sag-wiki/app/ai/repository"
+	system_db "sag-wiki/app/system/models/db"
+	system_repository "sag-wiki/app/system/repository"
 )
 
 type EmbeddingService struct {
-	repo       repository.ModelConfigRepository
+	repo       system_repository.ModelConfigRepository
 	httpClient *http.Client
 }
 
-func NewEmbeddingService(repo repository.ModelConfigRepository) *EmbeddingService {
+func NewEmbeddingService(repo system_repository.ModelConfigRepository) *EmbeddingService {
 	return &EmbeddingService{
 		repo:       repo,
 		httpClient: &http.Client{Timeout: 60 * time.Second},
@@ -26,7 +26,7 @@ func NewEmbeddingService(repo repository.ModelConfigRepository) *EmbeddingServic
 
 // GetEmbedding 调用 embedding API 获取向量
 func (s *EmbeddingService) GetEmbedding(ctx context.Context, text string) ([]float32, error) {
-	config, err := s.repo.FindDefaultByType(ctx, ai_db.ModelTypeEmbedding)
+	config, err := s.repo.FindDefaultByType(ctx, system_db.ModelTypeEmbedding)
 	if err != nil {
 		return nil, fmt.Errorf("获取 embedding 配置失败: %w", err)
 	}
@@ -35,7 +35,7 @@ func (s *EmbeddingService) GetEmbedding(ctx context.Context, text string) ([]flo
 }
 
 // CallEmbeddingAPI 调用 embedding API
-func (s *EmbeddingService) CallEmbeddingAPI(ctx context.Context, config *ai_db.ModelConfig, text string) ([]float32, error) {
+func (s *EmbeddingService) CallEmbeddingAPI(ctx context.Context, config *system_db.ModelConfig, text string) ([]float32, error) {
 	url := fmt.Sprintf("%s/embeddings", config.BaseURL)
 
 	reqBody := map[string]interface{}{

@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	ai_db "sag-wiki/app/ai/models/db"
+	system_db "sag-wiki/app/system/models/db"
 )
 
 func TestModelSyncServiceFetchModelsUsesPlatformAuthAndHeaders(t *testing.T) {
@@ -33,7 +33,7 @@ func TestModelSyncServiceFetchModelsUsesPlatformAuthAndHeaders(t *testing.T) {
 	defer server.Close()
 
 	svc := NewModelSyncService(nil)
-	platform := &ai_db.SysModelPlatform{
+	platform := &system_db.SysModelPlatform{
 		BaseURL:       server.URL + "/v1/",
 		ModelListPath: "models",
 		AuthScheme:    "bearer",

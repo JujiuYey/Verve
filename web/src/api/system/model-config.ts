@@ -86,7 +86,7 @@ export interface SyncModelsResult {
   errors: string[];
 }
 
-const RESOURCE_PATH = "/api/ai/model-config";
+const RESOURCE_PATH = "/api/system/model-config";
 
 const modelPlatformKeys = {
   all: ["system-model-platforms"] as const,

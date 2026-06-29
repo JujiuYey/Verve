@@ -7,12 +7,12 @@ import (
 	"github.com/cloudwego/eino-ext/components/model/openai"
 	"github.com/cloudwego/eino/components/model"
 
-	"sag-wiki/app/ai/models/db"
+	system_db "sag-wiki/app/system/models/db"
 )
 
 // NewChatModel 根据默认配置创建 ChatModel
 func NewChatModel(ctx context.Context, repo interface {
-	FindDefault(ctx context.Context) (*db.ModelConfig, error)
+	FindDefault(ctx context.Context) (*system_db.ModelConfig, error)
 }) (model.ToolCallingChatModel, error) {
 	config, err := repo.FindDefault(ctx)
 	if err != nil {
@@ -29,7 +29,7 @@ func NewChatModel(ctx context.Context, repo interface {
 
 // NewChatModelByID 根据指定 ID 创建 ChatModel
 func NewChatModelByID(ctx context.Context, repo interface {
-	FindOne(ctx context.Context, id string) (*db.ModelConfig, error)
+	FindOne(ctx context.Context, id string) (*system_db.ModelConfig, error)
 }, id string) (model.ToolCallingChatModel, error) {
 	config, err := repo.FindOne(ctx, id)
 	if err != nil {

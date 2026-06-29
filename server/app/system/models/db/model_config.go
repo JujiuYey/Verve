@@ -6,13 +6,11 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// 模型类型枚举
 const (
-	ModelTypeChat      = "chat"      // 对话模型
-	ModelTypeEmbedding = "embedding" // 向量模型
+	ModelTypeChat      = "chat"
+	ModelTypeEmbedding = "embedding"
 )
 
-// 模型配置模型
 type ModelConfig struct {
 	ID          string    `json:"id"`
 	Vendor      string    `json:"vendor"`

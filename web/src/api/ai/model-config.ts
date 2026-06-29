@@ -56,7 +56,7 @@ export interface UpdateModelConfigRequest {
   is_default: boolean;
 }
 
-const RESOURCE_PATH = "/api/ai/model-config";
+const RESOURCE_PATH = "/api/system/model-config";
 
 // API 函数
 const api = {

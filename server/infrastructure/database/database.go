@@ -11,35 +11,18 @@ import (
 	"github.com/uptrace/bun/driver/pgdriver"
 	"github.com/uptrace/bun/extra/bundebug"
 
-	ai_db "sag-wiki/app/ai/models/db"
-	ai_repo "sag-wiki/app/ai/repository"
 	learning_db "sag-wiki/app/learning/models/db"
 	learning_repo "sag-wiki/app/learning/repository"
 	system_db "sag-wiki/app/system/models/db"
 	system_repo "sag-wiki/app/system/repository"
-	wiki_db "sag-wiki/app/wiki/models/db"
-	wiki_repo "sag-wiki/app/wiki/repository"
 )
 
 // 数据库服务（只负责连接管理）
 type DatabaseService struct {
 	db *bun.DB
-
-	// Wiki Repositories
-	Documents *wiki_repo.DocumentRepository
-	Folders   wiki_repo.FolderRepository
-
-	// AI Repositories
-	AgentSessions *ai_repo.AgentSessionRepository
-	AgentMessages *ai_repo.AgentMessageRepository
-	RagSessions   *ai_repo.RagSessionRepository
-	RagMessages   *ai_repo.RagMessageRepository
-	ModelConfigs  ai_repo.ModelConfigRepository
-
 	// System Repositories
-	Users       *system_repo.UserRepository
-	Roles       system_repo.RoleRepository
-	Departments system_repo.DepartmentRepository
+	Users        *system_repo.UserRepository
+	ModelConfigs system_repo.ModelConfigRepository
 
 	// Learning Repositories
 	Goals      *learning_repo.GoalRepository
@@ -67,20 +50,9 @@ func NewDatabaseService(dsn string) (*DatabaseService, error) {
 	db := bun.NewDB(sqldb, pgdialect.New())
 
 	// 注册模型
-	db.RegisterModel((*wiki_db.Document)(nil))
-	db.RegisterModel((*wiki_db.Folder)(nil))
-	db.RegisterModel((*wiki_db.FolderPermission)(nil))
-	db.RegisterModel((*ai_db.AgentSession)(nil))
-	db.RegisterModel((*ai_db.AgentMessage)(nil))
-	db.RegisterModel((*ai_db.RagSession)(nil))
-	db.RegisterModel((*ai_db.RagMessage)(nil))
-	db.RegisterModel((*ai_db.SysModelPlatform)(nil))
-	db.RegisterModel((*ai_db.SysModel)(nil))
 	db.RegisterModel((*system_db.User)(nil))
-	db.RegisterModel((*system_db.Role)(nil))
-	db.RegisterModel((*system_db.Department)(nil))
-	db.RegisterModel((*system_db.UserRole)(nil))
-	db.RegisterModel((*system_db.UserDepartment)(nil))
+	db.RegisterModel((*system_db.SysModelPlatform)(nil))
+	db.RegisterModel((*system_db.SysModel)(nil))
 	db.RegisterModel((*learning_db.LearningGoal)(nil))
 	db.RegisterModel((*learning_db.LearningPath)(nil))
 	db.RegisterModel((*learning_db.LearningObjective)(nil))
@@ -108,21 +80,9 @@ func NewDatabaseService(dsn string) (*DatabaseService, error) {
 	return &DatabaseService{
 		db: db,
 
-		// Wiki Repositories
-		Documents: wiki_repo.NewDocumentRepository(db),
-		Folders:   wiki_repo.NewFolderRepository(db),
-
-		// AI Repositories
-		AgentSessions: ai_repo.NewAgentSessionRepository(db),
-		AgentMessages: ai_repo.NewAgentMessageRepository(db),
-		RagSessions:   ai_repo.NewRagSessionRepository(db),
-		RagMessages:   ai_repo.NewRagMessageRepository(db),
-		ModelConfigs:  ai_repo.NewModelConfigRepository(db),
-
 		// System Repositories
-		Users:       system_repo.NewUserRepository(db),
-		Roles:       system_repo.NewRoleRepository(db),
-		Departments: system_repo.NewDepartmentRepository(db),
+		Users:        system_repo.NewUserRepository(db),
+		ModelConfigs: system_repo.NewModelConfigRepository(db),
 
 		// Learning Repositories
 		Goals:      learning_repo.NewGoalRepository(db),

@@ -3,24 +3,24 @@ package repository
 import (
 	"testing"
 
-	ai_db "sag-wiki/app/ai/models/db"
+	system_db "sag-wiki/app/system/models/db"
 )
 
 func TestBuildModelConfigUsesPlatformAndModelFields(t *testing.T) {
 	t.Parallel()
 
-	platform := &ai_db.SysModelPlatform{
+	platform := &system_db.SysModelPlatform{
 		ID:               "platform-1",
 		Name:             "DeepSeek",
 		DefaultBaseURL:   "https://default.example.com",
 		BaseURL:          "https://api.deepseek.com",
 		APIKeyCiphertext: "ciphertext-key",
 	}
-	model := &ai_db.SysModel{
+	model := &system_db.SysModel{
 		ID:          "model-1",
 		DisplayName: "DeepSeek Chat",
 		ModelName:   "deepseek-chat",
-		ModelType:   ai_db.ModelTypeChat,
+		ModelType:   system_db.ModelTypeChat,
 		Status:      "active",
 		IsDefault:   true,
 		Temperature: 0.3,
@@ -50,8 +50,8 @@ func TestBuildModelConfigFallsBackToDefaultBaseURL(t *testing.T) {
 	t.Parallel()
 
 	config := buildModelConfig(
-		&ai_db.SysModelPlatform{Name: "OpenAI", DefaultBaseURL: "https://api.openai.com/v1"},
-		&ai_db.SysModel{Status: "inactive"},
+		&system_db.SysModelPlatform{Name: "OpenAI", DefaultBaseURL: "https://api.openai.com/v1"},
+		&system_db.SysModel{Status: "inactive"},
 	)
 
 	if config.BaseURL != "https://api.openai.com/v1" {

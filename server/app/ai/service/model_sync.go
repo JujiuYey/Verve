@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	ai_db "sag-wiki/app/ai/models/db"
+	system_db "sag-wiki/app/system/models/db"
 )
 
 var ErrModelPlatformNotFound = errors.New("model platform not found")
@@ -22,9 +22,9 @@ type SyncModelsResult struct {
 }
 
 type ModelSyncRepository interface {
-	FindPlatform(ctx context.Context, id string) (*ai_db.SysModelPlatform, error)
+	FindPlatform(ctx context.Context, id string) (*system_db.SysModelPlatform, error)
 	ModelExistsByPlatformAndName(ctx context.Context, platformID, modelName string) (bool, error)
-	CreateModel(ctx context.Context, model *ai_db.SysModel) error
+	CreateModel(ctx context.Context, model *system_db.SysModel) error
 	UpdatePlatformLastModelSyncAt(ctx context.Context, platformID string, syncedAt time.Time) error
 }
 
@@ -81,11 +81,11 @@ func (s *ModelSyncService) SyncModels(ctx context.Context, platformID string) (*
 			continue
 		}
 
-		if err := s.repo.CreateModel(ctx, &ai_db.SysModel{
+		if err := s.repo.CreateModel(ctx, &system_db.SysModel{
 			PlatformID:   platform.ID,
 			ModelName:    modelName,
 			DisplayName:  modelName,
-			ModelType:    ai_db.ModelTypeChat,
+			ModelType:    system_db.ModelTypeChat,
 			Capabilities: []string{},
 			Source:       "remote",
 			Status:       "active",
@@ -104,7 +104,7 @@ func (s *ModelSyncService) SyncModels(ctx context.Context, platformID string) (*
 	return result, nil
 }
 
-func (s *ModelSyncService) fetchModels(ctx context.Context, platform *ai_db.SysModelPlatform, apiKey string) (*openAIModelListResponse, error) {
+func (s *ModelSyncService) fetchModels(ctx context.Context, platform *system_db.SysModelPlatform, apiKey string) (*openAIModelListResponse, error) {
 	baseURL := strings.TrimRight(strings.TrimSpace(platform.BaseURL), "/")
 	if baseURL == "" {
 		baseURL = strings.TrimRight(strings.TrimSpace(platform.DefaultBaseURL), "/")

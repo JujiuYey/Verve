@@ -6,15 +6,11 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 
-	ai_router "sag-wiki/app/ai/router"
-	ai_service "sag-wiki/app/ai/service"
 	file_router "sag-wiki/app/file/router"
 	learning_router "sag-wiki/app/learning/router"
 	system_router "sag-wiki/app/system/router"
-	wiki_router "sag-wiki/app/wiki/router"
 	"sag-wiki/infrastructure/database"
 	qdrantdao "sag-wiki/infrastructure/qdrant"
-	"sag-wiki/infrastructure/queue"
 	"sag-wiki/infrastructure/storage"
 	"sag-wiki/middleware"
 )
@@ -23,9 +19,7 @@ import (
 func SetupRouter(
 	dbService *database.DatabaseService,
 	minioService *storage.MinIOService,
-	taskQueue *queue.TaskQueue,
 	chunkDAO *qdrantdao.ChunkDAO,
-	retrievalService *ai_service.RetrievalService,
 ) *fiber.App {
 	app := fiber.New(fiber.Config{
 		AppName:      "SAG-WIKI",
@@ -55,26 +49,11 @@ func SetupRouter(
 	protected := api.Group("/")
 	protected.Use(middleware.AuthMiddleware())
 	{
-		// 文档管理路由
-		wiki_router.SetupDocumentRoutes(protected.Group("/"), dbService, minioService, taskQueue, chunkDAO)
-
-		// 队列监控路由
-		system_router.SetupQueueRoutes(protected.Group("/"), taskQueue)
-
 		// 用户管理路由
 		system_router.SetupUserRoutes(protected.Group("/"), dbService, minioService)
 
-		// 文件夹管理路由
-		wiki_router.SetupFolderRoutes(protected.Group("/"), dbService)
-
 		// 模型配置路由
-		ai_router.SetupModelConfigRoutes(protected.Group("/"), dbService)
-
-		// Collection 路由
-		ai_router.SetupCollectionRoutes(protected.Group("/"))
-
-		// 聊天路由
-		ai_router.SetupChatRoutes(protected.Group("/"), dbService, retrievalService)
+		system_router.SetupModelConfigRoutes(protected.Group("/"), dbService)
 
 		// 学习平台路由
 		learning_router.SetupLearningRoutes(protected.Group("/"), dbService)
