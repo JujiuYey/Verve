@@ -95,8 +95,18 @@ export function FolderIcon(props: SVGProps<SVGSVGElement>) {
         d="M3.5 7.5A2.5 2.5 0 0 1 6 5h3.2c.58 0 1.13.2 1.56.56l1.05.88c.43.36.98.56 1.54.56H18A2.5 2.5 0 0 1 20.5 9.5V17A3 3 0 0 1 17.5 20h-11A3 3 0 0 1 3.5 17V7.5Z"
         fill="currentColor"
       />
-      <path data-tone="blue" d="M3.5 10.5h17V17a3 3 0 0 1-3 3h-11a3 3 0 0 1-3-3v-6.5Z" fill="currentColor" />
-      <path data-tone="white" d="M7.5 14h5" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+      <path
+        data-tone="blue"
+        d="M3.5 10.5h17V17a3 3 0 0 1-3 3h-11a3 3 0 0 1-3-3v-6.5Z"
+        fill="currentColor"
+      />
+      <path
+        data-tone="white"
+        d="M7.5 14h5"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.8"
+      />
     </SidebarIcon>
   );
 }
@@ -157,7 +167,13 @@ export function DepartmentIcon(props: SVGProps<SVGSVGElement>) {
       <rect data-tone="cyan" x="6" y="12" width="3" height="8" rx="1" fill="currentColor" />
       <rect data-tone="green" x="10.5" y="12" width="3" height="8" rx="1" fill="currentColor" />
       <rect data-tone="amber" x="15" y="12" width="3" height="8" rx="1" fill="currentColor" />
-      <path data-tone="blue" d="M4.6 20h14.8" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+      <path
+        data-tone="blue"
+        d="M4.6 20h14.8"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="2"
+      />
     </SidebarIcon>
   );
 }
@@ -178,7 +194,13 @@ export function RoleIcon(props: SVGProps<SVGSVGElement>) {
         strokeLinejoin="round"
         strokeWidth="2"
       />
-      <path data-tone="cyan" d="M12 6.2v2.1" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+      <path
+        data-tone="cyan"
+        d="M12 6.2v2.1"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.8"
+      />
     </SidebarIcon>
   );
 }
@@ -230,7 +252,13 @@ export function AgentIcon(props: SVGProps<SVGSVGElement>) {
         strokeLinecap="round"
         strokeWidth="1.9"
       />
-      <path data-tone="amber" d="M12 4V2.5" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+      <path
+        data-tone="amber"
+        d="M12 4V2.5"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="2"
+      />
     </SidebarIcon>
   );
 }

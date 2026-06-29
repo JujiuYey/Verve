@@ -1,118 +1,57 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
-import { useContinue, useCreateGoal, useGoalList } from "@/api/learning";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { getRoadmapList } from "@/pages/learning/mock-roadmaps";
 
-const EXAMPLES = ["Go 的并发", "Rust 所有权", "K8s 入门", "SQL 优化"];
+import { LearningOverviewHeader } from "./_components/learning-overview-header";
+import { LearningRoadmapEmptyState } from "./_components/learning-roadmap-empty-state";
+import {
+  LearningRoadmapFilters,
+  type LearningRoadmapFilter,
+} from "./_components/learning-roadmap-filters";
+import { LearningRoadmapGrid } from "./_components/learning-roadmap-grid";
+
+type FilterValue = LearningRoadmapFilter;
 
 export function LearningOverviewPage() {
   const navigate = useNavigate();
-  const [title, setTitle] = useState("");
+  const [filter, setFilter] = useState<FilterValue>("all");
+  const roadmaps = getRoadmapList();
 
-  const { data: continueInfo } = useContinue();
-  const { data: goalPage, isLoading } = useGoalList(1, 50);
-  const createGoal = useCreateGoal();
+  const visibleRoadmaps = useMemo(() => {
+    if (filter === "all") return roadmaps;
+    return roadmaps.filter((roadmap) => roadmap.category === filter);
+  }, [filter, roadmaps]);
 
-  const goals = goalPage?.data ?? [];
-
-  const handleCreate = async () => {
-    const t = title.trim();
-    if (!t) return;
-    const res = await createGoal.mutateAsync({ title: t });
-    setTitle("");
-    if (res?.goal_id) {
-      navigate({ to: "/learn/goal/$goalId", params: { goalId: res.goal_id } });
-    }
-  };
+  const totalStages = roadmaps.reduce((sum, item) => sum + item.stages.length, 0);
 
   return (
-    <div className="flex h-full flex-col gap-6 overflow-auto p-6">
-      {/* 新建目标 */}
-      <Card className="p-6">
-        <h2 className="mb-1 text-lg font-semibold">你想学什么?</h2>
-        <p className="mb-4 text-sm text-muted-foreground">
-          一句话告诉我学习目标,AI 会自动拆出学习路线,并陪你一节节学。
-        </p>
-        <div className="flex gap-2">
-          <Input
-            placeholder="例如:我要学 Go 的并发"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleCreate();
-            }}
-            disabled={createGoal.isPending}
-          />
-          <Button onClick={handleCreate} disabled={createGoal.isPending || !title.trim()}>
-            {createGoal.isPending ? "生成路线中…" : "生成学习路线"}
-          </Button>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {EXAMPLES.map((ex) => (
-            <Badge
-              key={ex}
-              variant="secondary"
-              className="cursor-pointer"
-              onClick={() => setTitle(`我要学 ${ex}`)}
-            >
-              {ex}
-            </Badge>
-          ))}
-        </div>
-      </Card>
+    <div className="flex h-full flex-col gap-6 p-6">
+      <LearningOverviewHeader roadmapCount={roadmaps.length} stageCount={totalStages} />
 
-      {/* 继续上次 */}
-      {continueInfo ? (
-        <Card className="flex items-center justify-between p-4">
-          <div>
-            <div className="text-sm text-muted-foreground">继续上次</div>
-            <div className="font-medium">{continueInfo.title ?? "上次的学习目标"}</div>
-          </div>
-          <Button
-            onClick={() =>
-              navigate({ to: "/learn/goal/$goalId", params: { goalId: continueInfo.goal_id } })
-            }
-          >
-            继续 ▶
-          </Button>
-        </Card>
-      ) : null}
-
-      {/* 我的目标 */}
-      <div>
-        <h2 className="mb-3 text-lg font-semibold">我的学习目标</h2>
-        {isLoading ? (
-          <div className="text-sm text-muted-foreground">加载中…</div>
-        ) : goals.length === 0 ? (
-          <div className="text-sm text-muted-foreground">
-            还没有学习目标,在上面创建第一个吧。
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {goals.map((goal) => (
-              <Card
-                key={goal.id}
-                className="cursor-pointer p-4 transition-colors hover:border-primary"
-                onClick={() => navigate({ to: "/learn/goal/$goalId", params: { goalId: goal.id } })}
-              >
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <span className="font-medium">{goal.title}</span>
-                  <Badge variant={goal.status === "completed" ? "default" : "secondary"}>
-                    {goal.status}
-                  </Badge>
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {new Date(goal.created_at).toLocaleDateString()}
-                </div>
-              </Card>
-            ))}
-          </div>
-        )}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold">学习项目列表</h2>
+          <p className="text-sm text-muted-foreground">
+            先做前端页面体验，每张卡片点进去都是一条可视化学习路线。
+          </p>
+        </div>
+        <LearningRoadmapFilters value={filter} onValueChange={setFilter} />
       </div>
+
+      <ScrollArea className="min-h-0 flex-1 px-3">
+        {visibleRoadmaps.length === 0 ? (
+          <LearningRoadmapEmptyState onReset={() => setFilter("all")} />
+        ) : (
+          <LearningRoadmapGrid
+            roadmaps={visibleRoadmaps}
+            onOpenRoadmap={(roadmap) => {
+              navigate({ to: "/learn/goal/$goalId", params: { goalId: roadmap.id } });
+            }}
+          />
+        )}
+      </ScrollArea>
     </div>
   );
 }

@@ -11,9 +11,7 @@ export function JournalPage() {
       {isLoading ? (
         <div className="text-sm text-muted-foreground">加载中…</div>
       ) : journals.length === 0 ? (
-        <div className="text-sm text-muted-foreground">
-          还没有学习日志,完成一节课后会自动生成。
-        </div>
+        <div className="text-sm text-muted-foreground">还没有学习日志,完成一节课后会自动生成。</div>
       ) : (
         <div className="flex flex-col gap-3">
           {journals.map((j) => (
