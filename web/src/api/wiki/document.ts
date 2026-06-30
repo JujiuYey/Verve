@@ -7,9 +7,6 @@ export interface Document {
   file_size: number;
   content_type: string;
   file_path: string;
-  status: "pending" | "processing" | "completed" | "failed";
-  chunk_count: number;
-  error_message?: string;
   created_at: string;
   updated_at: string;
 }
@@ -47,14 +44,6 @@ export interface DocumentDownloadResponse {
   expires_in: string;
 }
 
-export interface DocumentProcessResponse {
-  message: string;
-  document_id: string;
-  filename: string;
-  status: string;
-  chunk_count?: number;
-}
-
 export interface DocumentContentResponse {
   content: string;
   filename: string;
@@ -62,23 +51,6 @@ export interface DocumentContentResponse {
 
 export interface UpdateContentPayload {
   content: string;
-}
-
-export interface Chunk {
-  ChunkId: string;
-  ChunkIndex: number;
-  ChunkText: string;
-  ChunkSize: number;
-  DocumentID: string;
-  Filename: string;
-  FolderID: string;
-  VectorDim: number;
-}
-
-export interface ChunksResponse {
-  document_id: string;
-  chunk_count: number;
-  chunks: Chunk[];
 }
 
 const RESOURCE_PATH = "/api/wiki/documents";
@@ -116,10 +88,6 @@ export const documentApi = {
   // 删除文档
   delete: (id: string) => request.delete<{ message: string }>(`${RESOURCE_PATH}/${id}`),
 
-  // 处理文档（向量化）
-  process: (id: string) =>
-    request.post<DocumentProcessResponse>(`${RESOURCE_PATH}/${id}/reprocess`),
-
   // 获取文档内容
   getContent: (id: string) =>
     request.get<DocumentContentResponse>(`${RESOURCE_PATH}/${id}/content`),
@@ -127,11 +95,4 @@ export const documentApi = {
   // 更新文档内容
   updateContent: (id: string, data: UpdateContentPayload) =>
     request.put<{ message: string }>(`${RESOURCE_PATH}/${id}/content`, data),
-
-  // 获取文档 chunks
-  getChunks: (id: string) => request.get<ChunksResponse>(`${RESOURCE_PATH}/${id}/chunks`),
-
-  // 删除文档 chunks
-  deleteChunks: (id: string) =>
-    request.delete<{ message: string }>(`${RESOURCE_PATH}/${id}/chunks`),
 };

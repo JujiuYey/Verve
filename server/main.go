@@ -39,46 +39,8 @@ func main() {
 		log.Fatalf("❌ MinIO 初始化失败: %v", err)
 	}
 
-	// 初始化 Redis 和任务队列
-	// redisConfig := config.GetRedisConfig()
-	// taskQueue := queue.NewTaskQueue(redisConfig.Addr, redisConfig.Password, redisConfig.DB)
-	// defer taskQueue.Close()
-	// log.Println("✅ 任务队列初始化成功")
-
-	// 初始化 Qdrant ChunkDAO
-	// chunkDAO, err := qdrantdao.NewChunkDAO()
-	// if err != nil {
-	// 	log.Fatalf("❌ Qdrant ChunkDAO 初始化失败: %v", err)
-	// }
-	// log.Println("✅ Qdrant ChunkDAO 初始化成功")
-
-	// 初始化 RetrievalService (RAG 检索服务)
-	// folderPermissionRepo := repository.NewFolderPermissionRepository(dbService.GetDB())
-	// folderExpander := repository.NewFolderExpander(dbService.Folders, folderPermissionRepo)
-	// retrievalService := ai_service.NewRetrievalService(
-	// 	ai_service.NewEmbeddingService(dbService.ModelConfigs),
-	// 	chunkDAO,
-	// 	folderExpander,
-	// 	*dbService.Documents,
-	// )
-	// log.Println("✅ RetrievalService 初始化成功")
-
-	// 启动 Task Worker
-	// taskWorker := queue.NewTaskWorker(
-	// 	redisConfig.Addr,
-	// 	redisConfig.Password,
-	// 	redisConfig.DB,
-	// 	dbService,
-	// 	ai_service.NewEmbeddingService(dbService.ModelConfigs),
-	// 	chunkDAO,
-	// 	minioService,
-	// 	dbService.Documents,
-	// )
-	// go taskWorker.Start()
-	// log.Println("✅ Task Worker 启动成功")
-
 	// 设置路由
-	app := router.SetupRouter(dbService, minioService, nil)
+	app := router.SetupRouter(dbService, minioService)
 
 	// 优雅关闭
 	quit := make(chan os.Signal, 1)

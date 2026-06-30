@@ -8,9 +8,9 @@ import (
 
 	file_router "sag-wiki/app/file/router"
 	learning_router "sag-wiki/app/learning/router"
+	wiki_router "sag-wiki/app/wiki/router"
 	system_router "sag-wiki/app/system/router"
 	"sag-wiki/infrastructure/database"
-	qdrantdao "sag-wiki/infrastructure/qdrant"
 	"sag-wiki/infrastructure/storage"
 	"sag-wiki/middleware"
 )
@@ -19,7 +19,6 @@ import (
 func SetupRouter(
 	dbService *database.DatabaseService,
 	minioService *storage.MinIOService,
-	chunkDAO *qdrantdao.ChunkDAO,
 ) *fiber.App {
 	app := fiber.New(fiber.Config{
 		AppName:      "SAG-WIKI",
@@ -48,16 +47,20 @@ func SetupRouter(
 	// 需要认证的路由组
 	protected := api.Group("/")
 	protected.Use(middleware.AuthMiddleware())
-	{
-		// 用户管理路由
-		system_router.SetupUserRoutes(protected.Group("/"), dbService, minioService)
+		{
+			// 用户管理路由
+			system_router.SetupUserRoutes(protected.Group("/"), dbService, minioService)
 
-		// 模型配置路由
-		system_router.SetupModelConfigRoutes(protected.Group("/"), dbService)
+			// 模型配置路由
+			system_router.SetupModelConfigRoutes(protected.Group("/"), dbService)
 
-		// 学习平台路由
-		learning_router.SetupLearningRoutes(protected.Group("/"), dbService)
-	}
+			// 知识库路由
+			wiki_router.SetupFolderRoutes(protected.Group("/"), dbService)
+			wiki_router.SetupDocumentRoutes(protected.Group("/"), dbService, minioService)
+
+			// 学习平台路由
+			learning_router.SetupLearningRoutes(protected.Group("/"), dbService)
+		}
 
 	return app
 }
