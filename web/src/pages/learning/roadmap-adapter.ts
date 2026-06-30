@@ -1,10 +1,6 @@
 import type { Edge, Node } from "@xyflow/react";
 
-import type {
-  GoalDetail,
-  LearningGoal,
-  LearningObjective,
-} from "@/api/learning/goal";
+import type { GoalDetail, LearningGoal, LearningObjective } from "@/api/learning/goal";
 
 export type RoadmapStageStatus = "planned" | "active" | "completed";
 
@@ -12,6 +8,7 @@ export type RoadmapLesson = {
   id: string;
   title: string;
   summary: string;
+  sourceFolderPath?: string;
   outcomes: string[];
   duration: string;
   resources: string[];
@@ -53,6 +50,12 @@ type RoadmapNodeData = {
   duration: string;
   difficulty: string;
   status: RoadmapStageStatus;
+  kind: "folder" | "objective";
+  stageId: string;
+  folderPath?: string;
+  isCollapsed?: boolean;
+  childCount?: number;
+  objectiveId?: string;
 };
 
 export function goalToRoadmap(goal: LearningGoal): LearningRoadmap {
@@ -82,7 +85,10 @@ export function goalDetailToRoadmap(detail: GoalDetail): LearningRoadmap {
   return {
     ...goalToRoadmap(detail.goal),
     description: displayDescription(detail.goal),
-    tagline: detail.path?.status === "active" ? "按阶段推进，每次聚焦一个小目标" : statusLabel(detail.goal.status),
+    tagline:
+      detail.path?.status === "active"
+        ? "按阶段推进，每次聚焦一个小目标"
+        : statusLabel(detail.goal.status),
     duration: `${stages.length} 个阶段`,
     progress,
     tags: [sourceLabel(detail.goal.source), `${objectives.length} 个小目标`],
@@ -95,34 +101,96 @@ function displayDescription(goal: LearningGoal) {
   return goal.description || sourceDescription(goal.source);
 }
 
-export function getRoadmapFlow(roadmap: LearningRoadmap): {
+export function getRoadmapFlow(
+  roadmap: LearningRoadmap,
+  collapsedFolderPaths: Set<string> = new Set(),
+): {
   nodes: Node<RoadmapNodeData>[];
   edges: Edge[];
 } {
-  const nodes = roadmap.stages.map((stage) => ({
-    id: stage.id,
-    type: "roadmapNode",
-    position: { x: stage.x, y: stage.y },
-    data: {
-      label: stage.title,
-      duration: stage.duration,
-      difficulty: stage.difficulty,
-      status: stage.status,
-    },
-  }));
+  const layoutItems = roadmap.stages.flatMap((stage) =>
+    stage.lessons.map((lesson) => ({
+      stage,
+      lesson,
+      pathParts: normalizeFolderPath(lesson.sourceFolderPath || stage.title),
+    })),
+  );
+  const branchColumns = assignBranchColumns(layoutItems.map((item) => item.pathParts));
+  const directorySlots = assignDirectorySlots(layoutItems.map((item) => item.pathParts));
+  const nodes: Node<RoadmapNodeData>[] = [];
+  const edges: Edge[] = [];
+  const folderNodeIDs = new Set<string>();
+  const lessonIndexesByDirectory = new Map<string, number>();
 
-  const edges = roadmap.stages.slice(1).map((stage, index) => ({
-    id: `${roadmap.stages[index]?.id}-${stage.id}`,
-    source: roadmap.stages[index]?.id ?? stage.id,
-    target: stage.id,
-    animated: stage.status === "active",
-    style: {
-      stroke: stage.status === "completed" ? "var(--primary)" : "var(--border)",
-      strokeWidth: 2,
-    },
-  }));
+  for (const item of layoutItems) {
+    const { stage, lesson, pathParts } = item;
+    if (hasCollapsedAncestor(pathParts, collapsedFolderPaths)) continue;
 
-  return { nodes, edges };
+    const column = branchColumns.get(branchKeyForPath(pathParts)) ?? 0;
+    let parentNodeID = "";
+
+    pathParts.forEach((part, depth) => {
+      const folderPath = pathParts.slice(0, depth + 1).join(" / ");
+      const folderNodeID = `folder:${folderPath}`;
+      if (!folderNodeIDs.has(folderNodeID)) {
+        folderNodeIDs.add(folderNodeID);
+        const folderColumn = depth === 0 ? 0 : column;
+        const slot = directorySlots.get(folderPath) ?? 0;
+        nodes.push({
+          id: folderNodeID,
+          type: "roadmapNode",
+          position: { x: 70 + folderColumn * 320, y: 30 + depth * 150 + slot * 110 },
+          data: {
+            label: part,
+            duration: depth === 0 ? "根目录" : `第 ${depth + 1} 层目录`,
+            difficulty: "文件夹",
+            status: stage.status,
+            kind: "folder",
+            stageId: stage.id,
+            folderPath,
+            isCollapsed: collapsedFolderPaths.has(folderPath),
+            childCount: childCountForFolder(
+              folderPath,
+              layoutItems.map((entry) => entry.pathParts),
+            ),
+          },
+        });
+      }
+
+      if (parentNodeID) {
+        edges.push(buildRoadmapEdge(parentNodeID, folderNodeID, stage.status));
+      }
+      parentNodeID = folderNodeID;
+    });
+
+    if (collapsedFolderPaths.has(pathParts.join(" / "))) continue;
+
+    const directoryPath = pathParts.join(" / ");
+    const lessonIndex = lessonIndexesByDirectory.get(directoryPath) ?? 0;
+    lessonIndexesByDirectory.set(directoryPath, lessonIndex + 1);
+    const directorySlot = directorySlots.get(directoryPath) ?? 0;
+
+    nodes.push({
+      id: lesson.id,
+      type: "roadmapNode",
+      position: {
+        x: 70 + column * 320,
+        y: 30 + pathParts.length * 150 + directorySlot * 110 + lessonIndex * 132,
+      },
+      data: {
+        label: lesson.title,
+        duration: lesson.duration,
+        difficulty: "小目标",
+        status: stage.status,
+        kind: "objective",
+        stageId: stage.id,
+        objectiveId: lesson.id,
+      },
+    });
+    edges.push(buildRoadmapEdge(parentNodeID, lesson.id, stage.status));
+  }
+
+  return { nodes, edges: uniqueEdges(edges) };
 }
 
 function objectivesToStages(
@@ -163,12 +231,95 @@ function objectivesToStages(
         id: item.id,
         title: item.title,
         summary: item.detail || "围绕这个小目标完成理解、解释和练习。",
+        sourceFolderPath: item.source_folder_path,
         outcomes: [masteryLabel(item.mastery_level), statusLabel(item.status)],
         duration: `小目标 ${lessonIndex + 1}`,
-        resources: [item.stage_title || title],
+        resources: [item.source_folder_path || item.stage_title || title],
         tasks: ["用自己的话解释这个知识点", "完成一次练习并记录学习日志"],
       })),
     };
+  });
+}
+
+function normalizeFolderPath(path: string) {
+  return path
+    .split("/")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function branchKeyForPath(pathParts: string[]) {
+  return pathParts.length > 1 ? pathParts.slice(0, 2).join(" / ") : pathParts[0] || "学习资料";
+}
+
+function assignBranchColumns(paths: string[][]) {
+  const columns = new Map<string, number>();
+  for (const pathParts of paths) {
+    const branchKey = branchKeyForPath(pathParts);
+    if (!columns.has(branchKey)) {
+      columns.set(branchKey, columns.size);
+    }
+  }
+  return columns;
+}
+
+function assignDirectorySlots(paths: string[][]) {
+  const slots = new Map<string, number>();
+  for (const pathParts of paths) {
+    for (let depth = 0; depth < pathParts.length; depth++) {
+      const directoryPath = pathParts.slice(0, depth + 1).join(" / ");
+      if (!slots.has(directoryPath)) {
+        slots.set(directoryPath, slots.size);
+      }
+    }
+  }
+  return slots;
+}
+
+function hasCollapsedAncestor(pathParts: string[], collapsedFolderPaths: Set<string>) {
+  for (let depth = 0; depth < pathParts.length - 1; depth++) {
+    if (collapsedFolderPaths.has(pathParts.slice(0, depth + 1).join(" / "))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function childCountForFolder(folderPath: string, paths: string[][]) {
+  const directChildren = new Set<string>();
+  for (const pathParts of paths) {
+    const parts = folderPath.split(" / ");
+    const isDescendant = parts.every((part, index) => pathParts[index] === part);
+    if (!isDescendant) continue;
+
+    if (pathParts.length === parts.length) {
+      directChildren.add(`objective:${pathParts.join(" / ")}`);
+    } else {
+      directChildren.add(`folder:${pathParts.slice(0, parts.length + 1).join(" / ")}`);
+    }
+  }
+  return directChildren.size;
+}
+
+function buildRoadmapEdge(source: string, target: string, status: RoadmapStageStatus): Edge {
+  return {
+    id: `${source}-${target}`,
+    source,
+    target,
+    animated: status === "active",
+    style: {
+      stroke: status === "completed" ? "var(--primary)" : "var(--border)",
+      strokeWidth: 2,
+    },
+  };
+}
+
+function uniqueEdges(edges: Edge[]) {
+  const seen = new Set<string>();
+  return edges.filter((edge) => {
+    if (seen.has(edge.id)) return false;
+    seen.add(edge.id);
+    return true;
   });
 }
 

@@ -1,5 +1,16 @@
-import { ArrowLeftIcon } from "lucide-react";
+import { ArrowLeftIcon, Trash2Icon } from "lucide-react";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -7,10 +18,12 @@ import type { LearningRoadmap } from "@/pages/learning/roadmap-adapter";
 
 type Props = {
   roadmap: LearningRoadmap;
+  isDeleting: boolean;
   onBack: () => void;
+  onDelete: () => void;
 };
 
-export function LearningRoadmapDetailHeader({ roadmap, onBack }: Props) {
+export function LearningRoadmapDetailHeader({ roadmap, isDeleting, onBack, onDelete }: Props) {
   return (
     <section className="w-full flex flex-col gap-4 rounded-2xl border bg-background p-4">
       <div className="flex justify-between gap-2">
@@ -22,6 +35,28 @@ export function LearningRoadmapDetailHeader({ roadmap, onBack }: Props) {
           <Badge variant="outline">{roadmap.level}</Badge>
           <Badge variant="secondary">{roadmap.duration}</Badge>
           <Badge variant="outline">{roadmap.learners}</Badge>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm" disabled={isDeleting}>
+                <Trash2Icon className="size-4" />
+                删除
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>删除这个学习目标？</AlertDialogTitle>
+                <AlertDialogDescription className="leading-6">
+                  {`将删除「${roadmap.title}」以及它下面的学习路径、小目标、练习会话、练习记录、学习日志和学习画像。文件管理里的文件夹和 Markdown 原文不会被删除。`}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={isDeleting}>取消</AlertDialogCancel>
+                <AlertDialogAction variant="destructive" disabled={isDeleting} onClick={onDelete}>
+                  {isDeleting ? "删除中..." : "确认删除"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
 

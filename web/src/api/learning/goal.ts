@@ -23,6 +23,9 @@ export interface LearningObjective {
   stage_title?: string;
   title: string;
   detail?: string;
+  source_document_id?: string;
+  source_folder_id?: string;
+  source_folder_path?: string;
   order_index: number;
   status: string; // pending / active / completed / review
   mastery_level: string; // none / seen / heard / explained / written / verified
@@ -78,7 +81,6 @@ export interface GoalPageResponse {
 const BASE = "/api/learning";
 
 const api = {
-  // 创建目标(后端会同步生成学习路线)
   create: (data: CreateGoalRequest) => request.post<{ goal_id: string }>(`${BASE}/goal`, data),
 
   createFromFolder: (data: CreateGoalFromFolderRequest) =>
@@ -117,11 +119,6 @@ export function useGoalDetail(id: string) {
     queryKey: goalKeys.detail(id),
     queryFn: () => api.detail(id),
     enabled: !!id,
-    refetchInterval: (query) => {
-      const detail = query.state.data;
-      if (!detail || detail.path) return false;
-      return 3000;
-    },
   });
 }
 
@@ -137,7 +134,7 @@ export function useCreateGoal() {
   return useMutation({
     mutationFn: (data: CreateGoalRequest) => api.create(data),
     onSuccess: () => {
-      toast.success("学习目标已创建,路线已生成");
+      toast.success("学习目标已创建");
       queryClient.invalidateQueries({ queryKey: goalKeys.lists() });
       queryClient.invalidateQueries({ queryKey: goalKeys.continue() });
     },

@@ -1,5 +1,11 @@
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
-import { Clock3Icon } from "lucide-react";
+import {
+  ChevronDownIcon,
+  ChevronRightIcon,
+  Clock3Icon,
+  FileTextIcon,
+  FolderOpenIcon,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -9,6 +15,12 @@ type RoadmapNodeData = {
   duration: string;
   difficulty: string;
   status: "planned" | "active" | "completed";
+  kind: "folder" | "objective";
+  stageId: string;
+  folderPath?: string;
+  isCollapsed?: boolean;
+  childCount?: number;
+  objectiveId?: string;
 };
 
 const statusMeta: Record<RoadmapNodeData["status"], { label: string; dotClassName: string }> = {
@@ -28,11 +40,15 @@ const statusMeta: Record<RoadmapNodeData["status"], { label: string; dotClassNam
 
 export function LearningRoadmapNode({ data, selected }: NodeProps<Node<RoadmapNodeData>>) {
   const meta = statusMeta[data.status];
+  const isObjective = data.kind === "objective";
+  const KindIcon = isObjective ? FileTextIcon : FolderOpenIcon;
+  const ToggleIcon = data.isCollapsed ? ChevronRightIcon : ChevronDownIcon;
 
   return (
     <div
       className={cn(
         "w-56 rounded-2xl border bg-card p-4 shadow-sm transition-colors",
+        isObjective && "rounded-xl border-border bg-background",
         selected && "border-primary ring-2 ring-primary/15",
       )}
     >
@@ -45,7 +61,14 @@ export function LearningRoadmapNode({ data, selected }: NodeProps<Node<RoadmapNo
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <span className={cn("size-2 rounded-full", meta.dotClassName)} />
+            <KindIcon className="size-3.5" />
             {meta.label}
+            {!isObjective ? (
+              <span className="ml-auto inline-flex items-center gap-1">
+                <ToggleIcon className="size-3.5" />
+                {data.childCount ? `${data.childCount} 项` : null}
+              </span>
+            ) : null}
           </div>
           <div className="text-sm font-semibold leading-6">{data.label}</div>
         </div>

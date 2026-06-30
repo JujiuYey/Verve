@@ -1,4 +1,3 @@
-import { useNavigate } from "@tanstack/react-router";
 import {
   ArrowRightIcon,
   CheckCircle2Icon,
@@ -7,20 +6,10 @@ import {
   ListChecksIcon,
   PlayCircleIcon,
 } from "lucide-react";
-import { useMemo, useState } from "react";
 
 import { useExerciseList, type LearningExercise } from "@/api/learning";
-import { useGoalDetail, useGoalList, type LearningGoal } from "@/api/learning/goal";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -40,30 +29,9 @@ const masteryLabels: Record<string, string> = {
 };
 
 export function FeynmanExercisePage() {
-  const navigate = useNavigate();
-  const [selectedGoalId, setSelectedGoalId] = useState("");
-  const { data: goalsData, isLoading: goalsLoading } = useGoalList(1, 50);
   const { data: exercisesData, isLoading: exercisesLoading } = useExerciseList(1, 30);
-  const { data: selectedGoalDetail, isLoading: detailLoading } = useGoalDetail(selectedGoalId);
 
-  const goals = goalsData?.data ?? [];
   const exercises = exercisesData?.data ?? [];
-  const objectives = useMemo(
-    () => [...(selectedGoalDetail?.objectives ?? [])].sort((a, b) => a.order_index - b.order_index),
-    [selectedGoalDetail?.objectives],
-  );
-  const recommendedObjective =
-    objectives.find((item) => item.id === selectedGoalDetail?.path?.current_objective_id) ??
-    objectives.find((item) => item.status === "active") ??
-    objectives[0];
-
-  const startPractice = (objectiveId?: string) => {
-    if (!selectedGoalId || !objectiveId) return;
-    navigate({
-      to: "/learn/feynman-practice/$goalId/$objectiveId",
-      params: { goalId: selectedGoalId, objectiveId },
-    });
-  };
 
   return (
     <div className="flex h-full flex-col gap-6 overflow-auto p-6">
@@ -75,71 +43,10 @@ export function FeynmanExercisePage() {
           </div>
           <h1 className="text-2xl font-bold">用自己的话讲明白</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-            这里记录每次解释验证的结果，也可以从学习项目选择一个小目标开始新的费曼练习。
+            这里记录每次解释验证的结果。新的练习从学习项目详情里的小目标进入。
           </p>
         </div>
       </div>
-
-      <Card className="rounded-2xl">
-        <CardHeader>
-          <CardTitle className="text-base">开始一次练习</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-4 xl:grid-cols-[minmax(280px,420px)_1fr_auto] xl:items-start">
-          <div className="space-y-2">
-            <div className="text-sm font-medium">学习项目</div>
-            <Select value={selectedGoalId} onValueChange={setSelectedGoalId}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder={goalsLoading ? "正在加载学习项目..." : "选择一个学习项目"} />
-              </SelectTrigger>
-              <SelectContent>
-                {goals.map((goal: LearningGoal) => (
-                  <SelectItem key={goal.id} value={goal.id}>
-                    {goal.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="min-h-16 rounded-lg border bg-muted/20 p-3">
-            {detailLoading ? (
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-48" />
-                <Skeleton className="h-4 w-full" />
-              </div>
-            ) : recommendedObjective ? (
-              <div className="flex flex-col gap-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="secondary">{recommendedObjective.stage_title || "当前阶段"}</Badge>
-                  <Badge variant="outline">
-                    {masteryLabels[recommendedObjective.mastery_level] ??
-                      recommendedObjective.mastery_level}
-                  </Badge>
-                </div>
-                <div className="font-medium">{recommendedObjective.title}</div>
-                {recommendedObjective.detail ? (
-                  <p className="line-clamp-2 text-sm leading-6 text-muted-foreground">
-                    {recommendedObjective.detail}
-                  </p>
-                ) : null}
-              </div>
-            ) : (
-              <div className="text-sm text-muted-foreground">
-                选择学习项目后，会显示建议开始的小目标。
-              </div>
-            )}
-          </div>
-
-          <Button
-            className="xl:mt-7"
-            disabled={detailLoading || !recommendedObjective}
-            onClick={() => startPractice(recommendedObjective?.id)}
-          >
-            <PlayCircleIcon className="size-4" />
-            {detailLoading ? "读取小目标..." : "开始练习"}
-          </Button>
-        </CardContent>
-      </Card>
 
       <Card className="min-h-0 flex-1 rounded-2xl">
         <CardHeader className="flex flex-row items-center justify-between">
@@ -158,7 +65,7 @@ export function FeynmanExercisePage() {
               <PlayCircleIcon className="mb-3 size-8 text-muted-foreground" />
               <div className="font-medium">还没有费曼练习记录</div>
               <div className="mt-1 text-sm text-muted-foreground">
-                选择一个学习项目，完成第一次解释验证后会出现在这里。
+                从学习项目详情选择一个小目标，完成第一次解释验证后会出现在这里。
               </div>
             </div>
           ) : (
@@ -188,7 +95,9 @@ function ExerciseRecord({ exercise }: { exercise: LearningExercise }) {
               {new Date(exercise.created_at).toLocaleString()}
             </span>
           </div>
-          <div className="line-clamp-2 text-sm font-medium">{exercise.prompt || "费曼解释验证"}</div>
+          <div className="line-clamp-2 text-sm font-medium">
+            {exercise.prompt || "费曼解释验证"}
+          </div>
           {exercise.user_answer ? (
             <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">
               {exercise.user_answer}
@@ -202,7 +111,7 @@ function ExerciseRecord({ exercise }: { exercise: LearningExercise }) {
             <div className="text-sm font-medium">{meta?.label ?? "待判定"}</div>
             <div className="text-xs text-muted-foreground">
               {exercise.mastery_after
-                ? masteryLabels[exercise.mastery_after] ?? exercise.mastery_after
+                ? (masteryLabels[exercise.mastery_after] ?? exercise.mastery_after)
                 : "未验证"}
             </div>
           </div>
@@ -212,7 +121,9 @@ function ExerciseRecord({ exercise }: { exercise: LearningExercise }) {
         <>
           <Separator className="my-3" />
           <div className="flex items-start justify-between gap-3">
-            <p className="line-clamp-2 text-sm leading-6 text-muted-foreground">{exercise.feedback}</p>
+            <p className="line-clamp-2 text-sm leading-6 text-muted-foreground">
+              {exercise.feedback}
+            </p>
             <ArrowRightIcon className="mt-1 size-4 shrink-0 text-muted-foreground" />
           </div>
         </>

@@ -2,7 +2,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { AlertCircleIcon } from "lucide-react";
 import { useMemo } from "react";
 
-import { useGoalList } from "@/api/learning/goal";
+import { useDeleteGoal, useGoalList } from "@/api/learning/goal";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -14,6 +14,7 @@ import { LearningRoadmapGrid } from "./_components/learning-roadmap-grid";
 export function LearningOverviewPage() {
   const navigate = useNavigate();
   const { data, error, isError, isLoading, refetch } = useGoalList(1, 50);
+  const deleteGoal = useDeleteGoal();
   const roadmaps = useMemo(() => (data?.data || []).map(goalToRoadmap), [data?.data]);
 
   return (
@@ -51,6 +52,9 @@ export function LearningOverviewPage() {
             onOpenRoadmap={(roadmap) => {
               navigate({ to: "/learn/goal/$goalId", params: { goalId: roadmap.id } });
             }}
+            onDeleteRoadmap={(roadmap) => deleteGoal.mutate(roadmap.id)}
+            deletingRoadmapId={deleteGoal.variables}
+            isDeleting={deleteGoal.isPending}
           />
         )}
       </ScrollArea>

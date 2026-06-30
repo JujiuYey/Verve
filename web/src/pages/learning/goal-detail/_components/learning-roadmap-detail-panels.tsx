@@ -1,3 +1,4 @@
+import { useNavigate } from "@tanstack/react-router";
 import {
   BookMarkedIcon,
   CheckCircle2Icon,
@@ -12,10 +13,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import type { RoadmapStage } from "@/pages/learning/roadmap-adapter";
 
 type Props = {
+  goalId: string;
   activeStage: RoadmapStage | null;
 };
 
-export function LearningRoadmapDetailPanels({ activeStage }: Props) {
+export function LearningRoadmapDetailPanels({ goalId, activeStage }: Props) {
   return (
     <Card className="min-h-0 rounded-2xl py-0">
       <CardHeader className="border-b p-4!">
@@ -31,14 +33,23 @@ export function LearningRoadmapDetailPanels({ activeStage }: Props) {
       </CardHeader>
       <CardContent className="min-h-0 p-0 pb-2">
         <ScrollArea className="h-full">
-          {activeStage ? <StagePanel stage={activeStage} /> : null}
+          {activeStage ? <StagePanel goalId={goalId} stage={activeStage} /> : null}
         </ScrollArea>
       </CardContent>
     </Card>
   );
 }
 
-function StagePanel({ stage }: { stage: RoadmapStage }) {
+function StagePanel({ goalId, stage }: { goalId: string; stage: RoadmapStage }) {
+  const navigate = useNavigate();
+
+  const startPractice = (objectiveId: string) => {
+    navigate({
+      to: "/learn/feynman-practice/$goalId/$objectiveId",
+      params: { goalId, objectiveId },
+    });
+  };
+
   return (
     <div className="flex flex-col gap-5 px-3">
       {/* <div className="rounded-xl bg-muted/60 p-4">
@@ -67,7 +78,12 @@ function StagePanel({ stage }: { stage: RoadmapStage }) {
       <SectionTitle title="课程卡片" />
       <div className="flex flex-col gap-3">
         {stage.lessons.map((lesson) => (
-          <div key={lesson.id} className="rounded-xl border p-4">
+          <button
+            key={lesson.id}
+            type="button"
+            className="rounded-xl border p-4 text-left transition-colors hover:border-primary hover:bg-primary/5 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+            onClick={() => startPractice(lesson.id)}
+          >
             <div className="flex items-start justify-between gap-3">
               <div className="space-y-1">
                 <div className="font-medium">{lesson.title}</div>
@@ -86,7 +102,7 @@ function StagePanel({ stage }: { stage: RoadmapStage }) {
               />
               <LessonBlock title="练习任务" icon={PlayCircleIcon} items={lesson.tasks} />
             </div>
-          </div>
+          </button>
         ))}
       </div>
     </div>

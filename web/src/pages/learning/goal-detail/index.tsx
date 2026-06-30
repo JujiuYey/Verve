@@ -1,10 +1,8 @@
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { ReactFlowProvider } from "@xyflow/react";
-import { Loader2Icon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import { useGoalDetail } from "@/api/learning/goal";
-import { Card, CardContent } from "@/components/ui/card";
+import { useDeleteGoal, useGoalDetail } from "@/api/learning/goal";
 import { getRoadmapFlow, goalDetailToRoadmap } from "@/pages/learning/roadmap-adapter";
 
 import { LearningRoadmapDetailHeader } from "./_components/learning-roadmap-detail-header";
@@ -15,29 +13,31 @@ export function GoalDetailPage() {
   const navigate = useNavigate();
   const { goalId } = useParams({ from: "/_layout/learn/goal/$goalId" });
   const { data, isLoading } = useGoalDetail(goalId);
+  const deleteGoal = useDeleteGoal();
   const roadmap = useMemo(() => (data ? goalDetailToRoadmap(data) : null), [data]);
 
   const [activeStageId, setActiveStageId] = useState(roadmap?.stages[0]?.id ?? "");
+  const [collapsedFolderPaths, setCollapsedFolderPaths] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     setActiveStageId(roadmap?.stages[0]?.id ?? "");
+    setCollapsedFolderPaths(new Set());
   }, [roadmap?.id, roadmap?.stages]);
 
   const flow = useMemo(
-    () => (roadmap ? getRoadmapFlow(roadmap) : { nodes: [], edges: [] }),
-    [roadmap],
+    () => (roadmap ? getRoadmapFlow(roadmap, collapsedFolderPaths) : { nodes: [], edges: [] }),
+    [collapsedFolderPaths, roadmap],
   );
 
   const activeStage =
     roadmap?.stages.find((stage) => stage.id === activeStageId) ?? roadmap?.stages[0] ?? null;
-  const isGenerating = !!data?.goal && !data.path;
 
   if (isLoading) {
-    return <div className="p-6 text-sm text-muted-foreground">正在加载学习路线...</div>;
+    return <div className="p-6 text-sm text-muted-foreground">正在加载学习项目...</div>;
   }
 
   if (!roadmap) {
-    return <div className="p-6 text-sm text-muted-foreground">这条学习路线不存在</div>;
+    return <div className="p-6 text-sm text-muted-foreground">这个学习项目不存在</div>;
   }
 
   return (
@@ -45,29 +45,40 @@ export function GoalDetailPage() {
       <div className="flex h-full flex-col gap-6 overflow-hidden p-6">
         <LearningRoadmapDetailHeader
           roadmap={roadmap}
+          isDeleting={deleteGoal.isPending}
           onBack={() => navigate({ to: "/" })}
+          onDelete={() => {
+            deleteGoal.mutate(goalId, {
+              onSuccess: () => navigate({ to: "/" }),
+            });
+          }}
         />
 
-        {isGenerating ? (
-          <Card className="min-h-80 rounded-2xl">
-            <CardContent className="flex h-full min-h-80 flex-col items-center justify-center gap-3 text-center">
-              <Loader2Icon className="size-8 animate-spin text-primary" />
-              <div className="text-base font-medium">学习路线正在生成中</div>
-              <div className="max-w-md text-sm leading-6 text-muted-foreground">
-                学习目标已经保存，后台正在根据资料拆解阶段和小目标。页面会自动刷新生成结果。
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid min-h-0 flex-1 gap-6 xl:grid-cols-[minmax(0,1.45fr)_380px]">
-            <LearningRoadmapFlow
-              nodes={flow.nodes}
-              edges={flow.edges}
-              onNodeClick={(stageId) => setActiveStageId(stageId)}
-            />
-            <LearningRoadmapDetailPanels activeStage={activeStage} />
-          </div>
-        )}
+        <div className="grid min-h-0 flex-1 gap-6 xl:grid-cols-[minmax(0,1.45fr)_380px]">
+          <LearningRoadmapFlow
+            nodes={flow.nodes}
+            edges={flow.edges}
+            onStageClick={(stageId) => setActiveStageId(stageId)}
+            onFolderToggle={(folderPath) => {
+              setCollapsedFolderPaths((prev) => {
+                const next = new Set(prev);
+                if (next.has(folderPath)) {
+                  next.delete(folderPath);
+                } else {
+                  next.add(folderPath);
+                }
+                return next;
+              });
+            }}
+            onObjectiveClick={(objectiveId) =>
+              navigate({
+                to: "/learn/feynman-practice/$goalId/$objectiveId",
+                params: { goalId, objectiveId },
+              })
+            }
+          />
+          <LearningRoadmapDetailPanels goalId={goalId} activeStage={activeStage} />
+        </div>
       </div>
     </ReactFlowProvider>
   );

@@ -239,17 +239,21 @@ func buildStagesFromFolderStructure(goal *learning_db.LearningGoal, root *wiki_d
 		}
 
 		stage := findOrCreateStage(&stages, stageByFolderID, stageFolder, stageTitle)
+		folderPath := folderPathName(root, foldersByID, doc.FolderID)
 		detail := fmt.Sprintf("来源文档: %s", doc.Filename)
-		if folderPath := folderPathName(root, foldersByID, doc.FolderID); folderPath != "" {
+		if folderPath != "" {
 			detail = fmt.Sprintf("来源目录: %s\n来源文档: %s", folderPath, doc.Filename)
 		}
 		stage.Objectives = append(stage.Objectives, &learning_db.LearningObjective{
-			UserID:       goal.UserID,
-			StageTitle:   &stage.Title,
-			Title:        cleanLearningTitle(doc.Filename),
-			Detail:       &detail,
-			Status:       "pending",
-			MasteryLevel: "none",
+			UserID:           goal.UserID,
+			StageTitle:       &stage.Title,
+			Title:            cleanLearningTitle(doc.Filename),
+			Detail:           &detail,
+			SourceDocumentID: &doc.ID,
+			SourceFolderID:   &doc.FolderID,
+			SourceFolderPath: &folderPath,
+			Status:           "pending",
+			MasteryLevel:     "none",
 		})
 	}
 

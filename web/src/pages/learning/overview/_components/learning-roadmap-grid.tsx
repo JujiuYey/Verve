@@ -1,5 +1,16 @@
-import { Clock3Icon, LayersIcon, TrendingUpIcon, UsersIcon } from "lucide-react";
+import { Clock3Icon, LayersIcon, Trash2Icon, TrendingUpIcon, UsersIcon } from "lucide-react";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,12 +27,22 @@ import { type LearningRoadmap } from "@/pages/learning/roadmap-adapter";
 type Props = {
   roadmaps: LearningRoadmap[];
   onOpenRoadmap: (roadmap: LearningRoadmap) => void;
+  onDeleteRoadmap: (roadmap: LearningRoadmap) => void;
+  deletingRoadmapId?: string;
+  isDeleting?: boolean;
 };
 
-export function LearningRoadmapGrid({ roadmaps, onOpenRoadmap }: Props) {
+export function LearningRoadmapGrid({
+  roadmaps,
+  onOpenRoadmap,
+  onDeleteRoadmap,
+  deletingRoadmapId,
+  isDeleting = false,
+}: Props) {
   return (
     <div className="grid grid-cols-1 gap-3 xl:grid-cols-2 2xl:grid-cols-3">
       {roadmaps.map((roadmap) => {
+        const isDeletingThis = isDeleting && deletingRoadmapId === roadmap.id;
         return (
           <Card
             key={roadmap.id}
@@ -66,13 +87,56 @@ export function LearningRoadmapGrid({ roadmaps, onOpenRoadmap }: Props) {
               </div>
             </CardContent>
 
-            <CardFooter className="justify-end border-t py-3">
+            <CardFooter className="justify-between gap-2 border-t py-3">
+              <DeleteRoadmapDialog
+                roadmap={roadmap}
+                disabled={isDeleting}
+                isDeleting={isDeletingThis}
+                onDelete={() => onDeleteRoadmap(roadmap)}
+              />
               <Button onClick={() => onOpenRoadmap(roadmap)}>继续学习</Button>
             </CardFooter>
           </Card>
         );
       })}
     </div>
+  );
+}
+
+function DeleteRoadmapDialog({
+  roadmap,
+  disabled,
+  isDeleting,
+  onDelete,
+}: {
+  roadmap: LearningRoadmap;
+  disabled: boolean;
+  isDeleting: boolean;
+  onDelete: () => void;
+}) {
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button variant="outline" disabled={disabled}>
+          <Trash2Icon className="size-4" />
+          删除
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>删除这个学习目标？</AlertDialogTitle>
+          <AlertDialogDescription className="leading-6">
+            {`将删除「${roadmap.title}」以及它下面的学习路径、小目标、练习会话、练习记录、学习日志和学习画像。文件管理里的文件夹和 Markdown 原文不会被删除。`}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isDeleting}>取消</AlertDialogCancel>
+          <AlertDialogAction variant="destructive" disabled={isDeleting} onClick={onDelete}>
+            {isDeleting ? "删除中..." : "确认删除"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 

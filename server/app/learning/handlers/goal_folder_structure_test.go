@@ -38,6 +38,15 @@ func TestBuildStagesFromFolderStructureUsesTopLevelFolders(t *testing.T) {
 	if got := stages[0].Objectives[0].Title; got != "课程说明" {
 		t.Fatalf("expected cleaned root doc title, got %q", got)
 	}
+	if got := stages[0].Objectives[0].SourceDocumentID; got == nil || *got != "doc-root" {
+		t.Fatalf("expected root objective source document id, got %v", got)
+	}
+	if got := stages[0].Objectives[0].SourceFolderID; got == nil || *got != rootID {
+		t.Fatalf("expected root objective source folder id, got %v", got)
+	}
+	if got := stages[0].Objectives[0].SourceFolderPath; got == nil || *got != "golang" {
+		t.Fatalf("expected root objective source folder path, got %v", got)
+	}
 
 	if stages[1].Title != "01-工具链与HelloWorld" {
 		t.Fatalf("expected first numbered folder stage, got %q", stages[1].Title)
@@ -45,11 +54,29 @@ func TestBuildStagesFromFolderStructureUsesTopLevelFolders(t *testing.T) {
 	if got := stages[1].Objectives[0].Title; got != "工具链与HelloWorld" {
 		t.Fatalf("expected cleaned stage doc title, got %q", got)
 	}
+	if got := stages[1].Objectives[0].SourceDocumentID; got == nil || *got != "doc-1" {
+		t.Fatalf("expected stage objective source document id, got %v", got)
+	}
+	if got := stages[1].Objectives[0].SourceFolderID; got == nil || *got != stageOneID {
+		t.Fatalf("expected stage objective source folder id, got %v", got)
+	}
+	if got := stages[1].Objectives[0].SourceFolderPath; got == nil || *got != "golang / 01-工具链与HelloWorld" {
+		t.Fatalf("expected stage objective source folder path, got %v", got)
+	}
 
 	if stages[2].Title != "02-类型状态与控制流" {
 		t.Fatalf("expected nested doc to map to top-level stage, got %q", stages[2].Title)
 	}
 	if got := *stages[2].Objectives[0].Detail; got != "来源目录: golang / 02-类型状态与控制流 / 深入补充\n来源文档: 02-变量声明赋值零值与作用域.md" {
 		t.Fatalf("unexpected nested doc detail: %q", got)
+	}
+	if got := stages[2].Objectives[0].SourceDocumentID; got == nil || *got != "doc-2" {
+		t.Fatalf("expected nested objective source document id, got %v", got)
+	}
+	if got := stages[2].Objectives[0].SourceFolderID; got == nil || *got != nestedID {
+		t.Fatalf("expected nested objective source folder id, got %v", got)
+	}
+	if got := stages[2].Objectives[0].SourceFolderPath; got == nil || *got != "golang / 02-类型状态与控制流 / 深入补充" {
+		t.Fatalf("expected nested objective source folder path, got %v", got)
 	}
 }

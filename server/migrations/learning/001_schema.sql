@@ -42,6 +42,9 @@ CREATE TABLE learning_objectives (
     stage_title VARCHAR(255),
     title VARCHAR(255) NOT NULL,
     detail TEXT,
+    source_document_id VARCHAR(32),
+    source_folder_id VARCHAR(32),
+    source_folder_path TEXT,
     order_index INTEGER NOT NULL DEFAULT 0,
     status VARCHAR(20) NOT NULL DEFAULT 'pending',
     mastery_level VARCHAR(20) NOT NULL DEFAULT 'none',
@@ -53,6 +56,8 @@ CREATE TABLE learning_objectives (
 CREATE INDEX idx_learning_objectives_path_order ON learning_objectives(path_id, order_index);
 CREATE INDEX idx_learning_objectives_user_id ON learning_objectives(user_id);
 CREATE INDEX idx_learning_objectives_status ON learning_objectives(status);
+CREATE INDEX idx_learning_objectives_source_document_id ON learning_objectives(source_document_id);
+CREATE INDEX idx_learning_objectives_source_folder_id ON learning_objectives(source_folder_id);
 
 -- 4. 学习会话(learning_sessions):一节课
 CREATE TABLE learning_sessions (

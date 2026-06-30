@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import {
   ArrowLeftIcon,
@@ -19,6 +20,7 @@ import {
   type ExerciseResult,
   type LearningObjective,
 } from "@/api/learning";
+import { documentApi } from "@/api/wiki/document";
 import { MessageResponse } from "@/components/ai-elements/message";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -206,9 +208,17 @@ function SourcePanel({
   stageObjectives: LearningObjective[];
   onStartAnswering: () => void;
 }) {
-  const sourceMarkdown =
-    objective.detail?.trim() ||
-    "当前小目标还没有展开说明。后续接入原始 Markdown 正文后，这里会展示对应资料片段。";
+  const documentId = objective.source_document_id;
+  const {
+    data: sourceDocument,
+    isLoading: isSourceLoading,
+    isError: isSourceError,
+  } = useQuery({
+    queryKey: ["feynman-source-document", documentId],
+    queryFn: () => documentApi.getContent(documentId as string),
+    enabled: !!documentId,
+  });
+  const sourceMarkdown = sourceDocument?.content?.trim() || "";
 
   return (
     <Card className="min-h-0 flex-1 rounded-2xl py-0">
@@ -233,9 +243,24 @@ function SourcePanel({
             </section>
 
             <section className="rounded-xl border bg-background p-5">
-              <MessageResponse className="max-w-none text-sm leading-7">
-                {sourceMarkdown}
-              </MessageResponse>
+              {isSourceLoading ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-4 w-56" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-11/12" />
+                  <Skeleton className="h-4 w-4/5" />
+                </div>
+              ) : sourceMarkdown ? (
+                <MessageResponse className="max-w-none text-sm leading-7">
+                  {sourceMarkdown}
+                </MessageResponse>
+              ) : (
+                <div className="text-sm leading-7 text-muted-foreground">
+                  {isSourceError
+                    ? "原始 Markdown 文档读取失败，请稍后重试。"
+                    : "这个小目标还没有关联原始 Markdown 文档，暂时只能查看下方来源信息。"}
+                </div>
+              )}
             </section>
 
             <section>
