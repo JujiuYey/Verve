@@ -164,7 +164,7 @@ func (r *folderRepository) Delete(ctx context.Context, id string) error {
 func (r *folderRepository) GetAllSubFolderIDs(ctx context.Context, parentID string) ([]string, error) {
 	query := `
 		WITH RECURSIVE folder_tree AS (
-			SELECT id FROM wiki_folders WHERE id = $1
+			SELECT id FROM wiki_folders WHERE id = ?
 			UNION ALL
 			SELECT f.id FROM wiki_folders f
 			INNER JOIN folder_tree ft ON f.parent_id = ft.id

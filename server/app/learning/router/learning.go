@@ -23,6 +23,7 @@ func SetupLearningRoutes(router fiber.Router, dbService *database.DatabaseServic
 		goal := learning.Group("/goal")
 		{
 			goal.Get("/page", goalHandler.FindPage) // 注意:/page 在 /:id 之前注册
+			goal.Post("/from-folder", goalHandler.CreateFromFolder)
 			goal.Post("/", goalHandler.Create)
 			goal.Put("/", goalHandler.Update)
 			goal.Get("/:id", goalHandler.FindOne)

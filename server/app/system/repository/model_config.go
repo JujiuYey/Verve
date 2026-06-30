@@ -21,6 +21,7 @@ type ModelConfigRepository interface {
 	FindOne(ctx context.Context, id string) (*system_db.ModelConfig, error)
 	FindDefault(ctx context.Context) (*system_db.ModelConfig, error)
 	FindDefaultByType(ctx context.Context, modelType string) (*system_db.ModelConfig, error)
+	FindByModelName(ctx context.Context, modelName string) (*system_db.ModelConfig, error)
 	SetDefault(ctx context.Context, id string) error
 	FindList(ctx context.Context) ([]*system_db.ModelConfig, error)
 	Create(ctx context.Context, config *system_db.ModelConfig) error
@@ -197,6 +198,20 @@ func (r *modelConfigRepository) FindDefaultByType(ctx context.Context, modelType
 	})
 	if err != nil {
 		return nil, fmt.Errorf("获取默认模型配置失败: %w", err)
+	}
+	return config, nil
+}
+
+func (r *modelConfigRepository) FindByModelName(ctx context.Context, modelName string) (*system_db.ModelConfig, error) {
+	config, err := r.findModelConfig(ctx, func(query *bun.SelectQuery) *bun.SelectQuery {
+		return query.
+			Where("(sm.model_name = ? OR sm.display_name = ?)", modelName, modelName).
+			Where("sm.model_type = ?", system_db.ModelTypeChat).
+			Where("sm.status = ?", modelStatusActive).
+			Where("smp.enabled = ?", true)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("根据模型名称获取模型配置失败: %w", err)
 	}
 	return config, nil
 }

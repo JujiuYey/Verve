@@ -41,7 +41,7 @@ const examinerInstruction = `你是学习验证与监督者。根据小目标、
 
 // NewPlannerAgent 学习路线规划 agent(无工具,直接产出 JSON 路线)
 func NewPlannerAgent(ctx context.Context, modelRepo system_repo.ModelConfigRepository) (adk.Agent, error) {
-	chatModel, err := ai_model.NewChatModel(ctx, modelRepo)
+	chatModel, err := ai_model.NewPlannerChatModel(ctx, modelRepo)
 	if err != nil {
 		return nil, err
 	}

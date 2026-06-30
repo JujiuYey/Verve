@@ -57,6 +57,10 @@ export interface CreateGoalRequest {
   title: string;
 }
 
+export interface CreateGoalFromFolderRequest {
+  folder_id: string;
+}
+
 export interface UpdateGoalRequest {
   id: string;
   title?: string;
@@ -76,6 +80,9 @@ const BASE = "/api/learning";
 const api = {
   // 创建目标(后端会同步生成学习路线)
   create: (data: CreateGoalRequest) => request.post<{ goal_id: string }>(`${BASE}/goal`, data),
+
+  createFromFolder: (data: CreateGoalFromFolderRequest) =>
+    request.post<{ goal_id: string }>(`${BASE}/goal/from-folder`, data),
 
   page: (page = 1, pageSize = 20) =>
     request.get<GoalPageResponse>(`${BASE}/goal/page`, { params: { page, page_size: pageSize } }),

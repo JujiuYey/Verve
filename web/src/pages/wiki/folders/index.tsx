@@ -1,8 +1,9 @@
-import { IconPlus, IconRefresh, IconSearch, IconUpload } from "@tabler/icons-react";
-// import { useNavigate } from "@tanstack/react-router";
+import { IconPlus, IconRefresh, IconRoute, IconSearch, IconUpload } from "@tabler/icons-react";
+import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { goalApi } from "@/api/learning/goal";
 import type { Document } from "@/api/wiki/document";
 import { documentApi } from "@/api/wiki/document";
 import {
@@ -27,7 +28,7 @@ import { UploadDialog } from "./_components/upload-dialog";
 import { getFolderContentView } from "./_shared/content-view";
 
 export function FoldersPage() {
-  // const navigate = useNavigate();
+  const navigate = useNavigate();
   const [data, setData] = useState<Folder[]>([]);
   const [folderTreeData, setFolderTreeData] = useState<FolderTreeNode[]>([]);
   const [loading, setLoading] = useState(false);
@@ -54,6 +55,7 @@ export function FoldersPage() {
 
   const [uploadOpen, setUploadOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Folder | null>(null);
+  const [creatingLearningPath, setCreatingLearningPath] = useState(false);
 
   // 获取当前文件夹ID（面包屑最后一个）
   const currentFolderId = breadcrumb.length > 0 ? breadcrumb[breadcrumb.length - 1].id : undefined;
@@ -135,6 +137,25 @@ export function FoldersPage() {
       void loadDocuments(currentFolderId);
     }
   }, [currentFolderId, loadDocuments, loadFolders]);
+
+  const handleCreateLearningPath = useCallback(
+    async (folder?: Folder | null) => {
+      const folderId = folder?.id || currentFolderId;
+      if (!folderId) return;
+
+      setCreatingLearningPath(true);
+      try {
+        const res = await goalApi.createFromFolder({ folder_id: folderId });
+        toast.success("学习路径已生成");
+        await navigate({ to: "/learn/goal/$goalId", params: { goalId: res.goal_id } });
+      } catch (error) {
+        console.error("生成学习路径失败:", error);
+      } finally {
+        setCreatingLearningPath(false);
+      }
+    },
+    [currentFolderId, navigate],
+  );
 
   useEffect(() => {
     void loadFolderTree();
@@ -310,6 +331,14 @@ export function FoldersPage() {
                     <Button size="sm" variant="outline" onClick={handleRefresh}>
                       <IconRefresh className="h-4 w-4" />
                     </Button>
+                    <Button
+                      variant="outline"
+                      disabled={creatingLearningPath}
+                      onClick={() => handleCreateLearningPath(currentFolder)}
+                    >
+                      <IconRoute className="mr-2 h-4 w-4" />
+                      {creatingLearningPath ? "生成中..." : "生成学习路径"}
+                    </Button>
                     <Button onClick={() => setUploadOpen(true)}>
                       <IconUpload className="mr-2 h-4 w-4" />
                       上传文档
@@ -394,7 +423,12 @@ export function FoldersPage() {
               maxSize="35%"
               className="min-w-0 overflow-y-auto bg-background"
             >
-              <FolderDetailPanel folder={currentFolder} onEdit={handleEdit} />
+              <FolderDetailPanel
+                folder={currentFolder}
+                onEdit={handleEdit}
+                onCreateLearningPath={handleCreateLearningPath}
+                creatingLearningPath={creatingLearningPath}
+              />
             </ResizablePanel>
           </>
         )}
