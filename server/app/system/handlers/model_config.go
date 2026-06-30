@@ -5,10 +5,10 @@ import (
 	"log"
 	"strings"
 
-	ai_service "sag-wiki/app/ai/service"
 	system_db "sag-wiki/app/system/models/db"
 	system_payload "sag-wiki/app/system/models/payload"
 	system_repository "sag-wiki/app/system/repository"
+	system_service "sag-wiki/app/system/service"
 	"sag-wiki/common/response"
 	"sag-wiki/infrastructure/database"
 
@@ -17,14 +17,14 @@ import (
 
 type ModelConfigHandler struct {
 	repo    system_repository.ModelConfigRepository
-	syncSvc *ai_service.ModelSyncService
+	syncSvc *system_service.ModelSyncService
 }
 
 func NewModelConfigHandler(dbService *database.DatabaseService) *ModelConfigHandler {
 	repo := system_repository.NewModelConfigRepository(dbService.GetDB())
 	return &ModelConfigHandler{
 		repo:    repo,
-		syncSvc: ai_service.NewModelSyncService(repo),
+		syncSvc: system_service.NewModelSyncService(repo),
 	}
 }
 

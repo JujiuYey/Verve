@@ -1,4 +1,4 @@
-package model
+package llm
 
 import (
 	"context"
@@ -6,9 +6,6 @@ import (
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
-
-	ai_model "sag-wiki/app/ai/model"
-	system_repo "sag-wiki/app/system/repository"
 )
 
 const plannerInstruction = `你是学习路线规划专家,面向技术/编程类自学者。
@@ -40,8 +37,8 @@ const examinerInstruction = `你是学习验证与监督者。根据小目标、
 - 反馈具体、不敷衍、不空泛鼓励。`
 
 // NewPlannerAgent 学习路线规划 agent(无工具,直接产出 JSON 路线)
-func NewPlannerAgent(ctx context.Context, modelRepo system_repo.ModelConfigRepository) (adk.Agent, error) {
-	chatModel, err := ai_model.NewPlannerChatModel(ctx, modelRepo)
+func NewPlannerAgent(ctx context.Context) (adk.Agent, error) {
+	chatModel, err := NewChatModel(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -58,8 +55,8 @@ func NewPlannerAgent(ctx context.Context, modelRepo system_repo.ModelConfigRepos
 }
 
 // NewTutorAgent 费曼陪练 agent
-func NewTutorAgent(ctx context.Context, modelRepo system_repo.ModelConfigRepository, tools []tool.BaseTool) (adk.Agent, error) {
-	chatModel, err := ai_model.NewChatModel(ctx, modelRepo)
+func NewTutorAgent(ctx context.Context, tools []tool.BaseTool) (adk.Agent, error) {
+	chatModel, err := NewChatModel(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -79,8 +76,8 @@ func NewTutorAgent(ctx context.Context, modelRepo system_repo.ModelConfigReposit
 }
 
 // NewExaminerAgent 学习监督 agent
-func NewExaminerAgent(ctx context.Context, modelRepo system_repo.ModelConfigRepository, tools []tool.BaseTool) (adk.Agent, error) {
-	chatModel, err := ai_model.NewChatModel(ctx, modelRepo)
+func NewExaminerAgent(ctx context.Context, tools []tool.BaseTool) (adk.Agent, error) {
+	chatModel, err := NewChatModel(ctx)
 	if err != nil {
 		return nil, err
 	}

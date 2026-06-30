@@ -10,9 +10,9 @@ import (
 
 	"github.com/cloudwego/eino/adk"
 
-	learning_model "sag-wiki/app/learning/model"
 	learning_db "sag-wiki/app/learning/models/db"
 	"sag-wiki/infrastructure/database"
+	"sag-wiki/infrastructure/llm"
 )
 
 // 学习验证服务(Examiner)
@@ -32,7 +32,7 @@ type JudgeResult struct {
 
 // Judge 调 Examiner agent 判定一次作答
 func (s *ExaminerService) Judge(ctx context.Context, obj *learning_db.LearningObjective, exType, prompt, userAnswer string) (*JudgeResult, error) {
-	agent, err := learning_model.NewExaminerAgent(ctx, s.db.ModelConfigs, nil)
+	agent, err := llm.NewExaminerAgent(ctx, nil)
 	if err != nil {
 		log.Printf("❌ Examiner Agent 初始化失败: objective_id=%s type=%s err=%v", obj.ID, exType, err)
 		return nil, err

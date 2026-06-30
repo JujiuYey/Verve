@@ -10,9 +10,9 @@ import (
 
 	"github.com/cloudwego/eino/adk"
 
-	learning_model "sag-wiki/app/learning/model"
 	learning_db "sag-wiki/app/learning/models/db"
 	"sag-wiki/infrastructure/database"
+	"sag-wiki/infrastructure/llm"
 )
 
 // 学习路线生成服务(Planner)
@@ -52,7 +52,7 @@ func (s *PlannerService) generatePath(ctx context.Context, goal *learning_db.Lea
 	query = strings.TrimSpace(query)
 	log.Printf("🧠 Planner 开始生成学习路径: goal_id=%s source=%s query_chars=%d query_preview=%q", goal.ID, goal.Source, len(query), truncateForPlannerLog(query, 400))
 
-	agent, err := learning_model.NewPlannerAgent(ctx, s.db.ModelConfigs)
+	agent, err := llm.NewPlannerAgent(ctx)
 	if err != nil {
 		log.Printf("❌ Planner Agent 初始化失败: goal_id=%s err=%v", goal.ID, err)
 		return err

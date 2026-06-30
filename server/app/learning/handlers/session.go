@@ -15,13 +15,13 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/valyala/fasthttp"
 
-	learning_model "sag-wiki/app/learning/model"
 	learning_db "sag-wiki/app/learning/models/db"
 	learning_payload "sag-wiki/app/learning/models/payload"
 	learning_service "sag-wiki/app/learning/service"
 	learning_tools "sag-wiki/app/learning/tools"
 	"sag-wiki/common/response"
 	"sag-wiki/infrastructure/database"
+	"sag-wiki/infrastructure/llm"
 )
 
 // 学习会话处理器
@@ -124,7 +124,7 @@ func (h *SessionHandler) Chat(c *fiber.Ctx) error {
 
 	// 构造 Tutor agent(带读工具)
 	tools := learning_tools.NewLearningTools(h.db.Objectives, h.db.Exercises)
-	agent, err := learning_model.NewTutorAgent(c.Context(), h.db.ModelConfigs, tools)
+	agent, err := llm.NewTutorAgent(c.Context(), tools)
 	if err != nil {
 		return response.InternalServerCtx(c, "Tutor 初始化失败: "+err.Error())
 	}
