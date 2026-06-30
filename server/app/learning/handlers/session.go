@@ -3,6 +3,7 @@ package handlers
 import (
 	"bufio"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"io"
@@ -210,12 +211,49 @@ func (h *SessionHandler) Exercise(c *fiber.Ctx) error {
 	// 更新掌握层级
 	obj.MasteryLevel = result.MasteryAfter
 	_ = h.db.Objectives.Update(c.Context(), obj)
+	h.syncLearningExaminerState(c.Context(), userID, session.GoalID, obj, result)
 
 	return response.SuccessCtx(c, fiber.Map{
-		"verdict":       result.Verdict,
-		"mastery_after": result.MasteryAfter,
-		"feedback":      result.Feedback,
-		"objective_id":  obj.ID,
+		"verdict":             result.Verdict,
+		"mastery_after":       result.MasteryAfter,
+		"feedback":            result.Feedback,
+		"objective_id":        obj.ID,
+		"evidence":            result.Evidence,
+		"weak_points":         result.WeakPoints,
+		"next_recommendation": result.NextRecommendation,
+		"review_required":     result.ReviewRequired,
+	})
+}
+
+func (h *SessionHandler) syncLearningExaminerState(ctx context.Context, userID, goalID string, obj *learning_db.LearningObjective, result *learning_service.JudgeResult) {
+	if result == nil {
+		return
+	}
+
+	if profile, err := h.db.Profiles.FindByGoal(ctx, goalID); err == nil {
+		learning_service.MergeLearningProfileState(profile, obj, result)
+		_ = h.db.Profiles.Update(ctx, profile)
+	} else if err == sql.ErrNoRows {
+		profile := &learning_db.LearningProfile{
+			UserID: userID,
+			GoalID: goalID,
+		}
+		learning_service.MergeLearningProfileState(profile, obj, result)
+		_ = h.db.Profiles.Create(ctx, profile)
+	}
+
+	learned := obj.Title
+	evidence := result.Evidence
+	weakPoints := strings.Join(result.WeakPoints, "、")
+	nextStep := result.NextRecommendation
+	_ = h.db.Journals.Create(ctx, &learning_db.LearningJournal{
+		UserID:     userID,
+		GoalID:     goalID,
+		Date:       time.Now(),
+		Learned:    &learned,
+		Evidence:   &evidence,
+		WeakPoints: &weakPoints,
+		NextStep:   &nextStep,
 	})
 }
 

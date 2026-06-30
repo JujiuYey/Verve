@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"log"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
@@ -48,6 +49,7 @@ func (h *GuideHandler) Get(c *fiber.Ctx) error {
 		if err == sql.ErrNoRows {
 			return response.SuccessCtx[any](c, nil)
 		}
+		log.Printf("❌ 读取导学缓存失败: user_id=%s objective_id=%s content_hash=%s err=%v", userID, objectiveID, contentHash, err)
 		return response.InternalServerCtx(c, "读取导学缓存失败")
 	}
 

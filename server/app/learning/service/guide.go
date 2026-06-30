@@ -53,7 +53,7 @@ func (s *GuideService) FindCached(ctx context.Context, obj *learning_db.Learning
 		return nil, err
 	}
 	var result GuideResult
-	if err := json.Unmarshal([]byte(guide.Result), &result); err != nil {
+	if err := json.Unmarshal(guide.Result, &result); err != nil {
 		return nil, err
 	}
 	normalizeGuideResult(&result)
@@ -104,7 +104,7 @@ func (s *GuideService) Generate(ctx context.Context, obj *learning_db.LearningOb
 		ObjectiveID: obj.ID,
 		UserID:      obj.UserID,
 		ContentHash: contentHash,
-		Result:      string(resultJSON),
+		Result:      resultJSON,
 	}); err != nil {
 		return nil, err
 	}

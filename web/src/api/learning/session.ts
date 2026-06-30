@@ -46,6 +46,10 @@ export interface ExerciseResult {
   mastery_after: string;
   feedback: string;
   objective_id: string;
+  evidence?: string;
+  weak_points?: string[];
+  next_recommendation?: string;
+  review_required?: boolean;
 }
 
 export interface CompleteResult {
