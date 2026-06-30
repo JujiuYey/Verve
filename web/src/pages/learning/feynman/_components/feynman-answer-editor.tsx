@@ -136,9 +136,6 @@ function EditorToolbar({ editor, onClear }: { editor: Editor | null; onClear: ()
         <ListOrderedIcon className="size-4" />
       </ToolbarIconButton>
       <div className="ml-auto flex items-center gap-2 pl-2">
-        <span className="hidden text-xs text-muted-foreground sm:inline">
-          Markdown 会随提交一起保存
-        </span>
         <ToolbarIconButton
           label="清空"
           disabled={disabled || state.isEmpty}
