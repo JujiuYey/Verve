@@ -30,8 +30,11 @@ export function LearningRoadmapFlow({ nodes, edges, onNodeClick }: Props) {
         nodeTypes={nodeTypes}
         onNodeClick={(_, node) => onNodeClick(node.id)}
         nodesDraggable={false}
+        panOnDrag
+        selectionOnDrag={false}
         elementsSelectable
-        fitViewOptions={{ padding: 0.2 }}
+        minZoom={0.15}
+        fitViewOptions={{ padding: 0.08 }}
       >
         <Controls showInteractive={false} />
         <Background gap={20} color="var(--border)" />
