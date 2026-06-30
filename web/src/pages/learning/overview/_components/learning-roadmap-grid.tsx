@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
-import { type LearningRoadmap } from "@/pages/learning/mock-roadmaps";
+import { type LearningRoadmap } from "@/pages/learning/roadmap-adapter";
 
 const categoryMeta: Record<
   LearningRoadmap["category"],

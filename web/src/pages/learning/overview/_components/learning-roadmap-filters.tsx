@@ -1,5 +1,5 @@
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import type { LearningRoadmap } from "@/pages/learning/mock-roadmaps";
+import type { LearningRoadmap } from "@/pages/learning/roadmap-adapter";
 
 export type LearningRoadmapFilter = "all" | LearningRoadmap["category"];
 

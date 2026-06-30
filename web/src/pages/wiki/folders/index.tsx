@@ -146,7 +146,7 @@ export function FoldersPage() {
       setCreatingLearningPath(true);
       try {
         const res = await goalApi.createFromFolder({ folder_id: folderId });
-        toast.success("学习路径已生成");
+        toast.success("学习路线已生成");
         await navigate({ to: "/learn/goal/$goalId", params: { goalId: res.goal_id } });
       } catch (error) {
         console.error("生成学习路径失败:", error);

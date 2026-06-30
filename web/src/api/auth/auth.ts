@@ -16,8 +16,8 @@ export const authApi = {
 
   // 刷新 token
   refreshToken: (data: RefreshTokenRequest) =>
-    request.post<RefreshTokenResponse>(`${RESOURCE_PATH}/refresh`, data),
+    request.post<RefreshTokenResponse>(`${RESOURCE_PATH}/refresh-token`, data),
 
   // 获取当前用户信息
-  getCurrentUser: () => request.get<UserInfo>(`${RESOURCE_PATH}/me`),
+  getCurrentUser: () => request.get<UserInfo>("/api/system/user/me"),
 };

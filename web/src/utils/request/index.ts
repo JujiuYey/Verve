@@ -34,7 +34,7 @@ async function refreshToken(): Promise<string | null> {
 
   try {
     const { data } = await axios.post<ApiResponse<{ access_token: string }>>(
-      `${import.meta.env.VITE_API_BASE_URL}/auth/refresh`,
+      `${import.meta.env.VITE_API_BASE_URL}/auth/refresh-token`,
       { refresh_token: refresh },
     );
     if (data.code === 0 && data.data.access_token) {
@@ -84,7 +84,7 @@ instance.interceptors.response.use(
       status === 401 &&
       !originalRequest._retry &&
       !originalRequest.url?.includes("/auth/login") &&
-      !originalRequest.url?.includes("/auth/refresh")
+      !originalRequest.url?.includes("/auth/refresh-token")
     ) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {

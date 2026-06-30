@@ -117,6 +117,11 @@ export function useGoalDetail(id: string) {
     queryKey: goalKeys.detail(id),
     queryFn: () => api.detail(id),
     enabled: !!id,
+    refetchInterval: (query) => {
+      const detail = query.state.data;
+      if (!detail || detail.path) return false;
+      return 3000;
+    },
   });
 }
 

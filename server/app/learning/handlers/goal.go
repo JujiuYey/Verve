@@ -1,10 +1,14 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 
@@ -61,11 +65,7 @@ func (h *GoalHandler) Create(c *fiber.Ctx) error {
 		return response.InternalServerCtx(c, "创建学习目标失败")
 	}
 
-	// 生成学习路线(Planner)。失败则回收目标,避免半成品。
-	if err := h.planner.GeneratePath(c.Context(), goal); err != nil {
-		_ = h.db.Goals.Delete(c.Context(), goal.ID)
-		return response.InternalServerCtx(c, "学习路线生成失败,请重试")
-	}
+	h.generatePathAsync(goal, goal.Title, "")
 
 	return response.SuccessCtx(c, fiber.Map{"goal_id": goal.ID})
 }
@@ -112,18 +112,17 @@ func (h *GoalHandler) CreateFromFolder(c *fiber.Ctx) error {
 		return response.InternalServerCtx(c, "读取文档列表失败")
 	}
 	log.Printf("📄 学习路径来源统计: root_folder=%s folder_count=%d selected_folder_count=%d document_count=%d", folder.Name, len(folderIDs), len(selectedFolders), len(docs))
-	if len(folderIDs) <= 1 && len(docs) == 0 {
+	if len(docs) == 0 {
 		log.Printf("⚠️ 当前文件夹没有可生成学习路径的内容: folder_id=%s", req.FolderID)
 		return response.BadRequestCtx(c, "当前文件夹没有可用于生成学习路径的内容")
 	}
 
 	title := fmt.Sprintf("学习 %s", folder.Name)
-	sourcePrompt := buildFolderLearningPrompt(folder, selectedFolders, docs)
-	log.Printf("🧭 学习路径生成输入: title=%s prompt_chars=%d prompt_preview=%q", title, len(sourcePrompt), truncateForLog(sourcePrompt, 600))
+	description := fmt.Sprintf("基于文档管理中的「%s」目录结构生成。", folder.Name)
 	goal := &learning_db.LearningGoal{
 		UserID:      userID,
 		Title:       title,
-		Description: &sourcePrompt,
+		Description: &description,
 		Source:      "documents",
 		Status:      "active",
 	}
@@ -133,14 +132,219 @@ func (h *GoalHandler) CreateFromFolder(c *fiber.Ctx) error {
 	}
 	log.Printf("✅ 文档来源学习目标已创建: goal_id=%s source_folder_id=%s", goal.ID, req.FolderID)
 
-	if err := h.planner.GeneratePathWithQuery(c.Context(), goal, sourcePrompt); err != nil {
+	if err := h.createPathFromFolderStructure(c.Context(), goal, folder, selectedFolders, docs); err != nil {
 		_ = h.db.Goals.Delete(c.Context(), goal.ID)
-		log.Printf("❌ 文档来源学习路径生成失败，已回收目标: goal_id=%s folder_id=%s err=%v", goal.ID, req.FolderID, err)
+		log.Printf("❌ 根据文件夹结构创建学习路线失败，已回收目标: goal_id=%s folder_id=%s err=%v", goal.ID, req.FolderID, err)
 		return response.InternalServerCtx(c, "学习路线生成失败,请重试")
 	}
-	log.Printf("✅ 文档来源学习路径生成成功: goal_id=%s folder_id=%s", goal.ID, req.FolderID)
+	log.Printf("✅ 根据文件夹结构创建学习路线成功: goal_id=%s folder_id=%s", goal.ID, req.FolderID)
 
 	return response.SuccessCtx(c, fiber.Map{"goal_id": goal.ID})
+}
+
+type folderStage struct {
+	Title      string
+	Objectives []*learning_db.LearningObjective
+}
+
+func (h *GoalHandler) createPathFromFolderStructure(ctx context.Context, goal *learning_db.LearningGoal, root *wiki_db.Folder, folders []*wiki_db.Folder, docs []*wiki_db.Document) error {
+	stages := buildStagesFromFolderStructure(goal, root, folders, docs)
+	if len(stages) == 0 {
+		return fmt.Errorf("文件夹中没有可生成学习路线的文档")
+	}
+
+	overview := make([]map[string]interface{}, 0, len(stages))
+	for _, stage := range stages {
+		overview = append(overview, map[string]interface{}{"title": stage.Title})
+	}
+
+	path := &learning_db.LearningPath{
+		GoalID:   goal.ID,
+		UserID:   goal.UserID,
+		Overview: overview,
+		Status:   "active",
+	}
+	if err := h.db.Paths.Create(ctx, path); err != nil {
+		return err
+	}
+
+	objectives := make([]*learning_db.LearningObjective, 0)
+	orderIndex := 0
+	for _, stage := range stages {
+		for _, objective := range stage.Objectives {
+			objective.PathID = path.ID
+			objective.OrderIndex = orderIndex
+			if orderIndex == 0 {
+				objective.Status = "active"
+			}
+			objectives = append(objectives, objective)
+			orderIndex++
+		}
+	}
+	if err := h.db.Objectives.BulkCreate(ctx, objectives); err != nil {
+		return err
+	}
+
+	path.CurrentObjectiveID = &objectives[0].ID
+	if err := h.db.Paths.Update(ctx, path); err != nil {
+		return err
+	}
+
+	log.Printf("📌 文件夹结构学习路线已落库: goal_id=%s path_id=%s stage_count=%d objective_count=%d", goal.ID, path.ID, len(stages), len(objectives))
+	return nil
+}
+
+func buildStagesFromFolderStructure(goal *learning_db.LearningGoal, root *wiki_db.Folder, folders []*wiki_db.Folder, docs []*wiki_db.Document) []folderStage {
+	foldersByID := make(map[string]*wiki_db.Folder, len(folders))
+	for _, folder := range folders {
+		foldersByID[folder.ID] = folder
+	}
+
+	rootChildren := make([]*wiki_db.Folder, 0)
+	for _, folder := range folders {
+		if folder.ParentID != nil && *folder.ParentID == root.ID {
+			rootChildren = append(rootChildren, folder)
+		}
+	}
+	sort.Slice(rootChildren, func(i, j int) bool {
+		return rootChildren[i].Name < rootChildren[j].Name
+	})
+
+	stageByFolderID := make(map[string]*folderStage, len(rootChildren))
+	stages := make([]*folderStage, 0, len(rootChildren)+1)
+	if hasRootDocuments(root, docs) {
+		stages = append(stages, &folderStage{Title: "基础资料"})
+	}
+	for _, folder := range rootChildren {
+		stage := &folderStage{Title: folder.Name}
+		stages = append(stages, stage)
+		stageByFolderID[folder.ID] = stage
+	}
+
+	docs = append([]*wiki_db.Document(nil), docs...)
+	sort.Slice(docs, func(i, j int) bool {
+		leftStage := stageSortKey(root, foldersByID, docs[i])
+		rightStage := stageSortKey(root, foldersByID, docs[j])
+		if leftStage != rightStage {
+			return leftStage < rightStage
+		}
+		return docs[i].Filename < docs[j].Filename
+	})
+
+	for _, doc := range docs {
+		stageFolder := findTopLevelFolder(root, foldersByID, doc.FolderID)
+		stageTitle := "基础资料"
+		if stageFolder != nil {
+			stageTitle = stageFolder.Name
+		}
+
+		stage := findOrCreateStage(&stages, stageByFolderID, stageFolder, stageTitle)
+		detail := fmt.Sprintf("来源文档: %s", doc.Filename)
+		if folderPath := folderPathName(root, foldersByID, doc.FolderID); folderPath != "" {
+			detail = fmt.Sprintf("来源目录: %s\n来源文档: %s", folderPath, doc.Filename)
+		}
+		stage.Objectives = append(stage.Objectives, &learning_db.LearningObjective{
+			UserID:       goal.UserID,
+			StageTitle:   &stage.Title,
+			Title:        cleanLearningTitle(doc.Filename),
+			Detail:       &detail,
+			Status:       "pending",
+			MasteryLevel: "none",
+		})
+	}
+
+	result := make([]folderStage, 0, len(stages))
+	for _, stage := range stages {
+		if len(stage.Objectives) > 0 {
+			result = append(result, *stage)
+		}
+	}
+	return result
+}
+
+func hasRootDocuments(root *wiki_db.Folder, docs []*wiki_db.Document) bool {
+	for _, doc := range docs {
+		if doc.FolderID == root.ID {
+			return true
+		}
+	}
+	return false
+}
+
+func findOrCreateStage(stages *[]*folderStage, stageByFolderID map[string]*folderStage, stageFolder *wiki_db.Folder, title string) *folderStage {
+	if stageFolder != nil {
+		if stage, ok := stageByFolderID[stageFolder.ID]; ok {
+			return stage
+		}
+	}
+	for i := range *stages {
+		if (*stages)[i].Title == title {
+			return (*stages)[i]
+		}
+	}
+	stage := &folderStage{Title: title}
+	*stages = append(*stages, stage)
+	return stage
+}
+
+func findTopLevelFolder(root *wiki_db.Folder, foldersByID map[string]*wiki_db.Folder, folderID string) *wiki_db.Folder {
+	current := foldersByID[folderID]
+	for current != nil && current.ParentID != nil {
+		if *current.ParentID == root.ID {
+			return current
+		}
+		current = foldersByID[*current.ParentID]
+	}
+	return nil
+}
+
+func stageSortKey(root *wiki_db.Folder, foldersByID map[string]*wiki_db.Folder, doc *wiki_db.Document) string {
+	stage := findTopLevelFolder(root, foldersByID, doc.FolderID)
+	if stage == nil {
+		return ""
+	}
+	return stage.Name
+}
+
+func folderPathName(root *wiki_db.Folder, foldersByID map[string]*wiki_db.Folder, folderID string) string {
+	names := make([]string, 0)
+	for current := foldersByID[folderID]; current != nil; {
+		names = append(names, current.Name)
+		if current.ID == root.ID || current.ParentID == nil {
+			break
+		}
+		current = foldersByID[*current.ParentID]
+	}
+	for i, j := 0, len(names)-1; i < j; i, j = i+1, j-1 {
+		names[i], names[j] = names[j], names[i]
+	}
+	return strings.Join(names, " / ")
+}
+
+var titleNumberPrefixPattern = regexp.MustCompile(`^\d+[-_、.．\s]*`)
+
+func cleanLearningTitle(filename string) string {
+	title := strings.TrimSuffix(filename, filepath.Ext(filename))
+	title = titleNumberPrefixPattern.ReplaceAllString(title, "")
+	title = strings.TrimSpace(title)
+	if title == "" {
+		return filename
+	}
+	return title
+}
+
+func (h *GoalHandler) generatePathAsync(goal *learning_db.LearningGoal, query string, sourceFolderID string) {
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		defer cancel()
+
+		log.Printf("🚀 学习路径异步生成任务开始: goal_id=%s source=%s source_folder_id=%s", goal.ID, goal.Source, sourceFolderID)
+		if err := h.planner.GeneratePathWithQuery(ctx, goal, query); err != nil {
+			log.Printf("❌ 学习路径异步生成任务失败: goal_id=%s source=%s source_folder_id=%s err=%v", goal.ID, goal.Source, sourceFolderID, err)
+			return
+		}
+		log.Printf("✅ 学习路径异步生成任务完成: goal_id=%s source=%s source_folder_id=%s", goal.ID, goal.Source, sourceFolderID)
+	}()
 }
 
 func filterFoldersByID(folders []*wiki_db.Folder, folderIDs []string) []*wiki_db.Folder {
@@ -158,69 +362,13 @@ func filterFoldersByID(folders []*wiki_db.Folder, folderIDs []string) []*wiki_db
 	return selected
 }
 
-func buildFolderLearningPrompt(root *wiki_db.Folder, folders []*wiki_db.Folder, docs []*wiki_db.Document) string {
-	var sb strings.Builder
-	sb.WriteString("请根据文档管理中的资料结构，为学习者生成一条由浅入深的学习路径。\n")
-	sb.WriteString("资料根目录: ")
-	sb.WriteString(root.Name)
-	sb.WriteString("\n")
-	if root.Description != nil && strings.TrimSpace(*root.Description) != "" {
-		sb.WriteString("目录说明: ")
-		sb.WriteString(strings.TrimSpace(*root.Description))
-		sb.WriteString("\n")
-	}
-
-	docsByFolder := make(map[string][]*wiki_db.Document)
-	for _, doc := range docs {
-		docsByFolder[doc.FolderID] = append(docsByFolder[doc.FolderID], doc)
-	}
-	for folderID := range docsByFolder {
-		sort.Slice(docsByFolder[folderID], func(i, j int) bool {
-			return docsByFolder[folderID][i].Filename < docsByFolder[folderID][j].Filename
-		})
-	}
-	childrenByParent := make(map[string][]*wiki_db.Folder)
-	for _, folder := range folders {
-		if folder.ID == root.ID || folder.ParentID == nil {
-			continue
-		}
-		childrenByParent[*folder.ParentID] = append(childrenByParent[*folder.ParentID], folder)
-	}
-	for parentID := range childrenByParent {
-		sort.Slice(childrenByParent[parentID], func(i, j int) bool {
-			return childrenByParent[parentID][i].Name < childrenByParent[parentID][j].Name
-		})
-	}
-
-	sb.WriteString("资料目录结构:\n")
-	writeFolderLearningPromptNode(&sb, root, childrenByParent, docsByFolder, 0)
-	sb.WriteString("\n生成要求: 优先尊重目录和文件名中已有的编号顺序；把每个阶段拆成可练习、可验证的小目标；不要生成和资料主题无关的内容。\n")
-
-	return sb.String()
-}
-
-func writeFolderLearningPromptNode(sb *strings.Builder, folder *wiki_db.Folder, childrenByParent map[string][]*wiki_db.Folder, docsByFolder map[string][]*wiki_db.Document, depth int) {
-	indent := strings.Repeat("  ", depth)
-	sb.WriteString(fmt.Sprintf("%s- 文件夹: %s\n", indent, folder.Name))
-	for _, doc := range docsByFolder[folder.ID] {
-		sb.WriteString(fmt.Sprintf("%s  - 文档: %s\n", indent, doc.Filename))
-	}
-	for _, child := range childrenByParent[folder.ID] {
-		writeFolderLearningPromptNode(sb, child, childrenByParent, docsByFolder, depth+1)
-	}
-}
-
-func truncateForLog(text string, limit int) string {
-	text = strings.TrimSpace(text)
-	if len(text) <= limit {
-		return text
-	}
-	return text[:limit] + "...(truncated)"
-}
-
 // 学习目标分页列表(仅本人)
 func (h *GoalHandler) FindPage(c *fiber.Ctx) error {
 	userID, _ := c.Locals("user_id").(string)
+	if userID == "" {
+		log.Printf("⚠️ 学习目标分页查询缺少用户信息: path=%s", c.Path())
+		return response.UnauthorizedCtx(c, "未授权")
+	}
 
 	var req pagination.PaginationRequest
 	if err := c.QueryParser(&req); err != nil {
@@ -230,8 +378,10 @@ func (h *GoalHandler) FindPage(c *fiber.Ctx) error {
 
 	goals, total, err := h.db.Goals.FindByUser(c.Context(), userID, req.GetOffset(), req.PageSize)
 	if err != nil {
+		log.Printf("❌ 学习目标分页查询失败: user_id=%s page=%d page_size=%d err=%v", userID, req.Page, req.PageSize, err)
 		return response.InternalServerCtx(c, "获取学习目标失败")
 	}
+	log.Printf("📚 学习目标分页查询: user_id=%s page=%d page_size=%d total=%d returned=%d", userID, req.Page, req.PageSize, total, len(goals))
 	return response.PaginateCtx(c, goals, total, req.Page, req.PageSize)
 }
 

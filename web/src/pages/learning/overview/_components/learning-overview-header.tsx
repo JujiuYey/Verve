@@ -19,8 +19,8 @@ export function LearningOverviewHeader({ roadmapCount, stageCount }: HeaderProps
           <div className="space-y-2">
             <h1 className="text-3xl font-semibold tracking-tight">做成一张能点开的学习地图</h1>
             <p className="text-sm leading-6 text-muted-foreground">
-              先从项目卡片挑一个方向，再进入路线图详情页。每个项目都先用前端 mock
-              数据驱动，重点把“卡片入口 + 思维导图式地图 + 节点说明”的体验搭起来。
+              先从项目卡片挑一个方向，再进入路线图详情页。每个项目都来自真实学习目标，
+              路线会按阶段和小目标持续推进。
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -41,7 +41,7 @@ export function LearningOverviewHeader({ roadmapCount, stageCount }: HeaderProps
         <div className="grid gap-3 sm:grid-cols-3">
           <MetricCard label="项目数" value={`${roadmapCount}`} hint="先挑方向再深入" />
           <MetricCard label="路线阶段" value={`${stageCount}`} hint="每条路线分阶段推进" />
-          <MetricCard label="当前形态" value="Mock" hint="后面可直接换真实接口" />
+          <MetricCard label="当前形态" value="接口" hint="由后端学习目标驱动" />
         </div>
       </div>
     </section>

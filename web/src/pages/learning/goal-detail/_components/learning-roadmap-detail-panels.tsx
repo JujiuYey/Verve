@@ -3,7 +3,7 @@ import { BookMarkedIcon, CheckCircle2Icon, CircleDotIcon, Clock3Icon, FlagIcon, 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { RoadmapStage } from "@/pages/learning/mock-roadmaps";
+import type { RoadmapStage } from "@/pages/learning/roadmap-adapter";
 
 type Props = {
   activeStage: RoadmapStage | null;

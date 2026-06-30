@@ -3,7 +3,7 @@ import { ArrowLeftIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import type { LearningRoadmap } from "@/pages/learning/mock-roadmaps";
+import type { LearningRoadmap } from "@/pages/learning/roadmap-adapter";
 
 type Props = {
   roadmap: LearningRoadmap;
