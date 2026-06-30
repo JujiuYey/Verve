@@ -33,6 +33,7 @@ type DatabaseService struct {
 	Exercises  *learning_repo.ExerciseRepository
 	Profiles   *learning_repo.ProfileRepository
 	Journals   *learning_repo.JournalRepository
+	Guides     *learning_repo.GuideRepository
 }
 
 // 创建数据库服务
@@ -61,6 +62,7 @@ func NewDatabaseService(dsn string) (*DatabaseService, error) {
 	db.RegisterModel((*learning_db.LearningExercise)(nil))
 	db.RegisterModel((*learning_db.LearningProfile)(nil))
 	db.RegisterModel((*learning_db.LearningJournal)(nil))
+	db.RegisterModel((*learning_db.LearningGuide)(nil))
 
 	// 添加查询钩子（开发环境下打印 SQL）
 	db.AddQueryHook(bundebug.NewQueryHook(
@@ -93,6 +95,7 @@ func NewDatabaseService(dsn string) (*DatabaseService, error) {
 		Exercises:  learning_repo.NewExerciseRepository(db),
 		Profiles:   learning_repo.NewProfileRepository(db),
 		Journals:   learning_repo.NewJournalRepository(db),
+		Guides:     learning_repo.NewGuideRepository(db),
 	}, nil
 }
 
