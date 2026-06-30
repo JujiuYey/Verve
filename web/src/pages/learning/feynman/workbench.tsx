@@ -32,6 +32,12 @@ import { Textarea } from "@/components/ui/textarea";
 
 type WorkbenchPhase = "reading" | "answering";
 
+type MarkdownCatalogItem = {
+  line: number;
+  level: number;
+  text: string;
+};
+
 const masteryLabels: Record<string, string> = {
   none: "未验证",
   seen: "看过",
@@ -66,7 +72,6 @@ export function FeynmanWorkbenchPage() {
     [detail?.objectives],
   );
   const objective = objectives.find((item) => item.id === objectiveId) ?? null;
-  const stageObjectives = objectives.filter((item) => item.stage_title === objective?.stage_title);
 
   useEffect(() => {
     if (!objectiveId || sessionId || createSession.isPending) return;
@@ -154,11 +159,7 @@ export function FeynmanWorkbenchPage() {
       </div>
 
       {phase === "reading" ? (
-        <SourcePanel
-          objective={objective}
-          stageObjectives={stageObjectives}
-          onStartAnswering={() => setPhase("answering")}
-        />
+        <SourcePanel objective={objective} onStartAnswering={() => setPhase("answering")} />
       ) : (
         <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
           <PracticePanel
@@ -201,11 +202,9 @@ function PhaseBadge({ phase }: { phase: WorkbenchPhase }) {
 
 function SourcePanel({
   objective,
-  stageObjectives,
   onStartAnswering,
 }: {
   objective: LearningObjective;
-  stageObjectives: LearningObjective[];
   onStartAnswering: () => void;
 }) {
   const documentId = objective.source_document_id;
@@ -219,81 +218,78 @@ function SourcePanel({
     enabled: !!documentId,
   });
   const sourceMarkdown = sourceDocument?.content?.trim() || "";
+  const catalog = useMemo(() => extractMarkdownCatalog(sourceMarkdown), [sourceMarkdown]);
 
   return (
-    <Card className="min-h-0 flex-1 rounded-2xl py-0">
-      <CardHeader className="border-b p-4!">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <BookOpenTextIcon className="size-4" />
-            阅读原始资料
-          </CardTitle>
+    <div className="min-h-0 flex-1 overflow-hidden rounded-2xl border bg-background">
+      <div className="flex min-h-0 h-full flex-col">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b px-5 py-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <BookOpenTextIcon className="size-3.5" />
+              Markdown 阅读
+            </div>
+            <div className="mt-1 truncate text-base font-semibold">{objective.title}</div>
+          </div>
           <Button onClick={onStartAnswering}>
             <PlayCircleIcon className="size-4" />
             开始复述
           </Button>
         </div>
-      </CardHeader>
-      <CardContent className="min-h-0 p-0">
-        <ScrollArea className="h-full">
-          <div className="mx-auto max-w-5xl space-y-6 p-4 lg:p-6">
-            <section className="rounded-xl bg-muted/40 p-4">
-              <div className="mb-2 text-sm font-medium">本次小目标</div>
-              <div className="text-lg font-semibold">{objective.title}</div>
-            </section>
 
-            <section className="rounded-xl border bg-background p-5">
-              {isSourceLoading ? (
-                <div className="space-y-3">
-                  <Skeleton className="h-4 w-56" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-11/12" />
-                  <Skeleton className="h-4 w-4/5" />
-                </div>
-              ) : sourceMarkdown ? (
-                <MessageResponse className="max-w-none text-sm leading-7">
-                  {sourceMarkdown}
-                </MessageResponse>
-              ) : (
-                <div className="text-sm leading-7 text-muted-foreground">
-                  {isSourceError
-                    ? "原始 Markdown 文档读取失败，请稍后重试。"
-                    : "这个小目标还没有关联原始 Markdown 文档，暂时只能查看下方来源信息。"}
-                </div>
-              )}
-            </section>
-
-            <section>
-              <div className="mb-3 text-sm font-medium">同阶段上下文</div>
-              <div className="space-y-2">
-                {stageObjectives.map((item) => (
-                  <div
-                    key={item.id}
-                    className={`rounded-lg border p-3 text-sm ${
-                      item.id === objective.id ? "border-primary bg-primary/5" : "bg-background"
-                    }`}
-                  >
-                    <div className="font-medium">{item.title}</div>
-                    {item.detail ? (
-                      <div className="mt-1 line-clamp-2 leading-6 text-muted-foreground">
-                        {item.detail}
-                      </div>
-                    ) : null}
+        <div className="grid min-h-0 flex-1 lg:grid-cols-[240px_minmax(0,1fr)]">
+          <aside className="hidden min-h-0 border-r bg-muted/20 lg:block">
+            <ScrollArea className="h-full">
+              <nav className="space-y-1 p-3 text-sm">
+                <div className="px-2 pb-2 text-xs font-medium text-muted-foreground">目录</div>
+                {catalog.length > 0 ? (
+                  catalog.map((item) => (
+                    <button
+                      key={`${item.line}-${item.text}`}
+                      type="button"
+                      className="block w-full truncate rounded-md px-2 py-1.5 text-left text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+                      style={{ paddingLeft: `${8 + (item.level - 1) * 12}px` }}
+                      onClick={() => scrollToMarkdownHeading(item.text)}
+                    >
+                      {item.text}
+                    </button>
+                  ))
+                ) : (
+                  <div className="px-2 py-1.5 text-xs leading-5 text-muted-foreground">
+                    当前文档没有可识别标题。
                   </div>
-                ))}
-              </div>
-            </section>
+                )}
+              </nav>
+            </ScrollArea>
+          </aside>
 
-            <div className="flex justify-end border-t pt-4">
-              <Button onClick={onStartAnswering}>
-                <PlayCircleIcon className="size-4" />
-                我读完了，开始复述
-              </Button>
-            </div>
+          <div className="min-h-0">
+            <ScrollArea className="h-full">
+              <article className="mx-auto max-w-3xl px-5 py-6 lg:px-8">
+                {isSourceLoading ? (
+                  <div className="space-y-3">
+                    <Skeleton className="h-5 w-64" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-11/12" />
+                    <Skeleton className="h-4 w-4/5" />
+                  </div>
+                ) : sourceMarkdown ? (
+                  <MessageResponse className="max-w-none text-sm leading-7">
+                    {sourceMarkdown}
+                  </MessageResponse>
+                ) : (
+                  <div className="text-sm leading-7 text-muted-foreground">
+                    {isSourceError
+                      ? "原始 Markdown 文档读取失败，请稍后重试。"
+                      : "这个小目标还没有关联原始 Markdown 文档。"}
+                  </div>
+                )}
+              </article>
+            </ScrollArea>
           </div>
-        </ScrollArea>
-      </CardContent>
-    </Card>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -448,6 +444,29 @@ function InfoRow({ label, value }: { label: string; value: string }) {
       <span className="max-w-44 truncate font-medium">{value}</span>
     </div>
   );
+}
+
+function extractMarkdownCatalog(markdown: string): MarkdownCatalogItem[] {
+  return markdown
+    .split("\n")
+    .map((line, index) => {
+      const match = /^(#{1,4})\s+(.+)$/.exec(line.trim());
+      if (!match) return null;
+      return {
+        line: index,
+        level: match[1].length,
+        text: match[2].replace(/[#*_`]/g, "").trim(),
+      };
+    })
+    .filter((item): item is MarkdownCatalogItem => !!item && item.text.length > 0);
+}
+
+function scrollToMarkdownHeading(text: string) {
+  const headings = Array.from(
+    document.querySelectorAll<HTMLElement>("article h1, article h2, article h3, article h4"),
+  );
+  const heading = headings.find((item) => item.textContent?.trim() === text);
+  heading?.scrollIntoView({ block: "start", behavior: "smooth" });
 }
 
 function buildPrompt(objective: LearningObjective) {
