@@ -21,6 +21,23 @@ func NewExerciseRepository(database *bun.DB) *ExerciseRepository {
 
 func (r *ExerciseRepository) GetDB() *bun.DB { return r.db }
 
+// 按用户分页列出练习记录
+func (r *ExerciseRepository) FindByUser(ctx context.Context, userID string, offset, limit int) ([]*learning_db.LearningExercise, int, error) {
+	var exercises []*learning_db.LearningExercise
+	query := r.db.NewSelect().Model(&exercises).
+		Where("user_id = ?", userID).
+		Order("created_at DESC")
+
+	total, err := query.Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	if err := query.Offset(offset).Limit(limit).Scan(ctx); err != nil {
+		return nil, 0, err
+	}
+	return exercises, total, nil
+}
+
 // 按会话列出练习记录
 func (r *ExerciseRepository) FindBySession(ctx context.Context, sessionID string) ([]*learning_db.LearningExercise, error) {
 	var exercises []*learning_db.LearningExercise

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log"
 	"strings"
 	"time"
 
@@ -14,8 +15,8 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/valyala/fasthttp"
 
-	learning_db "sag-wiki/app/learning/models/db"
 	learning_model "sag-wiki/app/learning/model"
+	learning_db "sag-wiki/app/learning/models/db"
 	learning_payload "sag-wiki/app/learning/models/payload"
 	learning_service "sag-wiki/app/learning/service"
 	learning_tools "sag-wiki/app/learning/tools"
@@ -178,6 +179,17 @@ func (h *SessionHandler) Exercise(c *fiber.Ctx) error {
 
 	result, err := h.examiner.Judge(c.Context(), obj, req.Type, req.Prompt, req.UserAnswer)
 	if err != nil {
+		log.Printf("❌ Examiner 判定失败: session_id=%s user_id=%s goal_id=%s objective_id=%s objective_title=%q type=%s prompt_chars=%d answer_chars=%d err=%v",
+			id,
+			userID,
+			session.GoalID,
+			obj.ID,
+			obj.Title,
+			req.Type,
+			len(req.Prompt),
+			len(req.UserAnswer),
+			err,
+		)
 		return response.InternalServerCtx(c, "判定失败,请重试")
 	}
 

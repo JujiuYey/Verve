@@ -13,6 +13,7 @@ func SetupLearningRoutes(router fiber.Router, dbService *database.DatabaseServic
 	sessionHandler := learning_handlers.NewSessionHandler(dbService)
 	profileHandler := learning_handlers.NewProfileHandler(dbService)
 	journalHandler := learning_handlers.NewJournalHandler(dbService)
+	exerciseHandler := learning_handlers.NewExerciseHandler(dbService)
 
 	learning := router.Group("/learning")
 	{
@@ -45,6 +46,12 @@ func SetupLearningRoutes(router fiber.Router, dbService *database.DatabaseServic
 		journal := learning.Group("/journal")
 		{
 			journal.Get("/page", journalHandler.FindPage)
+		}
+
+		// 费曼练习记录
+		exercise := learning.Group("/exercise")
+		{
+			exercise.Get("/page", exerciseHandler.FindPage)
 		}
 	}
 }
