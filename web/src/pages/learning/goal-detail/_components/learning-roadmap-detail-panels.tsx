@@ -1,4 +1,10 @@
-import { BookMarkedIcon, CheckCircle2Icon, CircleDotIcon, Clock3Icon, FlagIcon, PlayCircleIcon } from "lucide-react";
+import {
+  BookMarkedIcon,
+  CheckCircle2Icon,
+  CircleDotIcon,
+  Clock3Icon,
+  PlayCircleIcon,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,13 +41,13 @@ export function LearningRoadmapDetailPanels({ activeStage }: Props) {
 function StagePanel({ stage }: { stage: RoadmapStage }) {
   return (
     <div className="flex flex-col gap-5 px-3">
-      <div className="rounded-xl bg-muted/60 p-4">
+      {/* <div className="rounded-xl bg-muted/60 p-4">
         <div className="mb-2 flex items-center gap-2 text-sm font-medium">
           <FlagIcon className="size-4" />
           这一阶段在做什么
         </div>
         <p className="text-sm leading-6 text-muted-foreground">{stage.description}</p>
-      </div>
+      </div> */}
 
       <div className="grid grid-cols-2 gap-3">
         <StageMetaCard icon={Clock3Icon} label="预计周期" value={stage.duration} />
@@ -72,7 +78,12 @@ function StagePanel({ stage }: { stage: RoadmapStage }) {
 
             <div className="mt-4 grid gap-4">
               <LessonBlock title="学完你应该会" icon={CircleDotIcon} items={lesson.outcomes} />
-              <LessonBlock title="配套资源" icon={BookMarkedIcon} items={lesson.resources} kind="badges" />
+              <LessonBlock
+                title="配套资源"
+                icon={BookMarkedIcon}
+                items={lesson.resources}
+                kind="badges"
+              />
               <LessonBlock title="练习任务" icon={PlayCircleIcon} items={lesson.tasks} />
             </div>
           </div>

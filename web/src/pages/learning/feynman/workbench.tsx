@@ -19,6 +19,7 @@ import {
   type ExerciseResult,
   type LearningObjective,
 } from "@/api/learning";
+import { MessageResponse } from "@/components/ai-elements/message";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +27,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+
+type WorkbenchPhase = "reading" | "answering";
 
 const masteryLabels: Record<string, string> = {
   none: "未验证",
@@ -51,6 +54,7 @@ export function FeynmanWorkbenchPage() {
   const createSession = useCreateSession();
 
   const [sessionId, setSessionId] = useState("");
+  const [phase, setPhase] = useState<WorkbenchPhase>("reading");
   const [answer, setAnswer] = useState("");
   const [result, setResult] = useState<ExerciseResult | null>(null);
   const submitExercise = useSubmitExercise(sessionId);
@@ -69,6 +73,12 @@ export function FeynmanWorkbenchPage() {
       .then((res) => setSessionId(res.session_id))
       .catch(() => toast.error("创建练习会话失败"));
   }, [createSession, objectiveId, sessionId]);
+
+  useEffect(() => {
+    setPhase("reading");
+    setAnswer("");
+    setResult(null);
+  }, [objectiveId]);
 
   const submit = async () => {
     if (!sessionId || !objective || !answer.trim()) return;
@@ -114,37 +124,75 @@ export function FeynmanWorkbenchPage() {
     <div className="flex h-full flex-col gap-4 overflow-hidden p-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
-          <Button variant="ghost" className="mb-2 px-0" onClick={() => navigate({ to: "/learn/feynman" })}>
+          <Button
+            variant="ghost"
+            className="mb-2 px-0"
+            onClick={() => navigate({ to: "/learn/feynman" })}
+          >
             <ArrowLeftIcon className="size-4" />
             返回费曼练习
           </Button>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary">{objective.stage_title || "学习阶段"}</Badge>
-            <Badge variant="outline">{masteryLabels[objective.mastery_level] ?? objective.mastery_level}</Badge>
+            <Badge variant="outline">
+              {masteryLabels[objective.mastery_level] ?? objective.mastery_level}
+            </Badge>
           </div>
           <h1 className="mt-2 truncate text-2xl font-bold">{objective.title}</h1>
         </div>
-        <Button
-          variant="outline"
-          onClick={() => navigate({ to: "/learn/goal/$goalId", params: { goalId } })}
-        >
-          查看路线图
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <PhaseBadge phase={phase} />
+          <Button
+            variant="outline"
+            onClick={() => navigate({ to: "/learn/goal/$goalId", params: { goalId } })}
+          >
+            查看路线图
+          </Button>
+        </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(380px,0.82fr)_320px]">
-        <SourcePanel objective={objective} stageObjectives={stageObjectives} />
-        <PracticePanel
-          answer={answer}
-          result={result}
-          disabled={!sessionId || submitExercise.isPending}
-          isSubmitting={submitExercise.isPending}
-          onAnswerChange={setAnswer}
-          onSubmit={submit}
-          onReset={resetAnswer}
+      {phase === "reading" ? (
+        <SourcePanel
+          objective={objective}
+          stageObjectives={stageObjectives}
+          onStartAnswering={() => setPhase("answering")}
         />
-        <StudyInfoPanel objective={objective} result={result} sessionId={sessionId} />
-      </div>
+      ) : (
+        <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <PracticePanel
+            answer={answer}
+            result={result}
+            disabled={!sessionId || submitExercise.isPending}
+            isSubmitting={submitExercise.isPending}
+            onAnswerChange={setAnswer}
+            onSubmit={submit}
+            onReset={resetAnswer}
+            onBackToReading={() => setPhase("reading")}
+          />
+          <StudyInfoPanel objective={objective} result={result} sessionId={sessionId} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PhaseBadge({ phase }: { phase: WorkbenchPhase }) {
+  return (
+    <div className="flex items-center gap-1 rounded-md border bg-background p-1 text-xs">
+      <span
+        className={`rounded px-2 py-1 ${
+          phase === "reading" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+        }`}
+      >
+        1 阅读
+      </span>
+      <span
+        className={`rounded px-2 py-1 ${
+          phase === "answering" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+        }`}
+      >
+        2 复述
+      </span>
     </div>
   );
 }
@@ -152,27 +200,42 @@ export function FeynmanWorkbenchPage() {
 function SourcePanel({
   objective,
   stageObjectives,
+  onStartAnswering,
 }: {
   objective: LearningObjective;
   stageObjectives: LearningObjective[];
+  onStartAnswering: () => void;
 }) {
+  const sourceMarkdown =
+    objective.detail?.trim() ||
+    "当前小目标还没有展开说明。后续接入原始 Markdown 正文后，这里会展示对应资料片段。";
+
   return (
-    <Card className="min-h-0 rounded-2xl py-0">
+    <Card className="min-h-0 flex-1 rounded-2xl py-0">
       <CardHeader className="border-b p-4!">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <BookOpenTextIcon className="size-4" />
-          原始资料
-        </CardTitle>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <BookOpenTextIcon className="size-4" />
+            阅读原始资料
+          </CardTitle>
+          <Button onClick={onStartAnswering}>
+            <PlayCircleIcon className="size-4" />
+            开始复述
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="min-h-0 p-0">
         <ScrollArea className="h-full">
-          <div className="space-y-5 p-4">
+          <div className="mx-auto max-w-5xl space-y-6 p-4 lg:p-6">
             <section className="rounded-xl bg-muted/40 p-4">
               <div className="mb-2 text-sm font-medium">本次小目标</div>
               <div className="text-lg font-semibold">{objective.title}</div>
-              <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-muted-foreground">
-                {objective.detail || "当前小目标还没有展开说明。后续接入原始 Markdown 正文后，这里会展示对应资料片段。"}
-              </p>
+            </section>
+
+            <section className="rounded-xl border bg-background p-5">
+              <MessageResponse className="max-w-none text-sm leading-7">
+                {sourceMarkdown}
+              </MessageResponse>
             </section>
 
             <section>
@@ -195,6 +258,13 @@ function SourcePanel({
                 ))}
               </div>
             </section>
+
+            <div className="flex justify-end border-t pt-4">
+              <Button onClick={onStartAnswering}>
+                <PlayCircleIcon className="size-4" />
+                我读完了，开始复述
+              </Button>
+            </div>
           </div>
         </ScrollArea>
       </CardContent>
@@ -210,6 +280,7 @@ function PracticePanel({
   onAnswerChange,
   onSubmit,
   onReset,
+  onBackToReading,
 }: {
   answer: string;
   result: ExerciseResult | null;
@@ -218,14 +289,21 @@ function PracticePanel({
   onAnswerChange: (value: string) => void;
   onSubmit: () => void;
   onReset: () => void;
+  onBackToReading: () => void;
 }) {
   return (
     <Card className="min-h-0 rounded-2xl py-0">
       <CardHeader className="border-b p-4!">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <MessageSquareTextIcon className="size-4" />
-          费曼讲解
-        </CardTitle>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <MessageSquareTextIcon className="size-4" />
+            费曼复述
+          </CardTitle>
+          <Button variant="outline" size="sm" onClick={onBackToReading}>
+            <BookOpenTextIcon className="size-4" />
+            返回阅读
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="flex min-h-0 flex-col gap-4 p-4">
         <div className="rounded-xl border bg-muted/20 p-4">
@@ -288,7 +366,9 @@ function ResultPanel({ result }: { result: ExerciseResult }) {
           掌握度：{masteryLabels[result.mastery_after] ?? result.mastery_after}
         </Badge>
       </div>
-      <p className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{result.feedback}</p>
+      <p className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
+        {result.feedback}
+      </p>
     </div>
   );
 }
@@ -317,18 +397,19 @@ function StudyInfoPanel({
         <Separator />
         <InfoRow
           label="本次判定"
-          value={result ? verdictLabels[result.verdict] ?? result.verdict : "待提交"}
+          value={result ? (verdictLabels[result.verdict] ?? result.verdict) : "待提交"}
         />
         <InfoRow
           label="判定后掌握度"
           value={
             result
-              ? masteryLabels[result.mastery_after] ?? result.mastery_after
-              : masteryLabels[objective.mastery_level] ?? objective.mastery_level
+              ? (masteryLabels[result.mastery_after] ?? result.mastery_after)
+              : (masteryLabels[objective.mastery_level] ?? objective.mastery_level)
           }
         />
         <div className="rounded-xl bg-muted/40 p-3 text-sm leading-6 text-muted-foreground">
-          通过后系统会把这次解释写入练习记录。后续接入 Learning Examiner 后，这里会同步展示薄弱点、日志和下一步建议。
+          通过后系统会把这次解释写入练习记录。后续接入 Learning Examiner
+          后，这里会同步展示薄弱点、日志和下一步建议。
         </div>
       </CardContent>
     </Card>
