@@ -17,13 +17,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { UploadDialog } from "@/pages/wiki/documents/_components/upload-dialog";
 
 import { BreadcrumbNav } from "./_components/breadcrumb-nav";
 import { FolderDetailPanel } from "./_components/folder-detail-panel";
 import { FolderFormModal } from "./_components/folder-form-modal";
 import { FolderTree } from "./_components/folder-tree";
 import { ItemGrid } from "./_components/item-grid";
+import { UploadDialog } from "./_components/upload-dialog";
 import { getFolderContentView } from "./_shared/content-view";
 
 export function FoldersPage() {

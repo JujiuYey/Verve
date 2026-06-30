@@ -23,6 +23,9 @@ interface UploadDialogProps {
   onSuccess?: (document: Document, folderId: string) => void;
 }
 
+const MAX_CONCURRENT_UPLOADS = 4;
+const ALLOWED_EXTENSIONS = [".md"];
+
 function folderTreeToTreeSelectItems(nodes: FolderTreeNode[]): TreeSelectItem<FolderTreeNode>[] {
   return nodes.map((node) => ({
     value: node.id,
@@ -41,7 +44,9 @@ export function UploadDialog({
 }: UploadDialogProps) {
   const [fallbackFolderTree, setFallbackFolderTree] = useState<FolderTreeNode[]>([]);
   const [selectedFolderId, setSelectedFolderId] = useState<string>("");
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadedCount, setUploadedCount] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -65,7 +70,8 @@ export function UploadDialog({
 
   useEffect(() => {
     if (!open) {
-      setSelectedFile(null);
+      setSelectedFiles([]);
+      setUploadedCount(0);
       setSelectedFolderId(defaultFolderId || "");
     }
   }, [open, defaultFolderId]);
@@ -77,19 +83,22 @@ export function UploadDialog({
   );
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
 
-    const allowedExts = [".md"];
-    const ext = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
-    if (!allowedExts.includes(ext)) {
+    const supportedFiles = files.filter((file) => {
+      const ext = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
+      return ALLOWED_EXTENSIONS.includes(ext);
+    });
+    const rejectedCount = files.length - supportedFiles.length;
+
+    if (rejectedCount > 0) {
       toast.error("不支持的文件类型", {
-        description: "仅支持 .md 文件",
+        description: `已忽略 ${rejectedCount} 个非 .md 文件`,
       });
-      return;
     }
 
-    setSelectedFile(file);
+    setSelectedFiles(supportedFiles);
   };
 
   const handleUpload = async () => {
@@ -97,21 +106,56 @@ export function UploadDialog({
       toast.error("请选择文件夹");
       return;
     }
-    if (!selectedFile) {
+    if (selectedFiles.length === 0) {
       toast.error("请选择文件");
       return;
     }
 
+    setUploading(true);
+    setUploadedCount(0);
+    let successCount = 0;
+    let failedCount = 0;
+    let nextIndex = 0;
+
     try {
-      const result = await documentApi.upload(selectedFile, selectedFolderId);
-      toast.success("文档上传成功", {
-        description: `${result.filename} 已成功上传`,
-      });
+      const uploadNext = async () => {
+        const file = selectedFiles[nextIndex];
+        nextIndex += 1;
+        if (!file) return;
+
+        try {
+          const result = await documentApi.upload(file, selectedFolderId);
+          successCount += 1;
+          setUploadedCount((count) => count + 1);
+          onSuccess?.(result, selectedFolderId);
+        } catch {
+          failedCount += 1;
+        }
+
+        await uploadNext();
+      };
+
+      const workerCount = Math.min(MAX_CONCURRENT_UPLOADS, selectedFiles.length);
+      await Promise.all(Array.from({ length: workerCount }, () => uploadNext()));
+
+      if (successCount > 0) {
+        toast.success("文档上传完成", {
+          description:
+            failedCount > 0
+              ? `成功 ${successCount} 个，失败 ${failedCount} 个`
+              : `成功上传 ${successCount} 个文件`,
+        });
+      }
+      if (successCount === 0 && failedCount > 0) {
+        toast.error("文档上传失败", {
+          description: `${failedCount} 个文件上传失败`,
+        });
+      }
       onOpenChange(false);
-      onSuccess?.(result, selectedFolderId);
     } catch {
       // 错误已在拦截器中处理
     } finally {
+      setUploading(false);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -123,7 +167,7 @@ export function UploadDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>上传文档</DialogTitle>
-          <DialogDescription>选择文件夹并上传单个 Markdown 文件</DialogDescription>
+          <DialogDescription>选择文件夹并上传 Markdown 文件</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
@@ -145,10 +189,15 @@ export function UploadDialog({
               className="flex items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
               onClick={() => fileInputRef.current?.click()}
             >
-              {selectedFile ? (
-                <div className="text-center">
-                  <p className="text-sm font-medium">{selectedFile.name}</p>
-                  <p className="text-xs text-muted-foreground mt-1">点击重新选择</p>
+              {selectedFiles.length > 0 ? (
+                <div className="w-full px-4 text-center">
+                  <p className="truncate text-sm font-medium">
+                    已选择 {selectedFiles.length} 个文件
+                  </p>
+                  <p className="mt-1 truncate text-xs text-muted-foreground">
+                    {selectedFiles.map((file) => file.name).join("、")}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">点击重新选择</p>
                 </div>
               ) : (
                 <div className="text-center">
@@ -163,19 +212,23 @@ export function UploadDialog({
               type="file"
               className="hidden"
               accept=".md"
+              multiple
               onChange={handleFileChange}
             />
           </div>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={uploading}>
             取消
           </Button>
-          <Button onClick={handleUpload} disabled={!selectedFile || !selectedFolderId}>
+          <Button
+            onClick={handleUpload}
+            disabled={uploading || selectedFiles.length === 0 || !selectedFolderId}
+          >
             <>
               <IconUpload className="mr-2 h-4 w-4" />
-              上传
+              {uploading ? `上传中 ${uploadedCount}/${selectedFiles.length}` : "上传"}
             </>
           </Button>
         </DialogFooter>

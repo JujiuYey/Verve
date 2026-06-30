@@ -1,7 +1,6 @@
 import {
   AgentIcon,
   ChatIcon,
-  CollectionIcon,
   ComposeIcon,
   DashboardIcon,
   DocumentIcon,
@@ -26,7 +25,6 @@ export const learnNav: NavItem[] = [
 
 export const knowledgeNav: NavItem[] = [
   { title: "文档管理", url: "/wiki/folders", icon: FolderIcon },
-  { title: "知识库", url: "/wiki/documents", icon: CollectionIcon },
   { title: "新建文档", url: "/wiki/tiptap-editor", icon: ComposeIcon },
 ];
 
