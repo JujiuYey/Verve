@@ -2,7 +2,7 @@ import { IconLoader2, IconUpload } from "@tabler/icons-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { documentApi } from "@/api/wiki/document";
+import { documentApi, type Document } from "@/api/wiki/document";
 import { folderApi, type FolderTreeNode } from "@/api/wiki/folder";
 import { TreeSelect, type TreeSelectItem } from "@/components/sag-ui/tree-select";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,7 @@ interface UploadDialogProps {
   defaultFolderId?: string;
   folderTree?: FolderTreeNode[];
   onOpenChange: (open: boolean) => void;
-  onSuccess?: () => void;
+  onSuccess?: (document: Document, folderId: string) => void;
 }
 
 function folderTreeToTreeSelectItems(nodes: FolderTreeNode[]): TreeSelectItem<FolderTreeNode>[] {
@@ -110,7 +110,7 @@ export function UploadDialog({
         description: `${result.filename} 已成功上传`,
       });
       onOpenChange(false);
-      onSuccess?.();
+      onSuccess?.(result, selectedFolderId);
     } catch {
       // 错误已在拦截器中处理
     } finally {

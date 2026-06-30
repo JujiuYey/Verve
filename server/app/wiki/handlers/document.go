@@ -145,12 +145,7 @@ func (h *DocumentHandler) Upload(c *fiber.Ctx) error {
 	}
 	log.Printf("✅ 文档上传成功，ID: %s", doc.ID)
 
-	return response.SuccessCtx(c, fiber.Map{
-		"message":     "文档上传成功",
-		"filename":    file.Filename,
-		"document_id": doc.ID,
-		"file_path":   objectName,
-	})
+	return response.SuccessCtx(c, doc)
 }
 
 // 下载文档接口

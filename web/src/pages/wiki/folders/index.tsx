@@ -233,17 +233,21 @@ export function FoldersPage() {
     try {
       if (formMode === "create") {
         // 创建时传入当前目录的 parent_id
-        await folderApi.create({
+        const createdFolder = await folderApi.create({
           ...(formData as CreateFolderRequest),
           parent_id: currentFolderId,
         });
+        setData((prev) => [...prev, createdFolder]);
         toast.success("创建成功");
       } else {
-        await folderApi.update(formData as UpdateFolderRequest);
+        const updatedFolder = await folderApi.update(formData as UpdateFolderRequest);
+        setData((prev) =>
+          prev.map((folder) => (folder.id === updatedFolder.id ? updatedFolder : folder)),
+        );
+        setCurrentFolder((prev) => (prev?.id === updatedFolder.id ? updatedFolder : prev));
         toast.success("更新成功");
       }
       setFormOpen(false);
-      void loadFolders(currentFolderId);
       void loadFolderTree();
     } catch (error) {
       console.error("保存文件夹失败:", error);
@@ -261,19 +265,10 @@ export function FoldersPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">文件夹管理</h1>
-            <p className="text-muted-foreground mt-2">管理文件夹和文档</p>
-          </div>
-        </div>
-      </div>
-
       <ResizablePanelGroup
         key={currentFolder ? "with-detail" : "without-detail"}
         orientation="horizontal"
-        className="min-h-0 flex-1 overflow-hidden"
+        className="min-h-0 flex-1 overflow-hidden border rounded-xl"
       >
         {/* 左侧文件夹树形导航 */}
         <ResizablePanel
@@ -397,7 +392,7 @@ export function FoldersPage() {
               defaultSize="25%"
               minSize="20%"
               maxSize="35%"
-              className="min-w-0 overflow-y-auto border-l bg-background"
+              className="min-w-0 overflow-y-auto bg-background"
             >
               <FolderDetailPanel folder={currentFolder} onEdit={handleEdit} />
             </ResizablePanel>
@@ -419,10 +414,9 @@ export function FoldersPage() {
         defaultFolderId={currentFolderId}
         folderTree={folderTreeData}
         onOpenChange={setUploadOpen}
-        onSuccess={() => {
-          void loadFolders(currentFolderId);
-          if (currentFolderId) {
-            void loadDocuments(currentFolderId);
+        onSuccess={(document, folderId) => {
+          if (folderId === currentFolderId) {
+            setDocuments((prev) => [...prev, { ...document, folder_id: folderId }]);
           }
         }}
       />

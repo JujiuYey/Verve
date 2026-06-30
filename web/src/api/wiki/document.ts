@@ -6,6 +6,7 @@ export interface Document {
   filename: string;
   file_size: number;
   content_type: string;
+  folder_id: string;
   file_path: string;
   created_at: string;
   updated_at: string;
@@ -29,13 +30,6 @@ export interface PageDocumentsResponse {
   page_size: number;
   page: number;
   total_page: number;
-}
-
-export interface DocumentUploadResponse {
-  message: string;
-  filename: string;
-  document_id: string;
-  file_path: string;
 }
 
 export interface DocumentDownloadResponse {
@@ -63,7 +57,7 @@ export const documentApi = {
     formData.append("file", file);
     formData.append("folder_id", folderId);
 
-    return request.post<DocumentUploadResponse>(`${RESOURCE_PATH}/upload`, formData, {
+    return request.post<Document>(`${RESOURCE_PATH}/upload`, formData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },
