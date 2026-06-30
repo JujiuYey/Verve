@@ -42,8 +42,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+
+import { FeynmanAnswerEditor } from "./_components/feynman-answer-editor";
 
 type WorkbenchPhase = "reading" | "answering";
 
@@ -801,12 +802,7 @@ function PracticePanel({
             </p>
           </div>
 
-          <Textarea
-            className="h-96 min-h-96 shrink-0 resize-none field-sizing-fixed"
-            placeholder="把你的解释写在这里。讲不出来也可以直接写卡住的地方。"
-            value={answer}
-            onChange={(event) => onAnswerChange(event.target.value)}
-          />
+          <FeynmanAnswerEditor value={answer} onChange={onAnswerChange} />
 
           <div className="flex shrink-0 items-center justify-between gap-3">
             <Button variant="outline" onClick={onReset} disabled={!answer && !result}>

@@ -1,0 +1,52 @@
+.feynman-answer-editor .tiptap {
+  min-height: 18rem;
+  outline: none;
+}
+
+.feynman-answer-editor .tiptap p.is-editor-empty:first-child::before {
+  color: var(--muted-foreground);
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.feynman-answer-editor .tiptap p {
+  margin: 0.5rem 0;
+}
+
+.feynman-answer-editor .tiptap ul,
+.feynman-answer-editor .tiptap ol {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+
+.feynman-answer-editor .tiptap li {
+  margin: 0.25rem 0;
+}
+
+.feynman-answer-editor .tiptap code {
+  background: var(--muted);
+  border-radius: 0.25rem;
+  font-size: 0.9em;
+  padding: 0.1rem 0.3rem;
+}
+
+.feynman-answer-editor .tiptap pre {
+  background: #18181b;
+  border-radius: 0.5rem;
+  color: #f4f4f5;
+  margin: 0.75rem 0;
+  overflow-x: auto;
+  padding: 0.875rem;
+}
+
+.feynman-answer-editor .tiptap pre code {
+  background: transparent;
+  border-radius: 0;
+  color: inherit;
+  display: block;
+  font-size: 0.85rem;
+  padding: 0;
+}
