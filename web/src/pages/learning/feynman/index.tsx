@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
@@ -228,21 +229,23 @@ export function FeynmanExercisePage() {
           </Card>
         </div>
 
-        <Card className="min-h-0 rounded-2xl">
-          <CardHeader>
+        <Card className="flex min-h-0 flex-col overflow-hidden rounded-2xl">
+          <CardHeader className="shrink-0">
             <CardTitle className="flex items-center gap-2 text-base">
               <HistoryIcon className="size-4" />
               最近验证
             </CardTitle>
             <CardDescription>这里不是主菜单，只用来回看最近几次解释判定。</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="min-h-0 flex-1">
             {orchestratorLoading ? (
-              <div className="flex flex-col gap-3">
-                {Array.from({ length: 4 }).map((_, index) => (
-                  <Skeleton key={index} className="h-24 w-full" />
-                ))}
-              </div>
+              <ScrollArea className="h-full">
+                <div className="flex flex-col gap-3 pr-3">
+                  {Array.from({ length: 4 }).map((_, index) => (
+                    <Skeleton key={index} className="h-24 w-full" />
+                  ))}
+                </div>
+              </ScrollArea>
             ) : recentExercises.length === 0 ? (
               <Empty className="min-h-56 border">
                 <EmptyHeader>
@@ -254,11 +257,13 @@ export function FeynmanExercisePage() {
                 </EmptyHeader>
               </Empty>
             ) : (
-              <div className="flex flex-col gap-3">
-                {recentExercises.map((exercise) => (
-                  <ExerciseRecord key={exercise.id} exercise={exercise} />
-                ))}
-              </div>
+              <ScrollArea className="h-full">
+                <div className="flex flex-col gap-3 pr-3">
+                  {recentExercises.map((exercise) => (
+                    <ExerciseRecord key={exercise.id} exercise={exercise} />
+                  ))}
+                </div>
+              </ScrollArea>
             )}
           </CardContent>
         </Card>

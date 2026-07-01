@@ -17,22 +17,32 @@ const (
 	modelStatusInactive = "inactive"
 )
 
+// ModelConfigRepository 模型配置数据访问接口
+//
+// 聚合 SysModelPlatform + SysModel 产出 ModelConfig,并提供对平台、模型的独立 CRUD
 type ModelConfigRepository interface {
+	// ModelConfig 聚合查询
 	FindOne(ctx context.Context, id string) (*system_db.ModelConfig, error)
 	FindDefault(ctx context.Context) (*system_db.ModelConfig, error)
 	FindDefaultByType(ctx context.Context, modelType string) (*system_db.ModelConfig, error)
 	FindByModelName(ctx context.Context, modelName string) (*system_db.ModelConfig, error)
 	SetDefault(ctx context.Context, id string) error
+
+	// ModelConfig 聚合列表与写入(同时操作平台与模型)
 	FindList(ctx context.Context) ([]*system_db.ModelConfig, error)
 	Create(ctx context.Context, config *system_db.ModelConfig) error
 	Update(ctx context.Context, config *system_db.ModelConfig) error
 	Delete(ctx context.Context, id string) error
+
+	// SysModelPlatform 平台 CRUD
 	FindPlatforms(ctx context.Context) ([]*system_db.SysModelPlatform, error)
 	FindPlatform(ctx context.Context, id string) (*system_db.SysModelPlatform, error)
 	CreatePlatform(ctx context.Context, platform *system_db.SysModelPlatform) error
 	UpdatePlatformConfig(ctx context.Context, platformID string, baseURL string, apiKey *string, clearAPIKey bool) (*system_db.SysModelPlatform, error)
 	UpdatePlatformLastModelSyncAt(ctx context.Context, platformID string, syncedAt time.Time) error
 	DeletePlatform(ctx context.Context, id string) error
+
+	// SysModel 模型 CRUD
 	FindModels(ctx context.Context) ([]*system_db.SysModel, error)
 	ModelExistsByPlatformAndName(ctx context.Context, platformID, modelName string) (bool, error)
 	CreateModel(ctx context.Context, model *system_db.SysModel) error
@@ -40,20 +50,24 @@ type ModelConfigRepository interface {
 	DeleteModel(ctx context.Context, id string) error
 }
 
+// ModelUpdate 模型可更新字段集合
 type ModelUpdate struct {
 	Status       *string
 	DisplayName  *string
 	Capabilities []string
 }
 
+// modelConfigRepository ModelConfigRepository 的实现
 type modelConfigRepository struct {
 	db *bun.DB
 }
 
+// NewModelConfigRepository 创建 ModelConfigRepository
 func NewModelConfigRepository(database *bun.DB) ModelConfigRepository {
 	return &modelConfigRepository{db: database}
 }
 
+// buildModelConfig 将平台与模型组合为 ModelConfig,BaseURL 缺失时回落到 DefaultBaseURL
 func buildModelConfig(platform *system_db.SysModelPlatform, model *system_db.SysModel) *system_db.ModelConfig {
 	baseURL := platform.BaseURL
 	if strings.TrimSpace(baseURL) == "" {
@@ -79,10 +93,12 @@ func buildModelConfig(platform *system_db.SysModelPlatform, model *system_db.Sys
 	}
 }
 
+// newID 生成 32 位无中划线 UUID
 func newID() string {
 	return strings.ReplaceAll(uuid.New().String(), "-", "")
 }
 
+// apiKeyHint 根据 API Key 生成脱敏提示,空值返回 nil
 func apiKeyHint(apiKey string) *string {
 	key := strings.TrimSpace(apiKey)
 	if key == "" {
@@ -96,6 +112,7 @@ func apiKeyHint(apiKey string) *string {
 	return &hint
 }
 
+// modelConfigRow JOIN 查询结果集
 type modelConfigRow struct {
 	ModelID          string    `bun:"model_id"`
 	ModelName        string    `bun:"model_name"`
@@ -142,6 +159,7 @@ func (r modelConfigRow) toModelConfig() *system_db.ModelConfig {
 	)
 }
 
+// findModelConfig 通用 JOIN 查询,filter 用于追加 WHERE 条件
 func (r *modelConfigRepository) findModelConfig(ctx context.Context, filter func(*bun.SelectQuery) *bun.SelectQuery) (*system_db.ModelConfig, error) {
 	var row modelConfigRow
 
@@ -174,6 +192,7 @@ func (r *modelConfigRepository) findModelConfig(ctx context.Context, filter func
 	return row.toModelConfig(), nil
 }
 
+// FindOne 根据 ID 查询 ModelConfig
 func (r *modelConfigRepository) FindOne(ctx context.Context, id string) (*system_db.ModelConfig, error) {
 	config, err := r.findModelConfig(ctx, func(query *bun.SelectQuery) *bun.SelectQuery {
 		return query.Where("sm.id = ?", id)
@@ -184,10 +203,12 @@ func (r *modelConfigRepository) FindOne(ctx context.Context, id string) (*system
 	return config, nil
 }
 
+// FindDefault 查询默认 chat 类型 ModelConfig
 func (r *modelConfigRepository) FindDefault(ctx context.Context) (*system_db.ModelConfig, error) {
 	return r.FindDefaultByType(ctx, system_db.ModelTypeChat)
 }
 
+// FindDefaultByType 查询指定类型的默认 ModelConfig
 func (r *modelConfigRepository) FindDefaultByType(ctx context.Context, modelType string) (*system_db.ModelConfig, error) {
 	config, err := r.findModelConfig(ctx, func(query *bun.SelectQuery) *bun.SelectQuery {
 		return query.
@@ -202,6 +223,7 @@ func (r *modelConfigRepository) FindDefaultByType(ctx context.Context, modelType
 	return config, nil
 }
 
+// FindByModelName 根据模型名称查询激活的 chat ModelConfig
 func (r *modelConfigRepository) FindByModelName(ctx context.Context, modelName string) (*system_db.ModelConfig, error) {
 	config, err := r.findModelConfig(ctx, func(query *bun.SelectQuery) *bun.SelectQuery {
 		return query.
@@ -216,6 +238,7 @@ func (r *modelConfigRepository) FindByModelName(ctx context.Context, modelName s
 	return config, nil
 }
 
+// SetDefault 在事务中将指定模型设为该类型下的默认模型,并清除同类型其他模型的默认状态
 func (r *modelConfigRepository) SetDefault(ctx context.Context, id string) error {
 	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		var model system_db.SysModel
@@ -244,6 +267,7 @@ func (r *modelConfigRepository) SetDefault(ctx context.Context, id string) error
 	})
 }
 
+// FindList 查询所有 ModelConfig 列表(关联平台信息)
 func (r *modelConfigRepository) FindList(ctx context.Context) ([]*system_db.ModelConfig, error) {
 	var models []*system_db.SysModel
 	if err := r.db.NewSelect().Model(&models).Order("created_at DESC").Scan(ctx); err != nil {
@@ -276,6 +300,7 @@ func (r *modelConfigRepository) FindList(ctx context.Context) ([]*system_db.Mode
 	return configs, nil
 }
 
+// Create 在事务中创建平台与模型,默认状态由 config.IsActive 决定
 func (r *modelConfigRepository) Create(ctx context.Context, config *system_db.ModelConfig) error {
 	model := &system_db.SysModel{
 		ID:          newID(),
@@ -325,6 +350,7 @@ func (r *modelConfigRepository) Create(ctx context.Context, config *system_db.Mo
 	})
 }
 
+// Update 在事务中更新模型与平台,IsDefault 变化时重置同类型默认
 func (r *modelConfigRepository) Update(ctx context.Context, config *system_db.ModelConfig) error {
 	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		var model system_db.SysModel
@@ -377,6 +403,7 @@ func (r *modelConfigRepository) Update(ctx context.Context, config *system_db.Mo
 	})
 }
 
+// Delete 在事务中删除模型并级联删除关联平台
 func (r *modelConfigRepository) Delete(ctx context.Context, id string) error {
 	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		var model system_db.SysModel
@@ -391,118 +418,4 @@ func (r *modelConfigRepository) Delete(ctx context.Context, id string) error {
 		}
 		return nil
 	})
-}
-
-func (r *modelConfigRepository) FindPlatforms(ctx context.Context) ([]*system_db.SysModelPlatform, error) {
-	var platforms []*system_db.SysModelPlatform
-	if err := r.db.NewSelect().Model(&platforms).Order("sort_order ASC, created_at DESC").Scan(ctx); err != nil {
-		return nil, err
-	}
-	for _, platform := range platforms {
-		platform.APIKeyHint = apiKeyHint(platform.APIKeyCiphertext)
-	}
-	return platforms, nil
-}
-
-func (r *modelConfigRepository) FindPlatform(ctx context.Context, id string) (*system_db.SysModelPlatform, error) {
-	platform := new(system_db.SysModelPlatform)
-	if err := r.db.NewSelect().Model(platform).Where("id = ?", id).Scan(ctx); err != nil {
-		return nil, err
-	}
-	platform.APIKeyHint = apiKeyHint(platform.APIKeyCiphertext)
-	return platform, nil
-}
-
-func (r *modelConfigRepository) CreatePlatform(ctx context.Context, platform *system_db.SysModelPlatform) error {
-	platform.ID = newID()
-	platform.APIKeyHint = apiKeyHint(platform.APIKeyCiphertext)
-	if platform.ModelListPath == "" {
-		platform.ModelListPath = "/models"
-	}
-	if platform.AuthScheme == "" {
-		platform.AuthScheme = "bearer"
-	}
-	platform.Enabled = true
-	_, err := r.db.NewInsert().Model(platform).Exec(ctx)
-	return err
-}
-
-func (r *modelConfigRepository) UpdatePlatformConfig(ctx context.Context, platformID string, baseURL string, apiKey *string, clearAPIKey bool) (*system_db.SysModelPlatform, error) {
-	platform, err := r.FindPlatform(ctx, platformID)
-	if err != nil {
-		return nil, err
-	}
-	platform.BaseURL = baseURL
-	if clearAPIKey {
-		platform.APIKeyCiphertext = ""
-	} else if apiKey != nil && strings.TrimSpace(*apiKey) != "" {
-		platform.APIKeyCiphertext = strings.TrimSpace(*apiKey)
-	}
-	platform.APIKeyHint = apiKeyHint(platform.APIKeyCiphertext)
-	if _, err := r.db.NewUpdate().Model(platform).WherePK().Exec(ctx); err != nil {
-		return nil, err
-	}
-	return platform, nil
-}
-
-func (r *modelConfigRepository) UpdatePlatformLastModelSyncAt(ctx context.Context, platformID string, syncedAt time.Time) error {
-	_, err := r.db.NewUpdate().
-		Model((*system_db.SysModelPlatform)(nil)).
-		Set("last_model_sync_at = ?", syncedAt).
-		Where("id = ?", platformID).
-		Exec(ctx)
-	return err
-}
-
-func (r *modelConfigRepository) DeletePlatform(ctx context.Context, id string) error {
-	_, err := r.db.NewDelete().Model((*system_db.SysModelPlatform)(nil)).Where("id = ?", id).Exec(ctx)
-	return err
-}
-
-func (r *modelConfigRepository) FindModels(ctx context.Context) ([]*system_db.SysModel, error) {
-	var models []*system_db.SysModel
-	err := r.db.NewSelect().Model(&models).Order("created_at DESC").Scan(ctx)
-	return models, err
-}
-
-func (r *modelConfigRepository) ModelExistsByPlatformAndName(ctx context.Context, platformID, modelName string) (bool, error) {
-	count, err := r.db.NewSelect().Model((*system_db.SysModel)(nil)).
-		Where("platform_id = ?", platformID).
-		Where("model_name = ?", modelName).
-		Count(ctx)
-	return count > 0, err
-}
-
-func (r *modelConfigRepository) CreateModel(ctx context.Context, model *system_db.SysModel) error {
-	model.ID = newID()
-	if model.Status == "" {
-		model.Status = modelStatusActive
-	}
-	_, err := r.db.NewInsert().Model(model).Exec(ctx)
-	return err
-}
-
-func (r *modelConfigRepository) UpdateModel(ctx context.Context, modelID string, update ModelUpdate) (*system_db.SysModel, error) {
-	var model system_db.SysModel
-	if err := r.db.NewSelect().Model(&model).Where("id = ?", modelID).Scan(ctx); err != nil {
-		return nil, err
-	}
-	if update.Status != nil {
-		model.Status = *update.Status
-	}
-	if update.DisplayName != nil {
-		model.DisplayName = strings.TrimSpace(*update.DisplayName)
-	}
-	if update.Capabilities != nil {
-		model.Capabilities = update.Capabilities
-	}
-	if _, err := r.db.NewUpdate().Model(&model).WherePK().Exec(ctx); err != nil {
-		return nil, err
-	}
-	return &model, nil
-}
-
-func (r *modelConfigRepository) DeleteModel(ctx context.Context, id string) error {
-	_, err := r.db.NewDelete().Model((*system_db.SysModel)(nil)).Where("id = ?", id).Exec(ctx)
-	return err
 }
