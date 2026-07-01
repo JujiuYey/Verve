@@ -285,13 +285,13 @@ func (h *SessionHandler) Complete(c *fiber.Ctx) error {
 	if obj.SourceFolderID != nil {
 		objectives, err := h.db.Objectives.FindByFolder(c.Context(), *obj.SourceFolderID)
 		if err == nil {
-		for _, o := range objectives {
-			if o.OrderIndex > obj.OrderIndex {
-				next = o
-				break
+			for _, o := range objectives {
+				if o.OrderIndex > obj.OrderIndex {
+					next = o
+					break
+				}
 			}
 		}
-	}
 	}
 	if next != nil {
 		next.Status = "active"
@@ -343,12 +343,17 @@ func stringValue(value *string) string {
 
 // 把 agent 事件流写成 SSE,并返回累积的 assistant 文本(对齐现有 chat.go)
 func writeLearningSSE(w *bufio.Writer, iter *adk.AsyncIterator[*adk.AgentEvent]) string {
+	content := writeLearningSSEContent(w, iter)
+	_, _ = w.Write([]byte("data: [DONE]\n\n"))
+	_ = w.Flush()
+	return content
+}
+
+func writeLearningSSEContent(w *bufio.Writer, iter *adk.AsyncIterator[*adk.AgentEvent]) string {
 	var content strings.Builder
 	for {
 		event, ok := iter.Next()
 		if !ok {
-			_, _ = w.Write([]byte("data: [DONE]\n\n"))
-			_ = w.Flush()
 			break
 		}
 		if event.Err != nil {

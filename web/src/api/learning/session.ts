@@ -62,6 +62,14 @@ export interface LearningStreamEvent {
   content?: string;
   agent?: string;
   phase?: string;
+  action?: LearningCoachAction;
+}
+
+export interface LearningCoachAction {
+  type: "navigate_to_practice";
+  objective_id?: string;
+  folder_id?: string;
+  label?: string;
 }
 
 const api = {
@@ -118,6 +126,69 @@ export async function sessionChatStream(
     }
 
     const response = await fetch(`${API_BASE_URL}${BASE}/session/${sessionId}/chat`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ message }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error("Response body is not readable");
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        onComplete?.();
+        break;
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          const data = line.slice(6).trim();
+          if (data === "[DONE]") {
+            onComplete?.();
+            return;
+          }
+          try {
+            const event = JSON.parse(data) as LearningStreamEvent;
+            onMessage(event);
+          } catch {
+            console.warn("Failed to parse SSE data:", data);
+          }
+        }
+      }
+    }
+  } catch (error) {
+    onError?.(error instanceof Error ? error : new Error(String(error)));
+  }
+}
+
+export async function coachChatStream(
+  message: string,
+  onMessage: (event: LearningStreamEvent) => void,
+  onComplete?: () => void,
+  onError?: (error: Error) => void,
+): Promise<void> {
+  try {
+    const { accessToken } = useAuthStore.getState();
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (accessToken) {
+      headers.Authorization = `Bearer ${accessToken}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}${BASE}/coach/chat`, {
       method: "POST",
       headers,
       body: JSON.stringify({ message }),

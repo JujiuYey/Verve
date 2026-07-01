@@ -14,6 +14,7 @@ func SetupLearningRoutes(router fiber.Router, dbService *database.DatabaseServic
 	exerciseHandler := learning_handlers.NewExerciseHandler(dbService)
 	guideHandler := learning_handlers.NewGuideHandler(dbService)
 	objectiveHandler := learning_handlers.NewObjectiveHandler(dbService)
+	coachHandler := learning_handlers.NewCoachHandler(dbService)
 
 	learning := router.Group("/learning")
 	{
@@ -49,6 +50,11 @@ func SetupLearningRoutes(router fiber.Router, dbService *database.DatabaseServic
 		{
 			guide.Get("/:objectiveId", guideHandler.Get)
 			guide.Post("/generate", guideHandler.Generate)
+		}
+
+		coach := learning.Group("/coach")
+		{
+			coach.Post("/chat", coachHandler.Chat)
 		}
 	}
 }

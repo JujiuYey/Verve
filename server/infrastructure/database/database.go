@@ -15,6 +15,7 @@ import (
 	learning_repo "verve/app/learning/repository"
 	system_db "verve/app/system/models/db"
 	system_repo "verve/app/system/repository"
+	wiki_repo "verve/app/wiki/repository"
 )
 
 // 数据库服务（只负责连接管理）
@@ -32,6 +33,10 @@ type DatabaseService struct {
 	Profiles   *learning_repo.ProfileRepository
 	Journals   *learning_repo.JournalRepository
 	Guides     *learning_repo.GuideRepository
+
+	// Wiki Repositories
+	Folders   wiki_repo.FolderRepository
+	Documents *wiki_repo.DocumentRepository
 }
 
 // 创建数据库服务
@@ -90,6 +95,10 @@ func NewDatabaseService(dsn string) (*DatabaseService, error) {
 		Profiles:   learning_repo.NewProfileRepository(db),
 		Journals:   learning_repo.NewJournalRepository(db),
 		Guides:     learning_repo.NewGuideRepository(db),
+
+		// Wiki Repositories
+		Folders:   wiki_repo.NewFolderRepository(db),
+		Documents: wiki_repo.NewDocumentRepository(db),
 	}, nil
 }
 

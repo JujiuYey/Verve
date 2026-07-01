@@ -42,6 +42,21 @@ func (r *ObjectiveRepository) FindByFolder(ctx context.Context, folderID string)
 	return objectives, nil
 }
 
+// 按用户列出最近学习小节,用于学习调度入口在未选文件夹时找上下文。
+func (r *ObjectiveRepository) FindRecentByUser(ctx context.Context, userID string, limit int) ([]*learning_db.LearningObjective, error) {
+	var objectives []*learning_db.LearningObjective
+	query := r.db.NewSelect().Model(&objectives).
+		Where("user_id = ?", userID).
+		Order("updated_at DESC", "order_index ASC")
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	if err := query.Scan(ctx); err != nil {
+		return nil, err
+	}
+	return objectives, nil
+}
+
 // 统计某 Wiki 文件夹下已完成 / 总数(用于进度)
 func (r *ObjectiveRepository) CountByFolder(ctx context.Context, folderID string) (completed, total int, err error) {
 	total, err = r.db.NewSelect().Model((*learning_db.LearningObjective)(nil)).
