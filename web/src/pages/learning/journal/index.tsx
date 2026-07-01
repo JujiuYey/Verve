@@ -21,7 +21,7 @@ export function JournalPage() {
               </div>
               {j.learned ? <div className="text-sm">学了:{j.learned}</div> : null}
               {j.weak_points ? (
-                <div className="text-sm text-muted-foreground">薄弱点:{j.weak_points}</div>
+                <div className="text-sm text-muted-foreground">待补齐:{j.weak_points}</div>
               ) : null}
               {j.next_step ? (
                 <div className="text-sm text-muted-foreground">下一步:{j.next_step}</div>

@@ -46,11 +46,11 @@ export function StudyInfoPanel({
               <div className="space-y-3 rounded-xl bg-muted/40 p-3 text-sm leading-6 text-muted-foreground">
                 <InfoBlock label="判定依据" value={result.evidence} fallback="本次未返回判定依据" />
                 <InfoBlock
-                  label="薄弱点"
+                  label="待补齐内容"
                   value={
                     result.weak_points && result.weak_points.length > 0
                       ? result.weak_points.join("、")
-                      : "暂无明显薄弱点"
+                      : "暂无需要补齐的内容"
                   }
                 />
                 <InfoBlock

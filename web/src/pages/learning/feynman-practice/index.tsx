@@ -12,6 +12,7 @@ import {
   type ExerciseResult,
   type GuidePracticePoint,
 } from "@/api/learning";
+import { documentApi } from "@/api/wiki/document";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -37,6 +38,7 @@ export function FeynmanWorkbenchPage() {
   const [result, setResult] = useState<ExerciseResult | null>(null);
   const [tutorAdvice, setTutorAdvice] = useState("");
   const [isTutorTeaching, setIsTutorTeaching] = useState(false);
+  const [isAppendingTutorNote, setIsAppendingTutorNote] = useState(false);
   const [selectedPracticePoint, setSelectedPracticePoint] = useState<GuidePracticePoint | null>(
     null,
   );
@@ -63,6 +65,7 @@ export function FeynmanWorkbenchPage() {
     setResult(null);
     setTutorAdvice("");
     setIsTutorTeaching(false);
+    setIsAppendingTutorNote(false);
     setSelectedPracticePoint(null);
   }, [objectiveId]);
 
@@ -85,6 +88,7 @@ export function FeynmanWorkbenchPage() {
     setResult(null);
     setTutorAdvice("");
     setIsTutorTeaching(false);
+    setIsAppendingTutorNote(false);
   };
 
   const requestTutorTeaching = async () => {
@@ -95,6 +99,7 @@ export function FeynmanWorkbenchPage() {
       selectedPracticePoint?.goal ? `本轮目标是：${selectedPracticePoint.goal}` : "",
       `Examiner 的反馈是：${result.feedback}`,
       "请你不要只评价我，直接教我：先用通俗的话讲清楚这个知识点，再指出我漏掉的关键点，最后给我一个很小的复述练习。",
+      "最后请补一段「可写回 Markdown 的学习旁注」：像用户写在教材边上的笔记一样，补充更顺手的解释、例子、易错点和复述提示，不要替换原教材。",
     ]
       .filter(Boolean)
       .join("\n");
@@ -117,6 +122,28 @@ export function FeynmanWorkbenchPage() {
         toast.error(err.message);
       },
     );
+  };
+
+  const appendTutorNoteToMarkdown = async () => {
+    if (!objective?.source_document_id || !tutorAdvice.trim() || isAppendingTutorNote) return;
+
+    setIsAppendingTutorNote(true);
+    try {
+      const sourceDocument = await documentApi.getContent(objective.source_document_id);
+      const title = selectedPracticePoint?.title || objective.title;
+      const note = ["", "---", "", `## 学习旁注：${title}`, "", tutorAdvice.trim(), ""].join("\n");
+      const nextContent = `${sourceDocument.content?.trimEnd() || ""}${note}`;
+
+      await documentApi.updateContent(objective.source_document_id, { content: nextContent });
+      await queryClient.invalidateQueries({
+        queryKey: ["feynman-source-document", objective.source_document_id],
+      });
+      toast.success("学习旁注已追加到 Markdown");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "追加学习旁注失败");
+    } finally {
+      setIsAppendingTutorNote(false);
+    }
   };
 
   if (isLoading) {
@@ -197,6 +224,9 @@ export function FeynmanWorkbenchPage() {
             tutorAdvice={tutorAdvice}
             isTutorTeaching={isTutorTeaching}
             onRequestTutorTeaching={requestTutorTeaching}
+            canAppendTutorNote={!!objective.source_document_id}
+            isAppendingTutorNote={isAppendingTutorNote}
+            onAppendTutorNote={appendTutorNoteToMarkdown}
           />
           <StudyInfoPanel objective={objective} result={result} sessionId={sessionId} />
         </div>

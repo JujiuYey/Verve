@@ -4,19 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useGoalList } from "@/api/learning";
 import { useLearningProfile } from "@/api/learning/profile";
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle,
-} from "@/components/ui/empty";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import {
   Select,
   SelectContent,
@@ -49,10 +38,7 @@ export function ProfilePage() {
 
   const { data: profile, isLoading: isProfileLoading } = useLearningProfile(goalId);
 
-  const selectedGoal = useMemo(
-    () => goals.find((g) => g.id === goalId),
-    [goals, goalId],
-  );
+  const selectedGoal = useMemo(() => goals.find((g) => g.id === goalId), [goals, goalId]);
 
   if (isLoading) {
     return (
@@ -87,7 +73,7 @@ export function ProfilePage() {
       <div className="flex flex-col gap-2">
         <h1 className="text-2xl font-bold">我的画像</h1>
         <p className="text-sm text-muted-foreground">
-          按目标维度展示学习画像:当前水平、薄弱点、验证习惯与下一步目标。
+          按目标维度展示学习画像:当前水平、已掌握内容、验证习惯与下一步目标。
         </p>
       </div>
 
@@ -97,9 +83,7 @@ export function ProfilePage() {
             <div className="flex flex-col gap-1">
               <CardTitle>选择学习目标</CardTitle>
               <CardDescription>
-                {selectedGoal
-                  ? `当前查看:${selectedGoal.title}`
-                  : "请选择要查看画像的目标"}
+                {selectedGoal ? `当前查看:${selectedGoal.title}` : "请选择要查看画像的目标"}
               </CardDescription>
             </div>
             <Select value={goalId} onValueChange={setGoalId}>
@@ -129,7 +113,7 @@ export function ProfilePage() {
           <EmptyHeader>
             <EmptyTitle>该目标尚未生成画像</EmptyTitle>
             <EmptyDescription>
-              完成该目标的相关学习内容后,系统会自动生成画像,展示你的水平与薄弱点。
+              完成该目标的相关学习内容后,系统会自动生成画像,展示你已经掌握了什么。
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
@@ -137,7 +121,6 @@ export function ProfilePage() {
         <div className="grid gap-4 md:grid-cols-2">
           <ProfileCurrentLevelCard level={profile.current_level} />
           <ProfileNextGoalCard nextGoal={profile.next_goal} />
-          <ProfileWeakPointsCard points={profile.weak_points} />
           <ProfileCompletedTopicsCard topics={profile.completed_topics} />
           <ProfileVerificationHabitsCard habits={profile.verification_habits} />
         </div>
@@ -196,36 +179,12 @@ function ProfileNextGoalCard({ nextGoal }: { nextGoal?: string }) {
   );
 }
 
-function ProfileWeakPointsCard({ points }: { points?: string[] }) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>薄弱点</CardTitle>
-        <CardDescription>需要重点巩固的知识点</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {points && points.length > 0 ? (
-          <div className="flex flex-wrap gap-2">
-            {points.map((p) => (
-              <Badge key={p} variant="destructive">
-                {p}
-              </Badge>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">暂无薄弱点记录</p>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
 function ProfileCompletedTopicsCard({ topics }: { topics?: string[] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>已完成主题</CardTitle>
-        <CardDescription>该目标下已掌握的知识点</CardDescription>
+        <CardTitle>已掌握内容</CardTitle>
+        <CardDescription>该目标下已经能够稳定复述和使用的知识点</CardDescription>
       </CardHeader>
       <CardContent>
         {topics && topics.length > 0 ? (
@@ -237,7 +196,7 @@ function ProfileCompletedTopicsCard({ topics }: { topics?: string[] }) {
             ))}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">还没有完成的主题</p>
+          <p className="text-sm text-muted-foreground">还没有记录已掌握内容</p>
         )}
       </CardContent>
     </Card>
