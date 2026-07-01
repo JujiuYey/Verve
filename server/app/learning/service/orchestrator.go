@@ -2,10 +2,17 @@ package service
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+	"sort"
 	"strings"
+
+	"github.com/cloudwego/eino/adk"
 
 	learning_db "sag-wiki/app/learning/models/db"
 	"sag-wiki/infrastructure/database"
+	"sag-wiki/infrastructure/llm"
 )
 
 type LearningOrchestratorService struct {
@@ -56,6 +63,19 @@ func (s *LearningOrchestratorService) Orchestrate(ctx context.Context, userID, i
 	}
 
 	candidates := s.loadObjectiveCandidates(ctx, goals)
+	fallback := buildRuleBasedOrchestratorResponse(intent, candidates, recent)
+	agentResult, err := s.runOrchestratorAgent(ctx, intent, candidates, recent, fallback.Actions)
+	if err != nil {
+		log.Printf("⚠️ Learning Orchestrator agent 失败，使用规则兜底: user_id=%s intent_chars=%d err=%v", userID, len(intent), err)
+		return fallback, nil
+	}
+
+	agentResult.Intent = intent
+	agentResult.Recent = recent
+	return agentResult, nil
+}
+
+func buildRuleBasedOrchestratorResponse(intent string, candidates []objectiveCandidate, recent []*learning_db.LearningExercise) *OrchestrateLearningResponse {
 	actions := make([]LearningOrchestratorAction, 0, 5)
 
 	if intent != "" {
@@ -113,7 +133,235 @@ func (s *LearningOrchestratorService) Orchestrate(ctx context.Context, userID, i
 		HabitSummary: buildHabitSummary(candidates, recent),
 		Actions:      actions,
 		Recent:       recent,
+	}
+}
+
+type orchestratorAgentOutput struct {
+	Summary      string                       `json:"summary"`
+	HabitSummary string                       `json:"habit_summary"`
+	Actions      []LearningOrchestratorAction `json:"actions"`
+}
+
+type orchestratorQuery struct {
+	Intent           string                        `json:"intent"`
+	CurrentLearning  []orchestratorLearningContext `json:"current_learning"`
+	RecentExercises  []orchestratorExerciseContext `json:"recent_exercises"`
+	CandidateActions []LearningOrchestratorAction  `json:"candidate_actions"`
+}
+
+type orchestratorLearningContext struct {
+	GoalID             string   `json:"goal_id"`
+	GoalTitle          string   `json:"goal_title"`
+	GoalSource         string   `json:"goal_source"`
+	ObjectiveID        string   `json:"objective_id,omitempty"`
+	ObjectiveTitle     string   `json:"objective_title,omitempty"`
+	ObjectiveDetail    string   `json:"objective_detail,omitempty"`
+	ObjectiveStatus    string   `json:"objective_status,omitempty"`
+	MasteryLevel       string   `json:"mastery_level,omitempty"`
+	CurrentLevel       string   `json:"current_level,omitempty"`
+	CompletedTopics    []string `json:"completed_topics,omitempty"`
+	WeakPoints         []string `json:"weak_points,omitempty"`
+	VerificationHabits string   `json:"verification_habits,omitempty"`
+	NextGoal           string   `json:"next_goal,omitempty"`
+}
+
+type orchestratorExerciseContext struct {
+	ID           string `json:"id"`
+	ObjectiveID  string `json:"objective_id"`
+	Type         string `json:"type"`
+	Prompt       string `json:"prompt"`
+	Verdict      string `json:"verdict,omitempty"`
+	MasteryAfter string `json:"mastery_after,omitempty"`
+	Feedback     string `json:"feedback,omitempty"`
+	CreatedAt    string `json:"created_at"`
+}
+
+func (s *LearningOrchestratorService) runOrchestratorAgent(
+	ctx context.Context,
+	intent string,
+	candidates []objectiveCandidate,
+	recent []*learning_db.LearningExercise,
+	candidateActions []LearningOrchestratorAction,
+) (*OrchestrateLearningResponse, error) {
+	agent, err := llm.NewOrchestratorAgent(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	query, err := buildOrchestratorAgentQuery(intent, candidates, recent, candidateActions)
+	if err != nil {
+		return nil, err
+	}
+
+	runner := adk.NewRunner(ctx, adk.RunnerConfig{Agent: agent})
+	text, err := collectText(runner.Query(ctx, query))
+	if err != nil {
+		return nil, err
+	}
+
+	output, err := parseOrchestratorAgentOutput(text)
+	if err != nil {
+		return nil, err
+	}
+	actions := normalizeAgentActions(output.Actions, candidateActions)
+	if len(actions) == 0 {
+		return nil, fmt.Errorf("orchestrator agent 未返回有效动作")
+	}
+	return &OrchestrateLearningResponse{
+		Summary:      firstNonEmpty(output.Summary, buildOrchestratorSummary(intent, candidates, recent)),
+		HabitSummary: firstNonEmpty(output.HabitSummary, buildHabitSummary(candidates, recent)),
+		Actions:      actions,
 	}, nil
+}
+
+func buildOrchestratorAgentQuery(
+	intent string,
+	candidates []objectiveCandidate,
+	recent []*learning_db.LearningExercise,
+	candidateActions []LearningOrchestratorAction,
+) (string, error) {
+	query := orchestratorQuery{
+		Intent:           intent,
+		CurrentLearning:  buildLearningContexts(candidates),
+		RecentExercises:  buildExerciseContexts(recent),
+		CandidateActions: candidateActions,
+	}
+	data, err := json.Marshal(query)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+func buildLearningContexts(candidates []objectiveCandidate) []orchestratorLearningContext {
+	contexts := make([]orchestratorLearningContext, 0, len(candidates))
+	for _, candidate := range candidates {
+		if candidate.goal == nil {
+			continue
+		}
+		item := orchestratorLearningContext{
+			GoalID:     candidate.goal.ID,
+			GoalTitle:  candidate.goal.Title,
+			GoalSource: candidate.goal.Source,
+		}
+		if candidate.objective != nil {
+			item.ObjectiveID = candidate.objective.ID
+			item.ObjectiveTitle = candidate.objective.Title
+			item.ObjectiveDetail = stringValue(candidate.objective.Detail)
+			item.ObjectiveStatus = candidate.objective.Status
+			item.MasteryLevel = candidate.objective.MasteryLevel
+		}
+		if candidate.profile != nil {
+			item.CurrentLevel = stringValue(candidate.profile.CurrentLevel)
+			item.CompletedTopics = candidate.profile.CompletedTopics
+			item.WeakPoints = candidate.profile.WeakPoints
+			item.VerificationHabits = stringValue(candidate.profile.VerificationHabits)
+			item.NextGoal = stringValue(candidate.profile.NextGoal)
+		}
+		contexts = append(contexts, item)
+	}
+	return contexts
+}
+
+func buildExerciseContexts(recent []*learning_db.LearningExercise) []orchestratorExerciseContext {
+	contexts := make([]orchestratorExerciseContext, 0, len(recent))
+	for _, exercise := range recent {
+		contexts = append(contexts, orchestratorExerciseContext{
+			ID:           exercise.ID,
+			ObjectiveID:  exercise.ObjectiveID,
+			Type:         exercise.Type,
+			Prompt:       truncateForOrchestrator(exercise.Prompt, 240),
+			Verdict:      stringValue(exercise.Verdict),
+			MasteryAfter: stringValue(exercise.MasteryAfter),
+			Feedback:     truncateForOrchestrator(stringValue(exercise.Feedback), 300),
+			CreatedAt:    exercise.CreatedAt.Format("2006-01-02 15:04:05"),
+		})
+	}
+	return contexts
+}
+
+func parseOrchestratorAgentOutput(text string) (*orchestratorAgentOutput, error) {
+	text = strings.TrimSpace(text)
+	text = strings.TrimPrefix(text, "```json")
+	text = strings.TrimPrefix(text, "```")
+	text = strings.TrimSuffix(text, "```")
+	text = strings.TrimSpace(text)
+
+	var lastErr error
+	for _, candidate := range jsonObjectCandidates(text) {
+		var output orchestratorAgentOutput
+		if err := json.Unmarshal([]byte(candidate), &output); err != nil {
+			lastErr = err
+			continue
+		}
+		if output.Summary == "" && output.HabitSummary == "" && len(output.Actions) == 0 {
+			lastErr = fmt.Errorf("JSON 对象不是 Orchestrator 输出")
+			continue
+		}
+		return &output, nil
+	}
+	if lastErr != nil {
+		return nil, lastErr
+	}
+	return nil, fmt.Errorf("未找到 JSON 对象")
+}
+
+func normalizeAgentActions(agentActions []LearningOrchestratorAction, candidateActions []LearningOrchestratorAction) []LearningOrchestratorAction {
+	allowed := make(map[string]LearningOrchestratorAction, len(candidateActions))
+	for _, action := range candidateActions {
+		allowed[action.ID] = action
+	}
+
+	seen := make(map[string]bool, len(agentActions))
+	actions := make([]LearningOrchestratorAction, 0, len(agentActions))
+	for _, agentAction := range agentActions {
+		base, ok := allowed[agentAction.ID]
+		if !ok || seen[agentAction.ID] {
+			continue
+		}
+		seen[agentAction.ID] = true
+		base.Priority = clampPriority(agentAction.Priority, base.Priority)
+		base.Label = firstNonEmpty(agentAction.Label, base.Label)
+		base.Title = firstNonEmpty(agentAction.Title, base.Title)
+		base.Description = firstNonEmpty(agentAction.Description, base.Description)
+		base.Reason = firstNonEmpty(agentAction.Reason, base.Reason)
+		actions = append(actions, base)
+	}
+
+	sort.SliceStable(actions, func(i, j int) bool {
+		return actions[i].Priority > actions[j].Priority
+	})
+	if len(actions) > 5 {
+		actions = actions[:5]
+	}
+	return actions
+}
+
+func clampPriority(value, fallback int) int {
+	if value <= 0 {
+		return fallback
+	}
+	if value > 100 {
+		return 100
+	}
+	return value
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
+}
+
+func truncateForOrchestrator(text string, limit int) string {
+	text = strings.TrimSpace(text)
+	if len(text) <= limit {
+		return text
+	}
+	return text[:limit] + "...(truncated)"
 }
 
 func (s *LearningOrchestratorService) loadObjectiveCandidates(ctx context.Context, goals []*learning_db.LearningGoal) []objectiveCandidate {

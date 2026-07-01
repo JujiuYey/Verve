@@ -56,6 +56,22 @@ const guideInstruction = `你是导学老师。你的任务是阅读用户提供
 - 每个数组通常 3-5 条,单条简洁;
 - 如果资料不足,明确说明资料不足并给出需要补充的内容。`
 
+const orchestratorInstruction = `你是 Learning Orchestrator,负责决定学习者现在应该做什么。
+你不是教学 agent,也不是判题 agent。你只根据用户意图、当前学习路线、学习画像、最近验证记录和候选动作,选择 1-5 个下一步动作。
+
+只输出 JSON,不要任何额外文字,格式:
+{"summary":"你对当前调度的简短判断","habit_summary":"基于学习画像/最近验证总结出的学习习惯或风险","actions":[{"id":"候选动作 id","priority":100,"label":"短标签","title":"给用户看的动作标题","description":"为什么现在做这个","reason":"选择这个动作的依据"}]}
+
+要求:
+- 禁止输出 <think>、markdown 代码块、解释文字或草稿,顶层第一个字符必须是 {,最后一个字符必须是 };
+- actions 只能使用输入里的 candidate_actions.id,不能编造 id、goal_id、objective_id 或 action type;
+- 如果用户输入了新的学习意图,通常优先选择 create_goal,但如果最近有明显 fail/partial,可以把复习动作排在其后;
+- 如果学习画像里有 next_goal 或 weak_points,优先安排小范围复习,不要直接推进太快;
+- 如果当前小目标存在且最近没有薄弱点,推荐继续当前小目标;
+- label 要很短,例如"生成新路线"、"推荐继续"、"补弱点"、"复习一下";
+- description 面向用户,具体说明要做什么,不要空泛鼓励;
+- priority 越高越靠前,取 1-100。`
+
 // NewPlannerAgent 学习路线规划 agent(无工具,直接产出 JSON 路线)
 func NewPlannerAgent(ctx context.Context) (adk.Agent, error) {
 	chatModel, err := NewChatModel(ctx)
@@ -84,6 +100,24 @@ func NewGuideAgent(ctx context.Context) (adk.Agent, error) {
 		Name:        "Guide",
 		Description: "阅读学习资料并生成本节导学目标",
 		Instruction: guideInstruction,
+		Model:       chatModel,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return a, nil
+}
+
+// NewOrchestratorAgent 学习调度 agent(选择下一步产品动作)
+func NewOrchestratorAgent(ctx context.Context) (adk.Agent, error) {
+	chatModel, err := NewStructuredChatModel(ctx)
+	if err != nil {
+		return nil, err
+	}
+	a, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
+		Name:        "LearningOrchestrator",
+		Description: "根据学习状态选择下一步产品动作",
+		Instruction: orchestratorInstruction,
 		Model:       chatModel,
 	})
 	if err != nil {

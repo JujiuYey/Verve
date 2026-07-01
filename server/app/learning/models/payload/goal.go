@@ -12,7 +12,7 @@ type CreateGoalFromFolderRequest struct {
 
 // 更新学习目标请求
 type UpdateGoalRequest struct {
-	ID     string  `json:"id"`
-	Title  *string `json:"title"`
+	ID     string  `json:"id"`     // 主键ID
+	Title  *string `json:"title"`  // 标题
 	Status *string `json:"status"` // active / archived / completed
 }
