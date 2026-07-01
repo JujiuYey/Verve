@@ -12,7 +12,7 @@ type LearningJournal struct {
 
 	ID         string    `bun:"id,pk,type:varchar(32)" json:"id"`                                        // 主键ID
 	UserID     string    `bun:"user_id,notnull" json:"user_id"`                                          // 用户ID
-	GoalID     string    `bun:"goal_id,notnull" json:"goal_id"`                                          // 目标ID
+	FolderID   string    `bun:"folder_id,notnull" json:"folder_id"`                                      // Wiki 文件夹ID
 	Date       time.Time `bun:"date,notnull,type:date" json:"date"`                                      // 日期
 	Learned    *string   `bun:"learned" json:"learned,omitempty"`                                        // 今日所学
 	Evidence   *string   `bun:"evidence" json:"evidence,omitempty"`                                      // 证据 / 产物

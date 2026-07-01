@@ -12,7 +12,6 @@ type LearningSession struct {
 
 	ID           string     `bun:"id,pk,type:varchar(32)" json:"id"`                                        // 主键ID
 	UserID       string     `bun:"user_id,notnull" json:"user_id"`                                          // 用户ID
-	GoalID       string     `bun:"goal_id,notnull" json:"goal_id"`                                          // 目标ID
 	ObjectiveID  string     `bun:"objective_id,notnull" json:"objective_id"`                                // 小目标ID
 	Status       string     `bun:"status,notnull" json:"status"`                                            // active / completed / abandoned
 	Summary      *string    `bun:"summary" json:"summary,omitempty"`                                        // 会话小结

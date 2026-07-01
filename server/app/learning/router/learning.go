@@ -9,32 +9,14 @@ import (
 
 // 配置学习平台路由(/api/learning/*)
 func SetupLearningRoutes(router fiber.Router, dbService *database.DatabaseService) {
-	goalHandler := learning_handlers.NewGoalHandler(dbService)
 	sessionHandler := learning_handlers.NewSessionHandler(dbService)
-	profileHandler := learning_handlers.NewProfileHandler(dbService)
 	journalHandler := learning_handlers.NewJournalHandler(dbService)
 	exerciseHandler := learning_handlers.NewExerciseHandler(dbService)
 	guideHandler := learning_handlers.NewGuideHandler(dbService)
-	orchestratorHandler := learning_handlers.NewOrchestratorHandler(dbService)
+	objectiveHandler := learning_handlers.NewObjectiveHandler(dbService)
 
 	learning := router.Group("/learning")
 	{
-		// 继续上次 / 今日推荐
-		learning.Get("/continue", goalHandler.Continue)
-		learning.Post("/orchestrate", orchestratorHandler.Orchestrate)
-
-		// 学习目标
-		goal := learning.Group("/goal")
-		{
-			goal.Get("/page", goalHandler.FindPage) // 注意:/page 在 /:id 之前注册
-			goal.Post("/from-folder", goalHandler.CreateFromFolder)
-			goal.Post("/", goalHandler.Create)
-			goal.Put("/", goalHandler.Update)
-			goal.Get("/:id", goalHandler.FindOne)
-			goal.Delete("/:id", goalHandler.Delete)
-			goal.Get("/:id/profile", profileHandler.Get)
-		}
-
 		// 学习会话
 		session := learning.Group("/session")
 		{
@@ -55,6 +37,11 @@ func SetupLearningRoutes(router fiber.Router, dbService *database.DatabaseServic
 		exercise := learning.Group("/exercise")
 		{
 			exercise.Get("/page", exerciseHandler.FindPage)
+		}
+
+		objective := learning.Group("/objective")
+		{
+			objective.Get("/:id", objectiveHandler.FindOne)
 		}
 
 		// 导学 agent

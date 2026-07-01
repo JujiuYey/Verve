@@ -7,7 +7,7 @@ const BASE = "/api/learning";
 export interface LearningJournal {
   id: string;
   user_id: string;
-  goal_id: string;
+  folder_id: string;
   date: string;
   learned?: string;
   evidence?: string;

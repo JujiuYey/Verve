@@ -21,10 +21,10 @@ func NewProfileRepository(database *bun.DB) *ProfileRepository {
 
 func (r *ProfileRepository) GetDB() *bun.DB { return r.db }
 
-// 一个目标一份画像
-func (r *ProfileRepository) FindByGoal(ctx context.Context, goalID string) (*learning_db.LearningProfile, error) {
+// 一个 Wiki 文件夹一份画像
+func (r *ProfileRepository) FindByFolder(ctx context.Context, folderID string) (*learning_db.LearningProfile, error) {
 	profile := new(learning_db.LearningProfile)
-	if err := r.db.NewSelect().Model(profile).Where("goal_id = ?", goalID).Scan(ctx); err != nil {
+	if err := r.db.NewSelect().Model(profile).Where("folder_id = ?", folderID).Scan(ctx); err != nil {
 		return nil, err
 	}
 	return profile, nil

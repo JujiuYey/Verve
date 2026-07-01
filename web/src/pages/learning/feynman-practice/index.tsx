@@ -1,13 +1,13 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { ArrowLeftIcon, CircleAlertIcon } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import {
   sessionChatStream,
   useCreateSession,
-  useGoalDetail,
+  useObjectiveDetail,
   useSubmitExercise,
   type ExerciseResult,
   type GuidePracticePoint,
@@ -25,10 +25,10 @@ import { buildPrompt, masteryLabels, type WorkbenchPhase } from "./_shared";
 
 export function FeynmanWorkbenchPage() {
   const navigate = useNavigate();
-  const { goalId, objectiveId } = useParams({
-    from: "/_layout/learn/feynman-practice/$goalId/$objectiveId",
+  const { objectiveId } = useParams({
+    from: "/_layout/learn/feynman-practice/$objectiveId",
   });
-  const { data: detail, isLoading } = useGoalDetail(goalId);
+  const { data: objective, isLoading } = useObjectiveDetail(objectiveId);
   const createSession = useCreateSession();
   const queryClient = useQueryClient();
 
@@ -43,13 +43,6 @@ export function FeynmanWorkbenchPage() {
     null,
   );
   const submitExercise = useSubmitExercise(sessionId);
-
-  const objectives = useMemo(
-    () => [...(detail?.objectives ?? [])].sort((a, b) => a.order_index - b.order_index),
-    [detail?.objectives],
-  );
-  const objective = objectives.find((item) => item.id === objectiveId) ?? null;
-  const stageObjectives = objectives.filter((item) => item.stage_title === objective?.stage_title);
 
   useEffect(() => {
     if (!objectiveId || sessionId || createSession.isPending) return;
@@ -80,7 +73,7 @@ export function FeynmanWorkbenchPage() {
     setTutorAdvice("");
     setIsTutorTeaching(false);
     void queryClient.invalidateQueries({ queryKey: ["learning-journals"] });
-    void queryClient.invalidateQueries({ queryKey: ["learning-profiles", goalId] });
+    void queryClient.invalidateQueries({ queryKey: ["learning-profiles"] });
   };
 
   const resetAnswer = () => {
@@ -195,9 +188,9 @@ export function FeynmanWorkbenchPage() {
           <PhaseBadge phase={phase} onPhaseChange={setPhase} />
           <Button
             variant="outline"
-            onClick={() => navigate({ to: "/learn/goal/$goalId", params: { goalId } })}
+            onClick={() => navigate({ to: "/wiki/folders" })}
           >
-            查看路线图
+            返回 Wiki
           </Button>
         </div>
       </div>
@@ -205,7 +198,7 @@ export function FeynmanWorkbenchPage() {
       {phase === "reading" ? (
         <SourcePanel
           objective={objective}
-          stageObjectives={stageObjectives}
+          stageObjectives={[]}
           selectedPracticePoint={selectedPracticePoint}
           onPracticePointSelect={setSelectedPracticePoint}
         />

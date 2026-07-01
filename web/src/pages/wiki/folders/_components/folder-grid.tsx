@@ -16,7 +16,6 @@ interface FolderGridProps {
   loading?: boolean;
   onEdit: (folder: Folder) => void;
   onDelete: (folder: Folder) => void;
-  onPermission: (folder: Folder) => void;
   onEnter?: (folder: Folder) => void;
 }
 
@@ -25,7 +24,6 @@ export function FolderGrid({
   loading,
   onEdit,
   onDelete,
-  onPermission,
   onEnter,
 }: FolderGridProps) {
   if (loading) {
@@ -60,7 +58,6 @@ export function FolderGrid({
           folder={folder}
           onEdit={onEdit}
           onDelete={onDelete}
-          onPermission={onPermission}
           onEnter={onEnter}
         />
       ))}

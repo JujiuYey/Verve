@@ -22,8 +22,7 @@ import { Route as LayoutLearnFeynmanRouteImport } from './routes/_layout/learn/f
 import { Route as LayoutCommonAppSettingRouteImport } from './routes/_layout/common/app-setting'
 import { Route as LayoutCommonAccountRouteImport } from './routes/_layout/common/account'
 import { Route as LayoutLearnSessionSessionIdRouteImport } from './routes/_layout/learn/session/$sessionId'
-import { Route as LayoutLearnGoalGoalIdRouteImport } from './routes/_layout/learn/goal/$goalId'
-import { Route as LayoutLearnFeynmanPracticeGoalIdObjectiveIdRouteImport } from './routes/_layout/learn/feynman-practice/$goalId/$objectiveId'
+import { Route as LayoutLearnFeynmanPracticeObjectiveIdRouteImport } from './routes/_layout/learn/feynman-practice/$objectiveId'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -90,15 +89,10 @@ const LayoutLearnSessionSessionIdRoute =
     path: '/learn/session/$sessionId',
     getParentRoute: () => LayoutRoute,
   } as any)
-const LayoutLearnGoalGoalIdRoute = LayoutLearnGoalGoalIdRouteImport.update({
-  id: '/learn/goal/$goalId',
-  path: '/learn/goal/$goalId',
-  getParentRoute: () => LayoutRoute,
-} as any)
-const LayoutLearnFeynmanPracticeGoalIdObjectiveIdRoute =
-  LayoutLearnFeynmanPracticeGoalIdObjectiveIdRouteImport.update({
-    id: '/learn/feynman-practice/$goalId/$objectiveId',
-    path: '/learn/feynman-practice/$goalId/$objectiveId',
+const LayoutLearnFeynmanPracticeObjectiveIdRoute =
+  LayoutLearnFeynmanPracticeObjectiveIdRouteImport.update({
+    id: '/learn/feynman-practice/$objectiveId',
+    path: '/learn/feynman-practice/$objectiveId',
     getParentRoute: () => LayoutRoute,
   } as any)
 
@@ -114,9 +108,8 @@ export interface FileRoutesByFullPath {
   '/system/user': typeof LayoutSystemUserRoute
   '/wiki/folders': typeof LayoutWikiFoldersRoute
   '/wiki/tiptap-editor': typeof LayoutWikiTiptapEditorRoute
-  '/learn/goal/$goalId': typeof LayoutLearnGoalGoalIdRoute
+  '/learn/feynman-practice/$objectiveId': typeof LayoutLearnFeynmanPracticeObjectiveIdRoute
   '/learn/session/$sessionId': typeof LayoutLearnSessionSessionIdRoute
-  '/learn/feynman-practice/$goalId/$objectiveId': typeof LayoutLearnFeynmanPracticeGoalIdObjectiveIdRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
@@ -130,9 +123,8 @@ export interface FileRoutesByTo {
   '/system/user': typeof LayoutSystemUserRoute
   '/wiki/folders': typeof LayoutWikiFoldersRoute
   '/wiki/tiptap-editor': typeof LayoutWikiTiptapEditorRoute
-  '/learn/goal/$goalId': typeof LayoutLearnGoalGoalIdRoute
+  '/learn/feynman-practice/$objectiveId': typeof LayoutLearnFeynmanPracticeObjectiveIdRoute
   '/learn/session/$sessionId': typeof LayoutLearnSessionSessionIdRoute
-  '/learn/feynman-practice/$goalId/$objectiveId': typeof LayoutLearnFeynmanPracticeGoalIdObjectiveIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -148,9 +140,8 @@ export interface FileRoutesById {
   '/_layout/system/user': typeof LayoutSystemUserRoute
   '/_layout/wiki/folders': typeof LayoutWikiFoldersRoute
   '/_layout/wiki/tiptap-editor': typeof LayoutWikiTiptapEditorRoute
-  '/_layout/learn/goal/$goalId': typeof LayoutLearnGoalGoalIdRoute
+  '/_layout/learn/feynman-practice/$objectiveId': typeof LayoutLearnFeynmanPracticeObjectiveIdRoute
   '/_layout/learn/session/$sessionId': typeof LayoutLearnSessionSessionIdRoute
-  '/_layout/learn/feynman-practice/$goalId/$objectiveId': typeof LayoutLearnFeynmanPracticeGoalIdObjectiveIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -166,9 +157,8 @@ export interface FileRouteTypes {
     | '/system/user'
     | '/wiki/folders'
     | '/wiki/tiptap-editor'
-    | '/learn/goal/$goalId'
+    | '/learn/feynman-practice/$objectiveId'
     | '/learn/session/$sessionId'
-    | '/learn/feynman-practice/$goalId/$objectiveId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
@@ -182,9 +172,8 @@ export interface FileRouteTypes {
     | '/system/user'
     | '/wiki/folders'
     | '/wiki/tiptap-editor'
-    | '/learn/goal/$goalId'
+    | '/learn/feynman-practice/$objectiveId'
     | '/learn/session/$sessionId'
-    | '/learn/feynman-practice/$goalId/$objectiveId'
   id:
     | '__root__'
     | '/_layout'
@@ -199,9 +188,8 @@ export interface FileRouteTypes {
     | '/_layout/system/user'
     | '/_layout/wiki/folders'
     | '/_layout/wiki/tiptap-editor'
-    | '/_layout/learn/goal/$goalId'
+    | '/_layout/learn/feynman-practice/$objectiveId'
     | '/_layout/learn/session/$sessionId'
-    | '/_layout/learn/feynman-practice/$goalId/$objectiveId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -302,18 +290,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutLearnSessionSessionIdRouteImport
       parentRoute: typeof LayoutRoute
     }
-    '/_layout/learn/goal/$goalId': {
-      id: '/_layout/learn/goal/$goalId'
-      path: '/learn/goal/$goalId'
-      fullPath: '/learn/goal/$goalId'
-      preLoaderRoute: typeof LayoutLearnGoalGoalIdRouteImport
-      parentRoute: typeof LayoutRoute
-    }
-    '/_layout/learn/feynman-practice/$goalId/$objectiveId': {
-      id: '/_layout/learn/feynman-practice/$goalId/$objectiveId'
-      path: '/learn/feynman-practice/$goalId/$objectiveId'
-      fullPath: '/learn/feynman-practice/$goalId/$objectiveId'
-      preLoaderRoute: typeof LayoutLearnFeynmanPracticeGoalIdObjectiveIdRouteImport
+    '/_layout/learn/feynman-practice/$objectiveId': {
+      id: '/_layout/learn/feynman-practice/$objectiveId'
+      path: '/learn/feynman-practice/$objectiveId'
+      fullPath: '/learn/feynman-practice/$objectiveId'
+      preLoaderRoute: typeof LayoutLearnFeynmanPracticeObjectiveIdRouteImport
       parentRoute: typeof LayoutRoute
     }
   }
@@ -330,9 +311,8 @@ interface LayoutRouteChildren {
   LayoutSystemUserRoute: typeof LayoutSystemUserRoute
   LayoutWikiFoldersRoute: typeof LayoutWikiFoldersRoute
   LayoutWikiTiptapEditorRoute: typeof LayoutWikiTiptapEditorRoute
-  LayoutLearnGoalGoalIdRoute: typeof LayoutLearnGoalGoalIdRoute
+  LayoutLearnFeynmanPracticeObjectiveIdRoute: typeof LayoutLearnFeynmanPracticeObjectiveIdRoute
   LayoutLearnSessionSessionIdRoute: typeof LayoutLearnSessionSessionIdRoute
-  LayoutLearnFeynmanPracticeGoalIdObjectiveIdRoute: typeof LayoutLearnFeynmanPracticeGoalIdObjectiveIdRoute
 }
 
 const LayoutRouteChildren: LayoutRouteChildren = {
@@ -346,10 +326,9 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutSystemUserRoute: LayoutSystemUserRoute,
   LayoutWikiFoldersRoute: LayoutWikiFoldersRoute,
   LayoutWikiTiptapEditorRoute: LayoutWikiTiptapEditorRoute,
-  LayoutLearnGoalGoalIdRoute: LayoutLearnGoalGoalIdRoute,
+  LayoutLearnFeynmanPracticeObjectiveIdRoute:
+    LayoutLearnFeynmanPracticeObjectiveIdRoute,
   LayoutLearnSessionSessionIdRoute: LayoutLearnSessionSessionIdRoute,
-  LayoutLearnFeynmanPracticeGoalIdObjectiveIdRoute:
-    LayoutLearnFeynmanPracticeGoalIdObjectiveIdRoute,
 }
 
 const LayoutRouteWithChildren =

@@ -1,4 +1,4 @@
-import { IconPencil, IconRoute, IconShare, IconUserPlus } from "@tabler/icons-react";
+import { IconPencil, IconShare, IconUserPlus } from "@tabler/icons-react";
 
 import type { Folder } from "@/api/wiki/folder";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -10,15 +10,11 @@ import { folderIconAsset } from "../_shared/file-icons";
 interface FolderDetailPanelProps {
   folder: Folder;
   onEdit: (folder: Folder) => void;
-  onCreateLearningPath?: (folder: Folder) => void;
-  creatingLearningPath?: boolean;
 }
 
 export function FolderDetailPanel({
   folder,
   onEdit,
-  onCreateLearningPath,
-  creatingLearningPath,
 }: FolderDetailPanelProps) {
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-4 p-4">
@@ -43,16 +39,6 @@ export function FolderDetailPanel({
           className="h-20 w-20 object-contain"
         />
       </div>
-
-      {/* 分享按钮 */}
-      <Button
-        className="w-full"
-        disabled={creatingLearningPath}
-        onClick={() => onCreateLearningPath?.(folder)}
-      >
-        <IconRoute className="mr-2 h-4 w-4" />
-        {creatingLearningPath ? "生成中..." : "生成学习路径"}
-      </Button>
 
       <Button variant="outline" className="w-full">
         <IconShare className="mr-2 h-4 w-4" />

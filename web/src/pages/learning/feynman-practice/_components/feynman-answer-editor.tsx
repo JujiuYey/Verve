@@ -80,7 +80,15 @@ function EditorToolbar({ editor, onClear }: { editor: Editor | null; onClear: ()
       isOrderedList: editor?.isActive("orderedList") ?? false,
       isEmpty: !editor || editor.isEmpty,
     }),
-  });
+  }) ?? {
+    isBold: false,
+    isItalic: false,
+    isCode: false,
+    isCodeBlock: false,
+    isBulletList: false,
+    isOrderedList: false,
+    isEmpty: true,
+  };
 
   const disabled = !editor;
 

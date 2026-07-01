@@ -29,11 +29,11 @@ func (r *ObjectiveRepository) FindOne(ctx context.Context, id string) (*learning
 	return obj, nil
 }
 
-// 按路线列出小目标(按顺序)
-func (r *ObjectiveRepository) FindByPath(ctx context.Context, pathID string) ([]*learning_db.LearningObjective, error) {
+// 按 Wiki 文件夹列出学习小节(按顺序)
+func (r *ObjectiveRepository) FindByFolder(ctx context.Context, folderID string) ([]*learning_db.LearningObjective, error) {
 	var objectives []*learning_db.LearningObjective
 	err := r.db.NewSelect().Model(&objectives).
-		Where("path_id = ?", pathID).
+		Where("source_folder_id = ?", folderID).
 		Order("order_index ASC").
 		Scan(ctx)
 	if err != nil {
@@ -42,22 +42,22 @@ func (r *ObjectiveRepository) FindByPath(ctx context.Context, pathID string) ([]
 	return objectives, nil
 }
 
-// 统计某路线下已完成 / 总数(用于进度)
-func (r *ObjectiveRepository) CountByPath(ctx context.Context, pathID string) (completed, total int, err error) {
+// 统计某 Wiki 文件夹下已完成 / 总数(用于进度)
+func (r *ObjectiveRepository) CountByFolder(ctx context.Context, folderID string) (completed, total int, err error) {
 	total, err = r.db.NewSelect().Model((*learning_db.LearningObjective)(nil)).
-		Where("path_id = ?", pathID).Count(ctx)
+		Where("source_folder_id = ?", folderID).Count(ctx)
 	if err != nil {
 		return 0, 0, err
 	}
 	completed, err = r.db.NewSelect().Model((*learning_db.LearningObjective)(nil)).
-		Where("path_id = ?", pathID).Where("status = ?", "completed").Count(ctx)
+		Where("source_folder_id = ?", folderID).Where("status = ?", "completed").Count(ctx)
 	if err != nil {
 		return 0, 0, err
 	}
 	return completed, total, nil
 }
 
-// 批量创建(Planner 生成路线时)
+// 批量创建学习小节
 func (r *ObjectiveRepository) BulkCreate(ctx context.Context, objectives []*learning_db.LearningObjective) error {
 	if len(objectives) == 0 {
 		return nil

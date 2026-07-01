@@ -25,8 +25,6 @@ type DatabaseService struct {
 	ModelConfigs system_repo.ModelConfigRepository
 
 	// Learning Repositories
-	Goals      *learning_repo.GoalRepository
-	Paths      *learning_repo.PathRepository
 	Objectives *learning_repo.ObjectiveRepository
 	Sessions   *learning_repo.SessionRepository
 	Messages   *learning_repo.MessageRepository
@@ -54,8 +52,6 @@ func NewDatabaseService(dsn string) (*DatabaseService, error) {
 	db.RegisterModel((*system_db.User)(nil))
 	db.RegisterModel((*system_db.SysModelPlatform)(nil))
 	db.RegisterModel((*system_db.SysModel)(nil))
-	db.RegisterModel((*learning_db.LearningGoal)(nil))
-	db.RegisterModel((*learning_db.LearningPath)(nil))
 	db.RegisterModel((*learning_db.LearningObjective)(nil))
 	db.RegisterModel((*learning_db.LearningSession)(nil))
 	db.RegisterModel((*learning_db.LearningMessage)(nil))
@@ -87,8 +83,6 @@ func NewDatabaseService(dsn string) (*DatabaseService, error) {
 		ModelConfigs: system_repo.NewModelConfigRepository(db),
 
 		// Learning Repositories
-		Goals:      learning_repo.NewGoalRepository(db),
-		Paths:      learning_repo.NewPathRepository(db),
 		Objectives: learning_repo.NewObjectiveRepository(db),
 		Sessions:   learning_repo.NewSessionRepository(db),
 		Messages:   learning_repo.NewMessageRepository(db),

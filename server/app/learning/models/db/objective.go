@@ -6,12 +6,11 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// 小目标(进度与掌握度最小单位)
+// 学习小节状态(来自 Wiki 文档)
 type LearningObjective struct {
 	bun.BaseModel `bun:"table:learning_objectives,alias:lo"`
 
 	ID               string    `bun:"id,pk,type:varchar(32)" json:"id"`                                        // 主键ID
-	PathID           string    `bun:"path_id,notnull" json:"path_id"`                                          // 路线ID
 	UserID           string    `bun:"user_id,notnull" json:"user_id"`                                          // 用户ID
 	StageTitle       *string   `bun:"stage_title" json:"stage_title,omitempty"`                                // 所属阶段标题
 	Title            string    `bun:"title,notnull" json:"title"`                                              // 小目标标题

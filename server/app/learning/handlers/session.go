@@ -55,14 +55,8 @@ func (h *SessionHandler) Create(c *fiber.Ctx) error {
 		return response.ForbiddenCtx(c, "无权访问")
 	}
 
-	path, err := h.db.Paths.FindOne(c.Context(), obj.PathID)
-	if err != nil {
-		return response.InternalServerCtx(c, "学习路线不存在")
-	}
-
 	session := &learning_db.LearningSession{
 		UserID:      userID,
-		GoalID:      path.GoalID,
 		ObjectiveID: obj.ID,
 		Status:      "active",
 	}
@@ -180,10 +174,10 @@ func (h *SessionHandler) Exercise(c *fiber.Ctx) error {
 
 	result, err := h.examiner.Judge(c.Context(), obj, req.Type, req.Prompt, req.UserAnswer)
 	if err != nil {
-		log.Printf("❌ Examiner 判定失败: session_id=%s user_id=%s goal_id=%s objective_id=%s objective_title=%q type=%s prompt_chars=%d answer_chars=%d err=%v",
+		log.Printf("❌ Examiner 判定失败: session_id=%s user_id=%s folder_id=%s objective_id=%s objective_title=%q type=%s prompt_chars=%d answer_chars=%d err=%v",
 			id,
 			userID,
-			session.GoalID,
+			stringValue(obj.SourceFolderID),
 			obj.ID,
 			obj.Title,
 			req.Type,
@@ -211,7 +205,7 @@ func (h *SessionHandler) Exercise(c *fiber.Ctx) error {
 	// 更新掌握层级
 	obj.MasteryLevel = result.MasteryAfter
 	_ = h.db.Objectives.Update(c.Context(), obj)
-	h.syncLearningExaminerState(c.Context(), userID, session.GoalID, obj, result)
+	h.syncLearningExaminerState(c.Context(), userID, obj, result)
 
 	return response.SuccessCtx(c, fiber.Map{
 		"verdict":             result.Verdict,
@@ -225,18 +219,22 @@ func (h *SessionHandler) Exercise(c *fiber.Ctx) error {
 	})
 }
 
-func (h *SessionHandler) syncLearningExaminerState(ctx context.Context, userID, goalID string, obj *learning_db.LearningObjective, result *learning_service.JudgeResult) {
+func (h *SessionHandler) syncLearningExaminerState(ctx context.Context, userID string, obj *learning_db.LearningObjective, result *learning_service.JudgeResult) {
 	if result == nil {
 		return
 	}
+	folderID := stringValue(obj.SourceFolderID)
+	if folderID == "" {
+		return
+	}
 
-	if profile, err := h.db.Profiles.FindByGoal(ctx, goalID); err == nil {
+	if profile, err := h.db.Profiles.FindByFolder(ctx, folderID); err == nil {
 		learning_service.MergeLearningProfileState(profile, obj, result)
 		_ = h.db.Profiles.Update(ctx, profile)
 	} else if err == sql.ErrNoRows {
 		profile := &learning_db.LearningProfile{
-			UserID: userID,
-			GoalID: goalID,
+			UserID:   userID,
+			FolderID: folderID,
 		}
 		learning_service.MergeLearningProfileState(profile, obj, result)
 		_ = h.db.Profiles.Create(ctx, profile)
@@ -248,7 +246,7 @@ func (h *SessionHandler) syncLearningExaminerState(ctx context.Context, userID, 
 	nextStep := result.NextRecommendation
 	_ = h.db.Journals.Create(ctx, &learning_db.LearningJournal{
 		UserID:     userID,
-		GoalID:     goalID,
+		FolderID:   folderID,
 		Date:       time.Now(),
 		Learned:    &learned,
 		Evidence:   &evidence,
@@ -284,7 +282,9 @@ func (h *SessionHandler) Complete(c *fiber.Ctx) error {
 
 	// 推进到下一个小目标
 	var next *learning_db.LearningObjective
-	if objectives, err := h.db.Objectives.FindByPath(c.Context(), obj.PathID); err == nil {
+	if obj.SourceFolderID != nil {
+		objectives, err := h.db.Objectives.FindByFolder(c.Context(), *obj.SourceFolderID)
+		if err == nil {
 		for _, o := range objectives {
 			if o.OrderIndex > obj.OrderIndex {
 				next = o
@@ -292,25 +292,22 @@ func (h *SessionHandler) Complete(c *fiber.Ctx) error {
 			}
 		}
 	}
-	if path, err := h.db.Paths.FindOne(c.Context(), obj.PathID); err == nil {
-		if next != nil {
-			next.Status = "active"
-			_ = h.db.Objectives.Update(c.Context(), next)
-			path.CurrentObjectiveID = &next.ID
-		} else {
-			path.Status = "completed"
-		}
-		_ = h.db.Paths.Update(c.Context(), path)
+	}
+	if next != nil {
+		next.Status = "active"
+		_ = h.db.Objectives.Update(c.Context(), next)
 	}
 
 	// 写一条简单日志(同日同目标的唯一冲突忽略)
 	learned := obj.Title
-	_ = h.db.Journals.Create(c.Context(), &learning_db.LearningJournal{
-		UserID:  userID,
-		GoalID:  session.GoalID,
-		Date:    now,
-		Learned: &learned,
-	})
+	if obj.SourceFolderID != nil {
+		_ = h.db.Journals.Create(c.Context(), &learning_db.LearningJournal{
+			UserID:   userID,
+			FolderID: *obj.SourceFolderID,
+			Date:     now,
+			Learned:  &learned,
+		})
+	}
 
 	resp := fiber.Map{"summary": "已完成:" + obj.Title}
 	if next != nil {
@@ -335,6 +332,13 @@ func buildTutorQuery(obj *learning_db.LearningObjective, message string) string 
 		sb.WriteString("\n\n请开始这一节,先用一个小问题诊断学习者的基础。")
 	}
 	return sb.String()
+}
+
+func stringValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 // 把 agent 事件流写成 SSE,并返回累积的 assistant 文本(对齐现有 chat.go)

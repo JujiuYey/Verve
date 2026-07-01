@@ -1,4 +1,4 @@
--- 导学 Agent 结果缓存:避免同一小目标、同一份 Markdown 反复消耗 token
+-- 导学 Agent 结果缓存:避免同一学习小节、同一份 Markdown 反复消耗 token
 CREATE TABLE learning_guides (
     id VARCHAR(32) PRIMARY KEY,
     objective_id VARCHAR(32) NOT NULL REFERENCES learning_objectives(id) ON DELETE CASCADE,

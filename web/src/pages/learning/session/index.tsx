@@ -111,10 +111,7 @@ export function SessionPage() {
   const handleComplete = async () => {
     const res = await completeSession.mutateAsync();
     toast.success(res.summary || "本节完成");
-    navigate({
-      to: "/learn/goal/$goalId",
-      params: { goalId: detail?.session.goal_id || "" },
-    });
+    navigate({ to: "/learn/feynman" });
   };
 
   return (

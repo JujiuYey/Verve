@@ -7,7 +7,7 @@ const BASE = "/api/learning";
 export interface LearningProfile {
   id: string;
   user_id: string;
-  goal_id: string;
+  folder_id: string;
   current_level?: string;
   completed_topics?: string[];
   weak_points?: string[];
@@ -18,19 +18,20 @@ export interface LearningProfile {
 }
 
 const api = {
-  get: (goalId: string) => request.get<LearningProfile | null>(`${BASE}/goal/${goalId}/profile`),
+  get: (folderId: string) =>
+    request.get<LearningProfile | null>(`${BASE}/folder/${folderId}/profile`),
 };
 
 export const profileKeys = {
   all: ["learning-profiles"] as const,
-  byGoal: (goalId: string) => [...profileKeys.all, goalId] as const,
+  byFolder: (folderId: string) => [...profileKeys.all, folderId] as const,
 };
 
-export function useLearningProfile(goalId: string | undefined) {
+export function useLearningProfile(folderId: string | undefined) {
   return useQuery({
-    queryKey: profileKeys.byGoal(goalId ?? ""),
-    queryFn: () => api.get(goalId as string),
-    enabled: !!goalId,
+    queryKey: profileKeys.byFolder(folderId ?? ""),
+    queryFn: () => api.get(folderId as string),
+    enabled: !!folderId,
     retry: false,
   });
 }

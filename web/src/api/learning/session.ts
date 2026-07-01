@@ -18,7 +18,6 @@ export interface LearningMessage {
 export interface LearningSession {
   id: string;
   user_id: string;
-  goal_id: string;
   objective_id: string;
   status: string;
   summary?: string;

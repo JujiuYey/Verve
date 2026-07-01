@@ -85,11 +85,11 @@ func (s *GuideService) Generate(ctx context.Context, obj *learning_db.LearningOb
 		log.Printf("❌ Guide Agent 调用失败: objective_id=%s err=%v", obj.ID, err)
 		return nil, err
 	}
-	log.Printf("📘 Guide 原始输出: objective_id=%s output_chars=%d output_preview=%q", obj.ID, len(text), truncateForPlannerLog(text, 1200))
+	log.Printf("📘 Guide 原始输出: objective_id=%s output_chars=%d output_preview=%q", obj.ID, len(text), truncateForAgentLog(text, 1200))
 
 	result, err := parseGuideOutput(text)
 	if err != nil {
-		log.Printf("❌ Guide 输出 JSON 解析失败: objective_id=%s err=%v raw=%q", obj.ID, err, truncateForPlannerLog(text, 2000))
+		log.Printf("❌ Guide 输出 JSON 解析失败: objective_id=%s err=%v raw=%q", obj.ID, err, truncateForAgentLog(text, 2000))
 		return nil, err
 	}
 	if len(result.MasteryGoals) == 0 && result.Summary == "" {
