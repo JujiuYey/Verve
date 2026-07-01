@@ -8,6 +8,20 @@ import (
 	system_db "sag-wiki/app/system/models/db"
 )
 
+// apiKeyHint 根据 API Key 生成脱敏提示,空值返回 nil
+func apiKeyHint(apiKey string) *string {
+	key := strings.TrimSpace(apiKey)
+	if key == "" {
+		return nil
+	}
+	if len(key) <= 8 {
+		hint := "已保存"
+		return &hint
+	}
+	hint := key[:2] + "****" + key[len(key)-4:]
+	return &hint
+}
+
 // FindPlatforms 查询所有平台,按 sort_order 升序、created_at 降序排列
 func (r *modelConfigRepository) FindPlatforms(ctx context.Context) ([]*system_db.SysModelPlatform, error) {
 	var platforms []*system_db.SysModelPlatform
