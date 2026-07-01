@@ -7,6 +7,11 @@ import (
 	system_db "sag-wiki/app/system/models/db"
 )
 
+const (
+	ModelTypeChat      = "chat"
+	ModelTypeEmbedding = "embedding"
+)
+
 // FindModels 查询所有模型,按 created_at 降序排列
 func (r *modelConfigRepository) FindModels(ctx context.Context) ([]*system_db.SysModel, error) {
 	var models []*system_db.SysModel

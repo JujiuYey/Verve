@@ -52,7 +52,8 @@ func SetupRouter(
 			system_router.SetupUserRoutes(protected.Group("/"), dbService, minioService)
 
 			// 模型配置路由
-			system_router.SetupModelConfigRoutes(protected.Group("/"), dbService)
+			system_router.SetupPlatformRoutes(protected.Group("/"), dbService)
+			system_router.SetupModelRoutes(protected.Group("/"), dbService)
 
 			// 知识库路由
 			wiki_router.SetupFolderRoutes(protected.Group("/"), dbService)

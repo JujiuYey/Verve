@@ -11,6 +11,7 @@ import (
 	"time"
 
 	system_db "sag-wiki/app/system/models/db"
+	system_repository "sag-wiki/app/system/repository"
 )
 
 var ErrModelPlatformNotFound = errors.New("model platform not found")
@@ -85,7 +86,7 @@ func (s *ModelSyncService) SyncModels(ctx context.Context, platformID string) (*
 			PlatformID:   platform.ID,
 			ModelName:    modelName,
 			DisplayName:  modelName,
-			ModelType:    system_db.ModelTypeChat,
+			ModelType:    system_repository.ModelTypeChat,
 			Capabilities: []string{},
 			Source:       "remote",
 			Status:       "active",
