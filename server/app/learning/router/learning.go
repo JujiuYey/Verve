@@ -15,11 +15,13 @@ func SetupLearningRoutes(router fiber.Router, dbService *database.DatabaseServic
 	journalHandler := learning_handlers.NewJournalHandler(dbService)
 	exerciseHandler := learning_handlers.NewExerciseHandler(dbService)
 	guideHandler := learning_handlers.NewGuideHandler(dbService)
+	orchestratorHandler := learning_handlers.NewOrchestratorHandler(dbService)
 
 	learning := router.Group("/learning")
 	{
 		// 继续上次 / 今日推荐
 		learning.Get("/continue", goalHandler.Continue)
+		learning.Post("/orchestrate", orchestratorHandler.Orchestrate)
 
 		// 学习目标
 		goal := learning.Group("/goal")

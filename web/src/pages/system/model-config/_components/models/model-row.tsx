@@ -1,8 +1,8 @@
 import { IconTrash } from "@tabler/icons-react";
 import { useState } from "react";
 
-import { useDeleteAIModel, useUpdateAIModel } from "@/api/system/model-config";
-import type { ModelCapability, ModelType } from "@/api/system/model-config";
+import { useDeleteAIModel, useUpdateAIModel } from "@/api";
+import type { ModelCapability, ModelType } from "@/api";
 import { ConfirmDialog } from "@/components/sag-ui";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

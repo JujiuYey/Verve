@@ -1,6 +1,6 @@
 import { IconExternalLink } from "@tabler/icons-react";
 
-import type { AIModel, AIPlatform } from "@/api/system/model-config";
+import type { AIModel, AIPlatform } from "@/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";

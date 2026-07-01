@@ -5,7 +5,7 @@ import { ProviderConfig } from "./provider-config";
 
 const mutateAsync = vi.fn();
 
-vi.mock("@/api/system/model-config", () => ({
+vi.mock("@/api", () => ({
   useUpdateAIPlatformConfig: () => ({
     mutateAsync,
     isPending: false,

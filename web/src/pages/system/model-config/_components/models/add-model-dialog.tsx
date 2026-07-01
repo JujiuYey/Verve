@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { toast } from "sonner";
 
-import type { ModelType } from "@/api/system/model-config";
-import { useCreateAIModel } from "@/api/system/model-config";
+import type { ModelType } from "@/api";
+import { useCreateAIModel } from "@/api";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,

@@ -1,4 +1,4 @@
-import type { ModelType } from "@/api/system/model-config";
+import type { ModelType } from "@/api";
 
 export const CUSTOM_VENDOR_ID = "custom";
 

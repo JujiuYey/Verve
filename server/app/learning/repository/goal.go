@@ -44,6 +44,22 @@ func (r *GoalRepository) FindByUser(ctx context.Context, userID string, offset, 
 	return goals, total, nil
 }
 
+// 按用户列出进行中的目标，用于学习调度入口生成继续选项。
+func (r *GoalRepository) FindActiveByUser(ctx context.Context, userID string, limit int) ([]*learning_db.LearningGoal, error) {
+	var goals []*learning_db.LearningGoal
+	query := r.db.NewSelect().Model(&goals).
+		Where("user_id = ?", userID).
+		Where("status = ?", "active").
+		Order("updated_at DESC", "created_at DESC")
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	if err := query.Scan(ctx); err != nil {
+		return nil, err
+	}
+	return goals, nil
+}
+
 func (r *GoalRepository) Create(ctx context.Context, goal *learning_db.LearningGoal) error {
 	goal.ID = strings.ReplaceAll(uuid.New().String(), "-", "")
 	_, err := r.db.NewInsert().Model(goal).Exec(ctx)

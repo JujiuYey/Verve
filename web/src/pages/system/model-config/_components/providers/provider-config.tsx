@@ -2,8 +2,8 @@ import { IconExternalLink, IconEye, IconEyeOff, IconTrash } from "@tabler/icons-
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import type { AIPlatform } from "@/api/system/model-config";
-import { useUpdateAIPlatformConfig } from "@/api/system/model-config";
+import type { AIPlatform } from "@/api";
+import { useUpdateAIPlatformConfig } from "@/api";
 import { ConfirmDialog } from "@/components/sag-ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

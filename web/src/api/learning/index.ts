@@ -4,3 +4,4 @@ export * from "./journal";
 export * from "./exercise";
 export * from "./profile";
 export * from "./guide";
+export * from "./orchestrator";

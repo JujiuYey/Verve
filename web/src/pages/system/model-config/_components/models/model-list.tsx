@@ -1,8 +1,8 @@
 import { IconPlus, IconRefresh, IconSearch } from "@tabler/icons-react";
 import { useMemo, useState } from "react";
 
-import type { AIModel, ModelType } from "@/api/system/model-config";
-import { useSyncModels } from "@/api/system/model-config";
+import type { AIModel, ModelType } from "@/api";
+import { useSyncModels } from "@/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

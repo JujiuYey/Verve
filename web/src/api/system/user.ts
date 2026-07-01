@@ -1,8 +1,5 @@
 import { request } from "@/utils/request";
 
-import type { Department } from "./department";
-import type { Role } from "./role";
-
 // 用户接口定义
 export interface User {
   id: string;
@@ -13,9 +10,6 @@ export interface User {
   status: string;
   created_at: string;
   updated_at: string;
-  departments?: Department[];
-  roles?: Role[];
-  primary_department_id?: string;
 }
 
 export interface CreateUserRequest {

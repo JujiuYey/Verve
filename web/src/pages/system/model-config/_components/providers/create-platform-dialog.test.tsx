@@ -5,7 +5,7 @@ import { CreatePlatformDialog } from "./create-platform-dialog";
 
 const mutateAsync = vi.fn();
 
-vi.mock("@/api/system/model-config", () => ({
+vi.mock("@/api", () => ({
   useCreateAIPlatform: () => ({
     mutateAsync,
     isPending: false,
