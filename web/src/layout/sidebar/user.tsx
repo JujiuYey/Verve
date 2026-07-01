@@ -91,13 +91,13 @@ export function User() {
           <DropdownMenuSeparator />
           <DropdownMenuGroup>
             <DropdownMenuItem asChild>
-              <Link to="/account">
+              <Link to="/common/account">
                 <IconUserCircle />
                 个人中心
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link to="/app-setting">
+              <Link to="/common/app-setting">
                 <IconSettings />
                 应用设置
               </Link>
