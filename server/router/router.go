@@ -6,13 +6,13 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 
-	file_router "sag-wiki/app/file/router"
-	learning_router "sag-wiki/app/learning/router"
-	wiki_router "sag-wiki/app/wiki/router"
-	system_router "sag-wiki/app/system/router"
-	"sag-wiki/infrastructure/database"
-	"sag-wiki/infrastructure/storage"
-	"sag-wiki/middleware"
+	file_router "verve/app/file/router"
+	learning_router "verve/app/learning/router"
+	system_router "verve/app/system/router"
+	wiki_router "verve/app/wiki/router"
+	"verve/infrastructure/database"
+	"verve/infrastructure/storage"
+	"verve/middleware"
 )
 
 // 配置路由
@@ -21,7 +21,7 @@ func SetupRouter(
 	minioService *storage.MinIOService,
 ) *fiber.App {
 	app := fiber.New(fiber.Config{
-		AppName:      "SAG-WIKI",
+		AppName:      "Verve",
 		ErrorHandler: customErrorHandler,
 	})
 
@@ -47,21 +47,21 @@ func SetupRouter(
 	// 需要认证的路由组
 	protected := api.Group("/")
 	protected.Use(middleware.AuthMiddleware())
-		{
-			// 用户管理路由
-			system_router.SetupUserRoutes(protected.Group("/"), dbService, minioService)
+	{
+		// 用户管理路由
+		system_router.SetupUserRoutes(protected.Group("/"), dbService, minioService)
 
-			// 模型配置路由
-			system_router.SetupPlatformRoutes(protected.Group("/"), dbService)
-			system_router.SetupModelRoutes(protected.Group("/"), dbService)
+		// 模型配置路由
+		system_router.SetupPlatformRoutes(protected.Group("/"), dbService)
+		system_router.SetupModelRoutes(protected.Group("/"), dbService)
 
-			// 知识库路由
-			wiki_router.SetupFolderRoutes(protected.Group("/"), dbService)
-			wiki_router.SetupDocumentRoutes(protected.Group("/"), dbService, minioService)
+		// 知识库路由
+		wiki_router.SetupFolderRoutes(protected.Group("/"), dbService)
+		wiki_router.SetupDocumentRoutes(protected.Group("/"), dbService, minioService)
 
-			// 学习平台路由
-			learning_router.SetupLearningRoutes(protected.Group("/"), dbService)
-		}
+		// 学习平台路由
+		learning_router.SetupLearningRoutes(protected.Group("/"), dbService)
+	}
 
 	return app
 }

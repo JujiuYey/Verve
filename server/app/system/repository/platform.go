@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	system_db "sag-wiki/app/system/models/db"
+	system_db "verve/app/system/models/db"
 )
 
 // apiKeyHint 根据 API Key 生成脱敏提示,空值返回 nil

@@ -1,6 +1,6 @@
 package config
 
-import "sag-wiki/utils"
+import "verve/utils"
 
 type RedisConfig struct {
 	Addr     string

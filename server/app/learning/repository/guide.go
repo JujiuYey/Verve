@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/uptrace/bun"
 
-	learning_db "sag-wiki/app/learning/models/db"
+	learning_db "verve/app/learning/models/db"
 )
 
 // 导学结果缓存数据访问层

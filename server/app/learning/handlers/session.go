@@ -16,13 +16,13 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/valyala/fasthttp"
 
-	learning_db "sag-wiki/app/learning/models/db"
-	learning_payload "sag-wiki/app/learning/models/payload"
-	learning_service "sag-wiki/app/learning/service"
-	learning_tools "sag-wiki/app/learning/tools"
-	"sag-wiki/common/response"
-	"sag-wiki/infrastructure/database"
-	"sag-wiki/infrastructure/llm"
+	learning_db "verve/app/learning/models/db"
+	learning_payload "verve/app/learning/models/payload"
+	learning_service "verve/app/learning/service"
+	learning_tools "verve/app/learning/tools"
+	"verve/common/response"
+	"verve/infrastructure/database"
+	"verve/infrastructure/llm"
 )
 
 // 学习会话处理器

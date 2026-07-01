@@ -7,8 +7,8 @@ import (
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
 
-	learning_db "sag-wiki/app/learning/models/db"
-	learning_repo "sag-wiki/app/learning/repository"
+	learning_db "verve/app/learning/models/db"
+	learning_repo "verve/app/learning/repository"
 )
 
 // ==================== Inputs / Outputs ====================

@@ -1,9 +1,9 @@
 package handlers
 
 import (
-	"sag-wiki/common/pagination"
-	"sag-wiki/common/response"
-	"sag-wiki/infrastructure/database"
+	"verve/common/pagination"
+	"verve/common/response"
+	"verve/infrastructure/database"
 
 	"github.com/gofiber/fiber/v2"
 )

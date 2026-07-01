@@ -7,10 +7,10 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 
-	learning_payload "sag-wiki/app/learning/models/payload"
-	learning_service "sag-wiki/app/learning/service"
-	"sag-wiki/common/response"
-	"sag-wiki/infrastructure/database"
+	learning_payload "verve/app/learning/models/payload"
+	learning_service "verve/app/learning/service"
+	"verve/common/response"
+	"verve/infrastructure/database"
 )
 
 type GuideHandler struct {

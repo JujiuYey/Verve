@@ -6,11 +6,11 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"golang.org/x/crypto/bcrypt"
 
-	system_payload "sag-wiki/app/system/models/payload"
-	system_repo "sag-wiki/app/system/repository"
-	"sag-wiki/common/response"
-	"sag-wiki/infrastructure/database"
-	"sag-wiki/utils"
+	system_payload "verve/app/system/models/payload"
+	system_repo "verve/app/system/repository"
+	"verve/common/response"
+	"verve/infrastructure/database"
+	"verve/utils"
 )
 
 // 认证处理器

@@ -3,8 +3,8 @@ package handlers
 import (
 	"github.com/gofiber/fiber/v2"
 
-	"sag-wiki/common/response"
-	"sag-wiki/infrastructure/database"
+	"verve/common/response"
+	"verve/infrastructure/database"
 )
 
 // 学习画像处理器

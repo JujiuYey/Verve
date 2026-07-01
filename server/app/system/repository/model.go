@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/uptrace/bun"
 
-	system_db "sag-wiki/app/system/models/db"
+	system_db "verve/app/system/models/db"
 )
 
 const (

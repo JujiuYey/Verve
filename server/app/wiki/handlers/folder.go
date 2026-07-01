@@ -4,13 +4,13 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/uptrace/bun"
 
-	system_repo "sag-wiki/app/system/repository"
-	wiki_db "sag-wiki/app/wiki/models/db"
-	wiki_repo "sag-wiki/app/wiki/repository"
-	"sag-wiki/infrastructure/database"
+	system_repo "verve/app/system/repository"
+	wiki_db "verve/app/wiki/models/db"
+	wiki_repo "verve/app/wiki/repository"
+	"verve/infrastructure/database"
 
-	"sag-wiki/common/pagination"
-	"sag-wiki/common/response"
+	"verve/common/pagination"
+	"verve/common/response"
 )
 
 // FolderTreeNode 树形节点结构

@@ -5,7 +5,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 
-	"sag-wiki/utils"
+	"verve/utils"
 )
 
 // JWT 认证中间件

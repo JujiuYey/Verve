@@ -3,9 +3,9 @@ package handlers
 import (
 	"github.com/gofiber/fiber/v2"
 
-	"sag-wiki/common/pagination"
-	"sag-wiki/common/response"
-	"sag-wiki/infrastructure/database"
+	"verve/common/pagination"
+	"verve/common/response"
+	"verve/infrastructure/database"
 )
 
 // 学习日志处理器

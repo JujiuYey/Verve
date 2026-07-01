@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/uptrace/bun"
 
-	wiki_db "sag-wiki/app/wiki/models/db"
+	wiki_db "verve/app/wiki/models/db"
 )
 
 // 文件夹仓储接口

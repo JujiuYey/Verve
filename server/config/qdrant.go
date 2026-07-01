@@ -1,6 +1,6 @@
 package config
 
-import "sag-wiki/utils"
+import "verve/utils"
 
 // Qdrant 配置
 type QdrantConfig struct {

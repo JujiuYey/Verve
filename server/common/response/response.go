@@ -1,7 +1,7 @@
 package response
 
 import (
-	"sag-wiki/common/pagination"
+	"verve/common/pagination"
 
 	"github.com/gofiber/fiber/v2"
 )

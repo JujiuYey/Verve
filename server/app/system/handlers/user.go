@@ -6,14 +6,14 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 
-	system_db "sag-wiki/app/system/models/db"
-	system_payload "sag-wiki/app/system/models/payload"
-	system_repo "sag-wiki/app/system/repository"
-	"sag-wiki/common/pagination"
-	"sag-wiki/common/response"
-	"sag-wiki/infrastructure/database"
-	"sag-wiki/infrastructure/storage"
-	"sag-wiki/utils"
+	system_db "verve/app/system/models/db"
+	system_payload "verve/app/system/models/payload"
+	system_repo "verve/app/system/repository"
+	"verve/common/pagination"
+	"verve/common/response"
+	"verve/infrastructure/database"
+	"verve/infrastructure/storage"
+	"verve/utils"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"

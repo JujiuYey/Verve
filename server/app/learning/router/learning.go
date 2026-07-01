@@ -3,8 +3,8 @@ package router
 import (
 	"github.com/gofiber/fiber/v2"
 
-	learning_handlers "sag-wiki/app/learning/handlers"
-	"sag-wiki/infrastructure/database"
+	learning_handlers "verve/app/learning/handlers"
+	"verve/infrastructure/database"
 )
 
 // 配置学习平台路由(/api/learning/*)

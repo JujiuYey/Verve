@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/uptrace/bun"
 
-	learning_db "sag-wiki/app/learning/models/db"
+	learning_db "verve/app/learning/models/db"
 )
 
 // 小目标数据访问层

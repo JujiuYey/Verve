@@ -3,11 +3,11 @@ package handlers
 import (
 	"strings"
 
-	system_db "sag-wiki/app/system/models/db"
-	system_payload "sag-wiki/app/system/models/payload"
-	system_repository "sag-wiki/app/system/repository"
-	"sag-wiki/common/response"
-	"sag-wiki/infrastructure/database"
+	system_db "verve/app/system/models/db"
+	system_payload "verve/app/system/models/payload"
+	system_repository "verve/app/system/repository"
+	"verve/common/response"
+	"verve/infrastructure/database"
 
 	"github.com/gofiber/fiber/v2"
 )

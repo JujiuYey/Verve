@@ -6,8 +6,8 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 
-	"sag-wiki/common/response"
-	"sag-wiki/infrastructure/storage"
+	"verve/common/response"
+	"verve/infrastructure/storage"
 )
 
 // 文件处理器

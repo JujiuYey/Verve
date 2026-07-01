@@ -1,6 +1,6 @@
 package payload
 
-import "sag-wiki/common/pagination"
+import "verve/common/pagination"
 
 // 文档列表请求参数 - 组合通用分页参数 + 特有参数
 type PageDocumentsRequest struct {

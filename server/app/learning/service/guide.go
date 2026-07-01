@@ -11,9 +11,9 @@ import (
 
 	"github.com/cloudwego/eino/adk"
 
-	learning_db "sag-wiki/app/learning/models/db"
-	"sag-wiki/infrastructure/database"
-	"sag-wiki/infrastructure/llm"
+	learning_db "verve/app/learning/models/db"
+	"verve/infrastructure/database"
+	"verve/infrastructure/llm"
 )
 
 // GuideService 调用导学 agent 阅读资料并生成本节学习目标。

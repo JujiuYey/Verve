@@ -10,9 +10,9 @@ import (
 
 	"github.com/cloudwego/eino/adk"
 
-	learning_db "sag-wiki/app/learning/models/db"
-	"sag-wiki/infrastructure/database"
-	"sag-wiki/infrastructure/llm"
+	learning_db "verve/app/learning/models/db"
+	"verve/infrastructure/database"
+	"verve/infrastructure/llm"
 )
 
 // 学习路线生成服务(Planner)

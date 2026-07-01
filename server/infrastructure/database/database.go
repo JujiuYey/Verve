@@ -11,10 +11,10 @@ import (
 	"github.com/uptrace/bun/driver/pgdriver"
 	"github.com/uptrace/bun/extra/bundebug"
 
-	learning_db "sag-wiki/app/learning/models/db"
-	learning_repo "sag-wiki/app/learning/repository"
-	system_db "sag-wiki/app/system/models/db"
-	system_repo "sag-wiki/app/system/repository"
+	learning_db "verve/app/learning/models/db"
+	learning_repo "verve/app/learning/repository"
+	system_db "verve/app/system/models/db"
+	system_repo "verve/app/system/repository"
 )
 
 // 数据库服务（只负责连接管理）

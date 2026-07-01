@@ -11,7 +11,7 @@ import (
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 
-	"sag-wiki/config"
+	"verve/config"
 )
 
 // 对象存储服务

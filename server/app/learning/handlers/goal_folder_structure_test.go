@@ -3,8 +3,8 @@ package handlers
 import (
 	"testing"
 
-	learning_db "sag-wiki/app/learning/models/db"
-	wiki_db "sag-wiki/app/wiki/models/db"
+	learning_db "verve/app/learning/models/db"
+	wiki_db "verve/app/wiki/models/db"
 )
 
 func TestBuildStagesFromFolderStructureUsesTopLevelFolders(t *testing.T) {

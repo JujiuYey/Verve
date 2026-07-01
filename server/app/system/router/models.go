@@ -3,8 +3,8 @@ package router
 import (
 	"github.com/gofiber/fiber/v2"
 
-	system_handlers "sag-wiki/app/system/handlers"
-	"sag-wiki/infrastructure/database"
+	system_handlers "verve/app/system/handlers"
+	"verve/infrastructure/database"
 )
 
 // SetupModelRoutes 配置已启用模型路由

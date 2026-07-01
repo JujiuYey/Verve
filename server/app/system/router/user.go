@@ -3,9 +3,9 @@ package router
 import (
 	"github.com/gofiber/fiber/v2"
 
-	system_handlers "sag-wiki/app/system/handlers"
-	"sag-wiki/infrastructure/database"
-	"sag-wiki/infrastructure/storage"
+	system_handlers "verve/app/system/handlers"
+	"verve/infrastructure/database"
+	"verve/infrastructure/storage"
 )
 
 // 配置用户管理路由

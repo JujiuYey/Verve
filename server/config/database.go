@@ -3,7 +3,7 @@ package config
 import (
 	"fmt"
 
-	"sag-wiki/utils"
+	"verve/utils"
 )
 
 // 数据库配置

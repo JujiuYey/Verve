@@ -8,10 +8,10 @@ import (
 
 	"github.com/joho/godotenv"
 
-	"sag-wiki/config"
-	"sag-wiki/infrastructure/database"
-	"sag-wiki/infrastructure/storage"
-	"sag-wiki/router"
+	"verve/config"
+	"verve/infrastructure/database"
+	"verve/infrastructure/storage"
+	"verve/router"
 )
 
 //go:generate msgp -file=../../models/api/ai/chat.go -o=../../models/api/ai/chat_msgp.go -tests=false

@@ -3,8 +3,8 @@ package router
 import (
 	"github.com/gofiber/fiber/v2"
 
-	file_handlers "sag-wiki/app/file/handlers"
-	"sag-wiki/infrastructure/storage"
+	file_handlers "verve/app/file/handlers"
+	"verve/infrastructure/storage"
 )
 
 // 配置文件访问路由

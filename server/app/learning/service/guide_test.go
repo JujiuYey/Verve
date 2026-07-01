@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	learning_db "sag-wiki/app/learning/models/db"
+	learning_db "verve/app/learning/models/db"
 )
 
 func TestParseGuideOutputStripsMarkdownFence(t *testing.T) {

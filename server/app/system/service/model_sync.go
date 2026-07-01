@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	system_db "sag-wiki/app/system/models/db"
-	system_repository "sag-wiki/app/system/repository"
+	system_db "verve/app/system/models/db"
+	system_repository "verve/app/system/repository"
 )
 
 var ErrModelPlatformNotFound = errors.New("model platform not found")

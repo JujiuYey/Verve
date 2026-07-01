@@ -3,7 +3,7 @@ package config
 import (
 	"os"
 
-	"sag-wiki/utils"
+	"verve/utils"
 )
 
 // MinIO 配置

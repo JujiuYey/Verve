@@ -9,12 +9,12 @@ import (
 
 	"github.com/google/uuid"
 
-	wiki_db "sag-wiki/app/wiki/models/db"
-	wiki_payload "sag-wiki/app/wiki/models/payload"
-	wiki_repo "sag-wiki/app/wiki/repository"
-	"sag-wiki/common/response"
-	"sag-wiki/infrastructure/database"
-	"sag-wiki/infrastructure/storage"
+	wiki_db "verve/app/wiki/models/db"
+	wiki_payload "verve/app/wiki/models/payload"
+	wiki_repo "verve/app/wiki/repository"
+	"verve/common/response"
+	"verve/infrastructure/database"
+	"verve/infrastructure/storage"
 )
 
 type documentRepository interface {

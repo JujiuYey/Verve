@@ -12,14 +12,14 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 
-	learning_db "sag-wiki/app/learning/models/db"
-	learning_payload "sag-wiki/app/learning/models/payload"
-	learning_service "sag-wiki/app/learning/service"
-	wiki_db "sag-wiki/app/wiki/models/db"
-	wiki_repo "sag-wiki/app/wiki/repository"
-	"sag-wiki/common/pagination"
-	"sag-wiki/common/response"
-	"sag-wiki/infrastructure/database"
+	learning_db "verve/app/learning/models/db"
+	learning_payload "verve/app/learning/models/payload"
+	learning_service "verve/app/learning/service"
+	wiki_db "verve/app/wiki/models/db"
+	wiki_repo "verve/app/wiki/repository"
+	"verve/common/pagination"
+	"verve/common/response"
+	"verve/infrastructure/database"
 )
 
 // 学习目标处理器
