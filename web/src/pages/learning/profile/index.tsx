@@ -14,7 +14,8 @@ export function ProfilePage() {
             等待接入 Wiki 文件夹学习现场
           </CardTitle>
           <CardDescription>
-            学习项目和学习路线已经移除，画像后续会按 Wiki 文件夹记录，像老师课前看的备课纸一样保存当前进度、已掌握内容和下一步。
+            学习项目和学习路线已经移除，画像后续会按 Wiki
+            文件夹记录，像老师课前看的备课纸一样保存当前进度、已掌握内容和下一步。
           </CardDescription>
         </CardHeader>
         <CardContent>

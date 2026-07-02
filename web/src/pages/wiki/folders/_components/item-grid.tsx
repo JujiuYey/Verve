@@ -109,11 +109,7 @@ export function ItemGrid({
           </h3>
           <div className={documentGridClassName}>
             {displayDocuments.map((doc) => (
-              <DocumentCard
-                key={doc.id}
-                document={doc}
-                onDelete={onDeleteDocument}
-              />
+              <DocumentCard key={doc.id} document={doc} onDelete={onDeleteDocument} />
             ))}
           </div>
         </div>

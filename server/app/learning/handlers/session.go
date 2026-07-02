@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"io"
 	"log"
@@ -12,7 +11,6 @@ import (
 	"time"
 
 	"github.com/cloudwego/eino/adk"
-	"github.com/cloudwego/eino/schema"
 	"github.com/gofiber/fiber/v2"
 	"github.com/valyala/fasthttp"
 
@@ -351,14 +349,14 @@ func writeLearningSSE(w *bufio.Writer, iter *adk.AsyncIterator[*adk.AgentEvent])
 
 func writeLearningSSEContent(w *bufio.Writer, iter *adk.AsyncIterator[*adk.AgentEvent]) string {
 	var content strings.Builder
+	state := &thinkParseState{}
 	for {
 		event, ok := iter.Next()
 		if !ok {
 			break
 		}
 		if event.Err != nil {
-			data, _ := json.Marshal(map[string]string{"type": "error", "content": event.Err.Error()})
-			writeSSEData(w, data)
+			_ = writeSSEEvent(w, SSEError, map[string]interface{}{"content": event.Err.Error()})
 			break
 		}
 		if event.Output == nil || event.Output.MessageOutput == nil {
@@ -373,41 +371,17 @@ func writeLearningSSEContent(w *bufio.Writer, iter *adk.AsyncIterator[*adk.Agent
 					break
 				}
 				if err != nil {
-					data, _ := json.Marshal(map[string]string{"type": "error", "content": err.Error()})
-					writeSSEData(w, data)
+					_ = writeSSEEvent(w, SSEError, map[string]interface{}{"content": err.Error()})
 					return content.String()
 				}
 				if chunk == nil {
 					continue
 				}
-				if chunk.Role != schema.Tool {
-					content.WriteString(chunk.Content)
-				}
-				data, _ := json.Marshal(map[string]interface{}{
-					"type":    "stream_chunk",
-					"content": chunk.Content,
-					"agent":   event.AgentName,
-				})
-				writeSSEData(w, data)
+				dispatchMessageChunk(w, chunk, event.AgentName, &content, state)
 			}
 		} else if mo.Message != nil {
-			if mo.Message.Role != schema.Tool {
-				content.WriteString(mo.Message.Content)
-			}
-			data, _ := json.Marshal(map[string]interface{}{
-				"type":    "message",
-				"content": mo.Message.Content,
-				"agent":   event.AgentName,
-			})
-			writeSSEData(w, data)
+			dispatchMessageChunk(w, mo.Message, event.AgentName, &content, state)
 		}
 	}
 	return content.String()
-}
-
-func writeSSEData(w *bufio.Writer, data []byte) {
-	_, _ = w.Write([]byte("data: "))
-	_, _ = w.Write(data)
-	_, _ = w.Write([]byte("\n\n"))
-	_ = w.Flush()
 }

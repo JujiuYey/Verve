@@ -26,6 +26,10 @@ type CoachAction struct {
 	Label       string `json:"label,omitempty"`
 }
 
+// BuildCoachQuery 把 runtime context + 用户消息拼成一段 prompt 喂给陪练 agent。
+//
+// 输出包含 6 个 Markdown 段:用户输入、Wiki 文件夹、当前文档、学习小节、学习画像、最近学习记录;
+// 末尾给出回复约束(自然语言 + 可选 <ACTION> 标签),供 ParseCoachAction 在回复中抽取跳转动作。
 func BuildCoachQuery(ctx CoachRuntimeContext, message string) string {
 	var sb strings.Builder
 	sb.WriteString("你正在 Verve 的费曼学习入口帮助用户继续学习。\n")

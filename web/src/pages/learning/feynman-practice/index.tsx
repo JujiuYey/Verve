@@ -186,10 +186,7 @@ export function FeynmanWorkbenchPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <PhaseBadge phase={phase} onPhaseChange={setPhase} />
-          <Button
-            variant="outline"
-            onClick={() => navigate({ to: "/wiki/folders" })}
-          >
+          <Button variant="outline" onClick={() => navigate({ to: "/wiki/folders" })}>
             返回 Wiki
           </Button>
         </div>

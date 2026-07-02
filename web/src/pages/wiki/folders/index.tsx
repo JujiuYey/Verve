@@ -392,10 +392,7 @@ export function FoldersPage() {
               maxSize="35%"
               className="min-w-0 overflow-y-auto bg-background"
             >
-              <FolderDetailPanel
-                folder={currentFolder}
-                onEdit={handleEdit}
-              />
+              <FolderDetailPanel folder={currentFolder} onEdit={handleEdit} />
             </ResizablePanel>
           </>
         )}

@@ -19,13 +19,7 @@ interface FolderGridProps {
   onEnter?: (folder: Folder) => void;
 }
 
-export function FolderGrid({
-  data,
-  loading,
-  onEdit,
-  onDelete,
-  onEnter,
-}: FolderGridProps) {
+export function FolderGrid({ data, loading, onEdit, onDelete, onEnter }: FolderGridProps) {
   if (loading) {
     return (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

@@ -31,13 +31,13 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
+import { useSHA256 } from "../_hooks/use-sha-256";
 import {
   extractMarkdownCatalog,
   guideResultToContent,
   scrollToMarkdownHeading,
   toArray,
 } from "../_shared";
-import { useSHA256 } from "../_hooks/use-sha-256";
 
 export function SourcePanel({
   objective,
@@ -507,4 +507,3 @@ function GuideContextRow({
     </div>
   );
 }
-

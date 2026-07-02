@@ -72,7 +72,10 @@ export function scrollToMarkdownHeading(text: string) {
   heading?.scrollIntoView({ block: "start", behavior: "smooth" });
 }
 
-export function buildPrompt(objective: LearningObjective, practicePoint: GuidePracticePoint | null) {
+export function buildPrompt(
+  objective: LearningObjective,
+  practicePoint: GuidePracticePoint | null,
+) {
   if (!practicePoint) {
     return `请用自己的话解释：${objective.title}`;
   }

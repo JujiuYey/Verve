@@ -1,5 +1,4 @@
 import "./feynman-answer-editor.css";
-
 import Placeholder from "@tiptap/extension-placeholder";
 import { EditorContent, useEditor, useEditorState, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";

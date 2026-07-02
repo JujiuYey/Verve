@@ -1,49 +1,28 @@
 import { useNavigate } from "@tanstack/react-router";
 import type { ChatStatus } from "ai";
-import { BotIcon, CornerDownLeftIcon, PlayIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { coachChatStream, type LearningCoachAction } from "@/api/learning";
-import {
-  Conversation,
-  ConversationContent,
-  ConversationEmptyState,
-  ConversationScrollButton,
-} from "@/components/ai-elements/conversation";
-import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
-import {
-  PromptInput,
-  PromptInputBody,
-  PromptInputFooter,
-  PromptInputProvider,
-  PromptInputSubmit,
-  PromptInputTextarea,
-  PromptInputTools,
-  type PromptInputMessage,
-} from "@/components/ai-elements/prompt-input";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { PromptInputProvider } from "@/components/ai-elements/prompt-input";
 
-type CoachMessage = {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-};
+import { CoachWorkspace, type CoachMessage, type ToolEvent } from "./_components/coach-workspace";
 
-type CoachWorkspaceProps = {
-  messages: CoachMessage[];
-  status: ChatStatus;
-  action: LearningCoachAction | null;
-  onSend: (message: string) => void;
-  onEnterPractice: () => void;
-};
+const STRIP_ACTIONS = /<ACTION>[\s\S]*?<\/ACTION>/g;
+
+function stripAction(content: string): string {
+  return content.replace(STRIP_ACTIONS, "").trimEnd();
+}
 
 export function FeynmanExercisePage() {
   const navigate = useNavigate();
   const [messages, setMessages] = useState<CoachMessage[]>([]);
   const [status, setStatus] = useState<ChatStatus>("ready");
   const [action, setAction] = useState<LearningCoachAction | null>(null);
+
+  const updateAssistant = (assistantId: string, patch: (m: CoachMessage) => CoachMessage) => {
+    setMessages((prev) => prev.map((item) => (item.id === assistantId ? patch(item) : item)));
+  };
 
   const send = async (rawMessage: string) => {
     const message = rawMessage.trim() || "继续学习";
@@ -61,20 +40,64 @@ export function FeynmanExercisePage() {
     await coachChatStream(
       message,
       (event) => {
-        if ((event.type === "stream_chunk" || event.type === "message") && event.content) {
-          const visibleContent = event.content.replace(/<ACTION>[\s\S]*?<\/ACTION>/g, "").trimEnd();
-          if (!visibleContent) return;
-          setStatus("streaming");
-          setMessages((prev) =>
-            prev.map((item) =>
-              item.id === assistantId ? { ...item, content: item.content + visibleContent } : item,
-            ),
-          );
-        } else if (event.type === "action" && event.action) {
-          setAction(event.action);
-        } else if (event.type === "error") {
-          setStatus("error");
-          toast.error(event.content || "学习 agent 出错");
+        switch (event.type) {
+          case "reasoning": {
+            if (!event.content) return;
+            setStatus("streaming");
+            updateAssistant(assistantId, (m) => ({
+              ...m,
+              reasoning: (m.reasoning || "") + event.content,
+            }));
+            return;
+          }
+          case "stream_chunk":
+          case "message": {
+            if (!event.content) return;
+            const cleaned = stripAction(event.content);
+            if (!cleaned) return;
+            setStatus("streaming");
+            updateAssistant(assistantId, (m) => ({ ...m, content: m.content + cleaned }));
+            return;
+          }
+          case "tool_call": {
+            if (!event.id || !event.name) return;
+            const next: ToolEvent = {
+              id: event.id,
+              name: event.name,
+              arguments: event.arguments,
+              state: "input-available",
+            };
+            updateAssistant(assistantId, (m) => ({
+              ...m,
+              toolEvents: [...(m.toolEvents || []), next],
+            }));
+            return;
+          }
+          case "tool_result": {
+            if (!event.tool_call_id) return;
+            updateAssistant(assistantId, (m) => ({
+              ...m,
+              toolEvents: (m.toolEvents || []).map((t) =>
+                t.id === event.tool_call_id
+                  ? {
+                      ...t,
+                      output: event.content || t.output,
+                      state: "output-available",
+                    }
+                  : t,
+              ),
+            }));
+            return;
+          }
+          case "action": {
+            if (event.action) setAction(event.action);
+            return;
+          }
+          case "error": {
+            setStatus("error");
+            toast.error(event.content || "学习 agent 出错");
+            return;
+          }
         }
       },
       () => setStatus("ready"),
@@ -103,119 +126,5 @@ export function FeynmanExercisePage() {
         status={status}
       />
     </PromptInputProvider>
-  );
-}
-
-function CoachWorkspace({
-  messages,
-  status,
-  action,
-  onSend,
-  onEnterPractice,
-}: CoachWorkspaceProps) {
-  const isBusy = status === "submitted" || status === "streaming";
-
-  const handleSubmit = (message: PromptInputMessage) => {
-    if (isBusy || !message.text.trim()) return;
-    onSend(message.text);
-  };
-
-  return (
-    <div className="flex h-full min-h-0 flex-col gap-4 overflow-hidden p-6">
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl font-bold">费曼学习 Agent</h1>
-          <Badge variant="secondary">真实上下文</Badge>
-        </div>
-        <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-          直接说继续学习。Agent 会查询 Wiki
-          文件夹、文档、学习记录和用户画像，再决定下一步进入哪一个小节。
-        </p>
-      </div>
-
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border bg-background">
-        <div className="flex items-center gap-2 border-b px-4 py-3">
-          <BotIcon className="size-4 text-muted-foreground" />
-          <div className="text-sm font-medium">学习调度</div>
-          {isBusy ? <Badge variant="outline">查询中</Badge> : null}
-        </div>
-
-        <Conversation className="min-h-0">
-          <ConversationContent className="min-h-full gap-6 p-4">
-            {messages.length === 0 ? (
-              <ConversationEmptyState
-                description="它会先读当前资料结构和学习状态，再告诉你该继续、复习，还是先补资料。"
-                icon={<BotIcon className="size-8" />}
-                title="让 Agent 接管下一步"
-              >
-                <div className="flex flex-col items-center gap-4">
-                  <div className="rounded-full border bg-muted/40 p-3 text-muted-foreground">
-                    <BotIcon className="size-6" />
-                  </div>
-                  <div className="space-y-1">
-                    <div className="text-base font-semibold">让 Agent 接管下一步</div>
-                    <div className="max-w-md text-sm leading-6 text-muted-foreground">
-                      它会先读当前资料结构和学习状态，再告诉你该继续、复习，还是先补资料。
-                    </div>
-                  </div>
-                  <Button onClick={() => onSend("继续学习")} disabled={isBusy}>
-                    <PlayIcon className="size-4" />
-                    继续学习
-                  </Button>
-                </div>
-              </ConversationEmptyState>
-            ) : (
-              messages.map((message) => (
-                <Message from={message.role} key={message.id}>
-                  <MessageContent>
-                    {message.role === "assistant" ? (
-                      message.content ? (
-                        <MessageResponse className="max-w-none text-sm leading-7">
-                          {message.content}
-                        </MessageResponse>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">正在查询上下文...</span>
-                      )
-                    ) : (
-                      <div className="whitespace-pre-wrap text-sm leading-6">{message.content}</div>
-                    )}
-                  </MessageContent>
-                </Message>
-              ))
-            )}
-
-            {action?.type === "navigate_to_practice" && action.objective_id ? (
-              <Message from="assistant">
-                <MessageContent>
-                  <Button onClick={onEnterPractice}>
-                    <CornerDownLeftIcon className="size-4" />
-                    {action.label || "进入练习"}
-                  </Button>
-                </MessageContent>
-              </Message>
-            ) : null}
-          </ConversationContent>
-          <ConversationScrollButton />
-        </Conversation>
-
-        <div className="border-t p-4">
-          <PromptInput onSubmit={handleSubmit}>
-            <PromptInputBody>
-              <PromptInputTextarea
-                className="min-h-11"
-                disabled={isBusy}
-                placeholder="继续学习 / 复习薄弱点 / 今天从哪里开始..."
-              />
-            </PromptInputBody>
-            <PromptInputFooter>
-              <PromptInputTools>
-                <Badge variant="outline">LearningCoach</Badge>
-              </PromptInputTools>
-              <PromptInputSubmit disabled={isBusy} status={status} />
-            </PromptInputFooter>
-          </PromptInput>
-        </div>
-      </div>
-    </div>
   );
 }

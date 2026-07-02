@@ -12,10 +12,7 @@ interface FolderDetailPanelProps {
   onEdit: (folder: Folder) => void;
 }
 
-export function FolderDetailPanel({
-  folder,
-  onEdit,
-}: FolderDetailPanelProps) {
+export function FolderDetailPanel({ folder, onEdit }: FolderDetailPanelProps) {
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-4 p-4">
       {/* 标题栏 */}

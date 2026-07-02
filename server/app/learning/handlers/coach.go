@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"database/sql"
-	"encoding/json"
 	"log"
 	"strings"
 
@@ -25,10 +24,16 @@ type CoachHandler struct {
 	db *database.DatabaseService
 }
 
+// NewCoachHandler 构造陪练 handler,持有 db 供 runtime context 与 tools 共用。
 func NewCoachHandler(db *database.DatabaseService) *CoachHandler {
 	return &CoachHandler{db: db}
 }
 
+// Chat 处理 POST /api/learning/coach/chat 陪练对话请求(SSE)。
+//
+// 流程:解析 message → 构建 runtime context → 初始化 CoachTools 与 agent →
+// 通过 eino ADK Runner 流式产出 → 写入 SSE 帧;最后解析 <ACTION> 标签
+// 追加一条 action 事件,并以 [DONE] 收尾。
 func (h *CoachHandler) Chat(c *fiber.Ctx) error {
 	userID, _ := c.Locals("user_id").(string)
 	var req struct {
@@ -63,11 +68,7 @@ func (h *CoachHandler) Chat(c *fiber.Ctx) error {
 	c.Context().SetBodyStreamWriter(fasthttp.StreamWriter(func(w *bufio.Writer) {
 		content := writeLearningSSEContent(w, iter)
 		if action := learning_service.ParseCoachAction(content); action != nil {
-			data, _ := json.Marshal(map[string]interface{}{
-				"type":   "action",
-				"action": action,
-			})
-			writeSSEData(w, data)
+			_ = writeSSEEvent(w, SSEAction, map[string]interface{}{"action": action})
 		}
 		_, _ = w.Write([]byte("data: [DONE]\n\n"))
 		_ = w.Flush()
@@ -75,6 +76,8 @@ func (h *CoachHandler) Chat(c *fiber.Ctx) error {
 	return nil
 }
 
+// buildRuntimeContext 聚合陪练 agent 所需的运行时上下文:用户文件夹(已过滤)、
+// 文档、最近 objective、每个文件夹的 LearningProfile、最近 journal。
 func (h *CoachHandler) buildRuntimeContext(ctx context.Context, userID string) (learning_service.CoachRuntimeContext, error) {
 	folders, err := h.db.Folders.List(ctx, map[string]interface{}{})
 	if err != nil {
@@ -122,6 +125,8 @@ func (h *CoachHandler) buildRuntimeContext(ctx context.Context, userID string) (
 	}, nil
 }
 
+// filterFoldersForUser 过滤出归属当前用户的文件夹;未归属(folder.UserID 为空)
+// 视为公开资源一并保留。
 func filterFoldersForUser(folders []*wiki_db.Folder, userID string) []*wiki_db.Folder {
 	result := make([]*wiki_db.Folder, 0, len(folders))
 	for _, folder := range folders {

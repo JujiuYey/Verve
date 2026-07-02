@@ -58,11 +58,25 @@ export interface CompleteResult {
 
 // 陪练 SSE 事件(对齐后端 learning SSE)
 export interface LearningStreamEvent {
-  type: "stream_chunk" | "message" | "tool_result" | "exercise" | "action" | "error";
+  type:
+    | "stream_chunk"
+    | "message"
+    | "reasoning"
+    | "tool_call"
+    | "tool_result"
+    | "exercise"
+    | "action"
+    | "error";
   content?: string;
   agent?: string;
   phase?: string;
   action?: LearningCoachAction;
+  // tool_call / tool_result 字段
+  tool_call_id?: string;
+  tool_name?: string;
+  id?: string;
+  name?: string;
+  arguments?: string;
 }
 
 export interface LearningCoachAction {
