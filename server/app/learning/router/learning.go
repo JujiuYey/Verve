@@ -5,16 +5,17 @@ import (
 
 	learning_handlers "verve/app/learning/handlers"
 	"verve/infrastructure/database"
+	"verve/infrastructure/storage"
 )
 
 // 配置学习平台路由(/api/learning/*)
-func SetupLearningRoutes(router fiber.Router, dbService *database.DatabaseService) {
+func SetupLearningRoutes(router fiber.Router, dbService *database.DatabaseService, minioService *storage.MinIOService) {
 	sessionHandler := learning_handlers.NewSessionHandler(dbService)
 	journalHandler := learning_handlers.NewJournalHandler(dbService)
 	exerciseHandler := learning_handlers.NewExerciseHandler(dbService)
 	guideHandler := learning_handlers.NewGuideHandler(dbService)
 	objectiveHandler := learning_handlers.NewObjectiveHandler(dbService)
-	coachHandler := learning_handlers.NewCoachHandler(dbService)
+	coachHandler := learning_handlers.NewCoachHandler(dbService, minioService)
 
 	learning := router.Group("/learning")
 	{

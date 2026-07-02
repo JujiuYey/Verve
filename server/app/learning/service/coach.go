@@ -62,7 +62,11 @@ func BuildCoachQuery(ctx CoachRuntimeContext, message string) string {
 
 	sb.WriteString("\n## 学习小节\n")
 	if len(ctx.Objectives) == 0 {
-		sb.WriteString("- 暂无学习小节。可以建议用户先去 Wiki 补充资料,或者选择一个文档生成小节。\n")
+		if len(ctx.Documents) > 0 {
+			sb.WriteString("- 暂无学习小节。请先选择最适合当前继续学习的一篇文档,调用 create_learning_objectives 生成学习小节。生成成功后,用 first_objective_id 输出 navigate_to_practice action。\n")
+		} else {
+			sb.WriteString("- 暂无学习小节。可以建议用户先去 Wiki 补充资料。\n")
+		}
 	} else {
 		for _, obj := range ctx.Objectives {
 			sb.WriteString(fmt.Sprintf("- %s (%s), status=%s, mastery=%s", obj.Title, obj.ID, obj.Status, obj.MasteryLevel))
@@ -131,6 +135,7 @@ func BuildCoachQuery(ctx CoachRuntimeContext, message string) string {
 	}
 
 	sb.WriteString("\n请基于这些真实上下文决定下一步。")
+	sb.WriteString("如果没有学习小节但有当前文档,优先调用 create_learning_objectives,不要只停留在口头建议。")
 	sb.WriteString("如果已经能确定要进入某个小节,在自然语言回复后追加一段 <ACTION>{\"type\":\"navigate_to_practice\",\"objective_id\":\"...\",\"label\":\"进入练习\"}</ACTION>。")
 	sb.WriteString("如果不能确定,只问用户一个选择题。")
 	return sb.String()

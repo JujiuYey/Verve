@@ -73,6 +73,30 @@ func TestBuildCoachQueryIncludesRuntimeContext(t *testing.T) {
 	}
 }
 
+func TestBuildCoachQueryTellsAgentToGenerateObjectivesWhenDocumentsExist(t *testing.T) {
+	ctx := CoachRuntimeContext{
+		UserID: "user-1",
+		Folders: []*wiki_db.Folder{
+			{ID: "folder-go", Name: "Go 基础"},
+		},
+		Documents: []*wiki_db.Document{
+			{ID: "doc-hello", FolderID: "folder-go", Filename: "hello.md"},
+		},
+	}
+
+	query := BuildCoachQuery(ctx, "继续学习")
+
+	for _, want := range []string{
+		"create_learning_objectives",
+		"doc-hello",
+		"生成学习小节",
+	} {
+		if !strings.Contains(query, want) {
+			t.Fatalf("query does not contain %q:\n%s", want, query)
+		}
+	}
+}
+
 func TestParseCoachActionFindsNavigateAction(t *testing.T) {
 	content := "我们继续接口基础。\n\n<ACTION>{\"type\":\"navigate_to_practice\",\"objective_id\":\"obj-interface\",\"label\":\"进入练习\"}</ACTION>"
 

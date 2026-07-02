@@ -60,7 +60,7 @@ func SetupRouter(
 		wiki_router.SetupDocumentRoutes(protected.Group("/"), dbService, minioService)
 
 		// 学习平台路由
-		learning_router.SetupLearningRoutes(protected.Group("/"), dbService)
+		learning_router.SetupLearningRoutes(protected.Group("/"), dbService, minioService)
 	}
 
 	return app

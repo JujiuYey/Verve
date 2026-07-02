@@ -10,7 +10,9 @@ import (
 	"github.com/cloudwego/eino/components/tool/utils"
 
 	learning_db "verve/app/learning/models/db"
+	learning_service "verve/app/learning/service"
 	"verve/infrastructure/database"
+	"verve/infrastructure/storage"
 )
 
 type ListFoldersInput struct {
@@ -39,6 +41,18 @@ type CreatePracticeSessionInput struct {
 	ObjectiveID string `json:"objective_id" jsonschema_description:"要进入练习的小节 ID"`
 }
 
+type CreateLearningObjectivesInput struct {
+	DocumentID string `json:"document_id" jsonschema_description:"要从哪篇 Wiki 文档生成学习小节"`
+}
+
+type CreateLearningObjectivesOutput struct {
+	DocumentID       string                   `json:"document_id"`
+	CreatedCount     int                      `json:"created_count"`
+	FirstObjectiveID string                   `json:"first_objective_id"`
+	Objectives       []map[string]interface{} `json:"objectives"`
+	Reused           bool                     `json:"reused"`
+}
+
 type CreatePracticeSessionOutput struct {
 	SessionID   string `json:"session_id"`
 	ObjectiveID string `json:"objective_id"`
@@ -54,13 +68,14 @@ type CompleteTaskOutput struct {
 	Status  string `json:"status"`
 }
 
-func NewCoachTools(db *database.DatabaseService, userID string) []tool.BaseTool {
+func NewCoachTools(db *database.DatabaseService, minio *storage.MinIOService, userID string) []tool.BaseTool {
 	return []tool.BaseTool{
 		newListFoldersTool(db, userID),
 		newListDocumentsTool(db),
 		newListObjectivesTool(db, userID),
 		newGetLearningProfileTool(db),
 		newListJournalsTool(db, userID),
+		newCreateLearningObjectivesTool(db, minio, userID),
 		newCreatePracticeSessionTool(db, userID),
 		newCompleteTaskTool(),
 	}
@@ -215,6 +230,50 @@ func newListJournalsTool(db *database.DatabaseService, userID string) tool.Invok
 	return t
 }
 
+func newCreateLearningObjectivesTool(db *database.DatabaseService, minio *storage.MinIOService, userID string) tool.InvokableTool {
+	t, err := utils.InferTool("create_learning_objectives", "读取指定 Wiki 文档并生成可进入练习的学习小节",
+		func(ctx context.Context, input *CreateLearningObjectivesInput) (*CreateLearningObjectivesOutput, error) {
+			documentID := strings.TrimSpace(input.DocumentID)
+			if documentID == "" {
+				return nil, sql.ErrNoRows
+			}
+			doc, err := db.Documents.FindOne(ctx, documentID)
+			if err != nil {
+				return nil, err
+			}
+			folder, err := db.Folders.FindOne(ctx, doc.FolderID)
+			if err != nil {
+				return nil, err
+			}
+			if folder.UserID != nil && *folder.UserID != "" && *folder.UserID != userID {
+				return nil, sql.ErrNoRows
+			}
+
+			existing, err := db.Objectives.FindByFolder(ctx, doc.FolderID)
+			if err != nil {
+				return nil, err
+			}
+			reused := filterObjectivesByDocument(existing, doc.ID)
+			if len(reused) > 0 {
+				return buildCreateLearningObjectivesOutput(doc.ID, reused, true), nil
+			}
+
+			content, err := minio.GetFileContent(ctx, doc.FilePath)
+			if err != nil {
+				return nil, err
+			}
+			objectives, err := learning_service.NewObjectiveGenerationService(db).GenerateFromMarkdown(ctx, userID, doc, folder, content)
+			if err != nil {
+				return nil, err
+			}
+			return buildCreateLearningObjectivesOutput(doc.ID, objectives, false), nil
+		})
+	if err != nil {
+		log.Fatal(err)
+	}
+	return t
+}
+
 func newCreatePracticeSessionTool(db *database.DatabaseService, userID string) tool.InvokableTool {
 	t, err := utils.InferTool("create_practice_session", "为指定学习小节创建练习会话",
 		func(ctx context.Context, input *CreatePracticeSessionInput) (*CreatePracticeSessionOutput, error) {
@@ -239,6 +298,38 @@ func newCreatePracticeSessionTool(db *database.DatabaseService, userID string) t
 		log.Fatal(err)
 	}
 	return t
+}
+
+func filterObjectivesByDocument(objectives []*learning_db.LearningObjective, documentID string) []*learning_db.LearningObjective {
+	result := make([]*learning_db.LearningObjective, 0)
+	for _, obj := range objectives {
+		if stringValue(obj.SourceDocumentID) == documentID {
+			result = append(result, obj)
+		}
+	}
+	return result
+}
+
+func buildCreateLearningObjectivesOutput(documentID string, objectives []*learning_db.LearningObjective, reused bool) *CreateLearningObjectivesOutput {
+	out := &CreateLearningObjectivesOutput{
+		DocumentID:   documentID,
+		CreatedCount: len(objectives),
+		Objectives:   make([]map[string]interface{}, 0, len(objectives)),
+		Reused:       reused,
+	}
+	for _, obj := range objectives {
+		if out.FirstObjectiveID == "" {
+			out.FirstObjectiveID = obj.ID
+		}
+		out.Objectives = append(out.Objectives, map[string]interface{}{
+			"id":            obj.ID,
+			"title":         obj.Title,
+			"detail":        stringValue(obj.Detail),
+			"status":        obj.Status,
+			"mastery_level": obj.MasteryLevel,
+		})
+	}
+	return out
 }
 
 func newCompleteTaskTool() tool.InvokableTool {
