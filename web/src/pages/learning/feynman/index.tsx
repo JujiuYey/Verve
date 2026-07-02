@@ -1,14 +1,29 @@
 import { useNavigate } from "@tanstack/react-router";
-import { BotIcon, CornerDownLeftIcon, Loader2Icon, PlayIcon, SendIcon } from "lucide-react";
-import { useRef, useState } from "react";
+import type { ChatStatus } from "ai";
+import { BotIcon, CornerDownLeftIcon, PlayIcon } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import { coachChatStream, type LearningCoachAction } from "@/api/learning";
+import {
+  Conversation,
+  ConversationContent,
+  ConversationEmptyState,
+  ConversationScrollButton,
+} from "@/components/ai-elements/conversation";
+import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
+import {
+  PromptInput,
+  PromptInputBody,
+  PromptInputFooter,
+  PromptInputProvider,
+  PromptInputSubmit,
+  PromptInputTextarea,
+  PromptInputTools,
+  type PromptInputMessage,
+} from "@/components/ai-elements/prompt-input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Textarea } from "@/components/ui/textarea";
 
 type CoachMessage = {
   id: string;
@@ -16,21 +31,23 @@ type CoachMessage = {
   content: string;
 };
 
+type CoachWorkspaceProps = {
+  messages: CoachMessage[];
+  status: ChatStatus;
+  action: LearningCoachAction | null;
+  onSend: (message: string) => void;
+  onEnterPractice: () => void;
+};
+
 export function FeynmanExercisePage() {
   const navigate = useNavigate();
-  const bottomRef = useRef<HTMLDivElement>(null);
   const [messages, setMessages] = useState<CoachMessage[]>([]);
-  const [input, setInput] = useState("继续学习");
-  const [streaming, setStreaming] = useState(false);
+  const [status, setStatus] = useState<ChatStatus>("ready");
   const [action, setAction] = useState<LearningCoachAction | null>(null);
-
-  const scrollToBottom = () => {
-    window.requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }));
-  };
 
   const send = async (rawMessage: string) => {
     const message = rawMessage.trim() || "继续学习";
-    if (streaming) return;
+    if (status === "submitted" || status === "streaming") return;
 
     const assistantId = `assistant-${Date.now()}`;
     setAction(null);
@@ -39,8 +56,7 @@ export function FeynmanExercisePage() {
       { id: `user-${Date.now()}`, role: "user", content: message },
       { id: assistantId, role: "assistant", content: "" },
     ]);
-    setStreaming(true);
-    scrollToBottom();
+    setStatus("submitted");
 
     await coachChatStream(
       message,
@@ -48,31 +64,25 @@ export function FeynmanExercisePage() {
         if ((event.type === "stream_chunk" || event.type === "message") && event.content) {
           const visibleContent = event.content.replace(/<ACTION>[\s\S]*?<\/ACTION>/g, "").trimEnd();
           if (!visibleContent) return;
+          setStatus("streaming");
           setMessages((prev) =>
             prev.map((item) =>
               item.id === assistantId ? { ...item, content: item.content + visibleContent } : item,
             ),
           );
-          scrollToBottom();
         } else if (event.type === "action" && event.action) {
           setAction(event.action);
         } else if (event.type === "error") {
+          setStatus("error");
           toast.error(event.content || "学习 agent 出错");
         }
       },
-      () => setStreaming(false),
+      () => setStatus("ready"),
       (error) => {
-        setStreaming(false);
+        setStatus("error");
         toast.error(error.message);
       },
     );
-  };
-
-  const handleSubmit = () => {
-    const message = input.trim();
-    if (!message || streaming) return;
-    setInput("");
-    void send(message);
   };
 
   const enterPractice = () => {
@@ -81,6 +91,33 @@ export function FeynmanExercisePage() {
       to: "/learn/feynman-practice/$objectiveId",
       params: { objectiveId: action.objective_id },
     });
+  };
+
+  return (
+    <PromptInputProvider initialInput="继续学习">
+      <CoachWorkspace
+        action={action}
+        messages={messages}
+        onEnterPractice={enterPractice}
+        onSend={(message) => void send(message)}
+        status={status}
+      />
+    </PromptInputProvider>
+  );
+}
+
+function CoachWorkspace({
+  messages,
+  status,
+  action,
+  onSend,
+  onEnterPractice,
+}: CoachWorkspaceProps) {
+  const isBusy = status === "submitted" || status === "streaming";
+
+  const handleSubmit = (message: PromptInputMessage) => {
+    if (isBusy || !message.text.trim()) return;
+    onSend(message.text);
   };
 
   return (
@@ -96,20 +133,24 @@ export function FeynmanExercisePage() {
         </p>
       </div>
 
-      <Card className="min-h-0 flex-1 gap-0 overflow-hidden rounded-lg py-0">
-        <CardHeader className="border-b px-4 py-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <BotIcon className="size-4" />
-            学习调度
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex min-h-0 flex-1 flex-col gap-0 p-0">
-          <ScrollArea className="min-h-0 flex-1">
-            <div className="flex min-h-[420px] flex-col gap-4 p-4">
-              {messages.length === 0 ? (
-                <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
-                  <div className="rounded-full border bg-muted/40 p-3">
-                    <BotIcon className="size-6 text-muted-foreground" />
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border bg-background">
+        <div className="flex items-center gap-2 border-b px-4 py-3">
+          <BotIcon className="size-4 text-muted-foreground" />
+          <div className="text-sm font-medium">学习调度</div>
+          {isBusy ? <Badge variant="outline">查询中</Badge> : null}
+        </div>
+
+        <Conversation className="min-h-0">
+          <ConversationContent className="min-h-full gap-6 p-4">
+            {messages.length === 0 ? (
+              <ConversationEmptyState
+                description="它会先读当前资料结构和学习状态，再告诉你该继续、复习，还是先补资料。"
+                icon={<BotIcon className="size-8" />}
+                title="让 Agent 接管下一步"
+              >
+                <div className="flex flex-col items-center gap-4">
+                  <div className="rounded-full border bg-muted/40 p-3 text-muted-foreground">
+                    <BotIcon className="size-6" />
                   </div>
                   <div className="space-y-1">
                     <div className="text-base font-semibold">让 Agent 接管下一步</div>
@@ -117,72 +158,64 @@ export function FeynmanExercisePage() {
                       它会先读当前资料结构和学习状态，再告诉你该继续、复习，还是先补资料。
                     </div>
                   </div>
-                  <Button onClick={() => void send("继续学习")} disabled={streaming}>
+                  <Button onClick={() => onSend("继续学习")} disabled={isBusy}>
                     <PlayIcon className="size-4" />
                     继续学习
                   </Button>
                 </div>
-              ) : (
-                messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={message.role === "user" ? "flex justify-end" : "flex justify-start"}
-                  >
-                    <div
-                      className={
-                        message.role === "user"
-                          ? "max-w-[78%] whitespace-pre-wrap rounded-lg bg-primary px-3 py-2 text-sm leading-6 text-primary-foreground"
-                          : "max-w-[78%] whitespace-pre-wrap rounded-lg border bg-muted/40 px-3 py-2 text-sm leading-6"
-                      }
-                    >
-                      {message.content || (streaming ? "正在查询上下文..." : "")}
-                    </div>
-                  </div>
-                ))
-              )}
-              {action?.type === "navigate_to_practice" && action.objective_id ? (
-                <div className="flex justify-start">
-                  <Button onClick={enterPractice}>
+              </ConversationEmptyState>
+            ) : (
+              messages.map((message) => (
+                <Message from={message.role} key={message.id}>
+                  <MessageContent>
+                    {message.role === "assistant" ? (
+                      message.content ? (
+                        <MessageResponse className="max-w-none text-sm leading-7">
+                          {message.content}
+                        </MessageResponse>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">正在查询上下文...</span>
+                      )
+                    ) : (
+                      <div className="whitespace-pre-wrap text-sm leading-6">{message.content}</div>
+                    )}
+                  </MessageContent>
+                </Message>
+              ))
+            )}
+
+            {action?.type === "navigate_to_practice" && action.objective_id ? (
+              <Message from="assistant">
+                <MessageContent>
+                  <Button onClick={onEnterPractice}>
                     <CornerDownLeftIcon className="size-4" />
                     {action.label || "进入练习"}
                   </Button>
-                </div>
-              ) : null}
-              <div ref={bottomRef} />
-            </div>
-          </ScrollArea>
+                </MessageContent>
+              </Message>
+            ) : null}
+          </ConversationContent>
+          <ConversationScrollButton />
+        </Conversation>
 
-          <div className="border-t p-4">
-            <div className="flex gap-2">
-              <Textarea
-                className="max-h-32 min-h-11 resize-none"
-                value={input}
+        <div className="border-t p-4">
+          <PromptInput onSubmit={handleSubmit}>
+            <PromptInputBody>
+              <PromptInputTextarea
+                className="min-h-11"
+                disabled={isBusy}
                 placeholder="继续学习 / 复习薄弱点 / 今天从哪里开始..."
-                onChange={(event) => setInput(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey) {
-                    event.preventDefault();
-                    handleSubmit();
-                  }
-                }}
-                disabled={streaming}
               />
-              <Button
-                className="h-11 shrink-0"
-                onClick={handleSubmit}
-                disabled={streaming || !input.trim()}
-              >
-                {streaming ? (
-                  <Loader2Icon className="size-4 animate-spin" />
-                ) : (
-                  <SendIcon className="size-4" />
-                )}
-                发送
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+            </PromptInputBody>
+            <PromptInputFooter>
+              <PromptInputTools>
+                <Badge variant="outline">LearningCoach</Badge>
+              </PromptInputTools>
+              <PromptInputSubmit disabled={isBusy} status={status} />
+            </PromptInputFooter>
+          </PromptInput>
+        </div>
+      </div>
     </div>
   );
 }
