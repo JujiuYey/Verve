@@ -43,6 +43,7 @@ func SetupLearningRoutes(router fiber.Router, dbService *database.DatabaseServic
 
 		objective := learning.Group("/objective")
 		{
+			objective.Get("/", objectiveHandler.List)
 			objective.Get("/:id", objectiveHandler.FindOne)
 		}
 

@@ -19,13 +19,26 @@ export interface LearningObjective {
 }
 
 const api = {
+  list: (params?: { document_id?: string; folder_id?: string }) =>
+    request.get<LearningObjective[]>(`${BASE}/objective/`, { params }),
+
   detail: (id: string) => request.get<LearningObjective>(`${BASE}/objective/${id}`),
 };
 
 export const objectiveKeys = {
   all: ["learning-objectives"] as const,
+  list: (params?: { document_id?: string; folder_id?: string }) =>
+    [...objectiveKeys.all, "list", params?.document_id || "", params?.folder_id || ""] as const,
   detail: (id: string) => [...objectiveKeys.all, id] as const,
 };
+
+export function useObjectives(params?: { document_id?: string; folder_id?: string }) {
+  return useQuery({
+    queryKey: objectiveKeys.list(params),
+    queryFn: () => api.list(params),
+    enabled: !!params?.document_id || !!params?.folder_id,
+  });
+}
 
 export function useObjectiveDetail(id: string) {
   return useQuery({

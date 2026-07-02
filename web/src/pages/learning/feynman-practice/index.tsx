@@ -10,7 +10,6 @@ import {
   useObjectiveDetail,
   useSubmitExercise,
   type ExerciseResult,
-  type GuidePracticePoint,
 } from "@/api/learning";
 import { documentApi } from "@/api/wiki/document";
 import { Badge } from "@/components/ui/badge";
@@ -39,9 +38,6 @@ export function FeynmanWorkbenchPage() {
   const [tutorAdvice, setTutorAdvice] = useState("");
   const [isTutorTeaching, setIsTutorTeaching] = useState(false);
   const [isAppendingTutorNote, setIsAppendingTutorNote] = useState(false);
-  const [selectedPracticePoint, setSelectedPracticePoint] = useState<GuidePracticePoint | null>(
-    null,
-  );
   const submitExercise = useSubmitExercise(sessionId);
 
   useEffect(() => {
@@ -59,14 +55,13 @@ export function FeynmanWorkbenchPage() {
     setTutorAdvice("");
     setIsTutorTeaching(false);
     setIsAppendingTutorNote(false);
-    setSelectedPracticePoint(null);
   }, [objectiveId]);
 
   const submit = async () => {
     if (!sessionId || !objective || !answer.trim()) return;
     const res = await submitExercise.mutateAsync({
       type: "explain",
-      prompt: buildPrompt(objective, selectedPracticePoint),
+      prompt: buildPrompt(objective),
       user_answer: answer,
     });
     setResult(res);
@@ -88,8 +83,8 @@ export function FeynmanWorkbenchPage() {
     if (!sessionId || !objective || !result || isTutorTeaching) return;
 
     const message = [
-      `我刚才复述「${selectedPracticePoint?.title || objective.title}」没有通过。`,
-      selectedPracticePoint?.goal ? `本轮目标是：${selectedPracticePoint.goal}` : "",
+      `我刚才复述「${objective.title}」没有通过。`,
+      objective.detail ? `本轮目标是：${objective.detail}` : "",
       `Examiner 的反馈是：${result.feedback}`,
       "请你不要只评价我，直接教我：先用通俗的话讲清楚这个知识点，再指出我漏掉的关键点，最后给我一个很小的复述练习。",
       "最后请补一段「可写回 Markdown 的学习旁注」：像用户写在教材边上的笔记一样，补充更顺手的解释、例子、易错点和复述提示，不要替换原教材。",
@@ -123,7 +118,7 @@ export function FeynmanWorkbenchPage() {
     setIsAppendingTutorNote(true);
     try {
       const sourceDocument = await documentApi.getContent(objective.source_document_id);
-      const title = selectedPracticePoint?.title || objective.title;
+      const title = objective.title;
       const note = ["", "---", "", `## 学习旁注：${title}`, "", tutorAdvice.trim(), ""].join("\n");
       const nextContent = `${sourceDocument.content?.trimEnd() || ""}${note}`;
 
@@ -193,12 +188,7 @@ export function FeynmanWorkbenchPage() {
       </div>
 
       {phase === "reading" ? (
-        <SourcePanel
-          objective={objective}
-          stageObjectives={[]}
-          selectedPracticePoint={selectedPracticePoint}
-          onPracticePointSelect={setSelectedPracticePoint}
-        />
+        <SourcePanel objective={objective} />
       ) : (
         <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
           <PracticePanel
@@ -207,7 +197,6 @@ export function FeynmanWorkbenchPage() {
             disabled={!sessionId || submitExercise.isPending}
             isSubmitting={submitExercise.isPending}
             objective={objective}
-            practicePoint={selectedPracticePoint}
             onAnswerChange={setAnswer}
             onSubmit={submit}
             onReset={resetAnswer}

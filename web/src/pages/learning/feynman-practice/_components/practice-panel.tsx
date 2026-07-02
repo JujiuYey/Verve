@@ -9,7 +9,7 @@ import {
   RotateCcwIcon,
 } from "lucide-react";
 
-import type { ExerciseResult, GuidePracticePoint, LearningObjective } from "@/api/learning";
+import type { ExerciseResult, LearningObjective } from "@/api/learning";
 import { MessageResponse } from "@/components/ai-elements/message";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,6 @@ export function PracticePanel({
   disabled,
   isSubmitting,
   objective,
-  practicePoint,
   tutorAdvice,
   isTutorTeaching,
   canAppendTutorNote,
@@ -41,7 +40,6 @@ export function PracticePanel({
   disabled: boolean;
   isSubmitting: boolean;
   objective: LearningObjective;
-  practicePoint: GuidePracticePoint | null;
   tutorAdvice: string;
   isTutorTeaching: boolean;
   canAppendTutorNote: boolean;
@@ -59,9 +57,9 @@ export function PracticePanel({
           <div className="flex shrink-0 items-start gap-2 rounded-lg bg-muted/30 px-3 py-2">
             <PlayCircleIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
             <p className="text-sm leading-6 text-muted-foreground">
-              {practicePoint
-                ? `本轮只复述「${practicePoint.title}」：${practicePoint.goal || "用自己的话讲清这个小点是什么、为什么重要、容易错在哪里。"}`
-                : `本轮复述「${objective.title}」。如果内容太多，先回到阅读页让导学 Agent 拆成小点，再选择一个小点来讲。`}
+              本轮只复述「{objective.title}」：
+              {objective.detail ||
+                "用自己的话讲清这个小节是什么、为什么重要、怎么用、容易错在哪里。"}
             </p>
           </div>
 

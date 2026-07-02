@@ -42,6 +42,19 @@ func (r *ObjectiveRepository) FindByFolder(ctx context.Context, folderID string)
 	return objectives, nil
 }
 
+// 按 Wiki 文档列出学习小节(按顺序)
+func (r *ObjectiveRepository) FindByDocument(ctx context.Context, documentID string) ([]*learning_db.LearningObjective, error) {
+	var objectives []*learning_db.LearningObjective
+	err := r.db.NewSelect().Model(&objectives).
+		Where("source_document_id = ?", documentID).
+		Order("order_index ASC").
+		Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return objectives, nil
+}
+
 // 按用户列出最近学习小节,用于学习调度入口在未选文件夹时找上下文。
 func (r *ObjectiveRepository) FindRecentByUser(ctx context.Context, userID string, limit int) ([]*learning_db.LearningObjective, error) {
 	var objectives []*learning_db.LearningObjective

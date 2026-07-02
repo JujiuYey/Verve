@@ -1,4 +1,4 @@
-import type { GuidePracticePoint, GuideResult, LearningObjective } from "@/api/learning";
+import type { LearningObjective } from "@/api/learning";
 
 export type WorkbenchPhase = "reading" | "answering";
 
@@ -6,16 +6,6 @@ export type MarkdownCatalogItem = {
   line: number;
   level: number;
   text: string;
-};
-
-export type GuideContent = {
-  summary: string;
-  focusItems: string[];
-  practicePoints: GuidePracticePoint[];
-  readingSteps: string[];
-  pitfalls: string[];
-  selfCheckQuestions: string[];
-  evidenceItems: string[];
 };
 
 export const masteryLabels: Record<string, string> = {
@@ -48,22 +38,6 @@ export function extractMarkdownCatalog(markdown: string): MarkdownCatalogItem[] 
     .filter((item): item is MarkdownCatalogItem => !!item && item.text.length > 0);
 }
 
-export function guideResultToContent(result: GuideResult): GuideContent {
-  return {
-    summary: result.summary,
-    focusItems: toArray(result.mastery_goals),
-    practicePoints: toArray(result.practice_points),
-    readingSteps: toArray(result.reading_steps),
-    pitfalls: toArray(result.pitfalls),
-    selfCheckQuestions: toArray(result.self_check_questions),
-    evidenceItems: toArray(result.evidence),
-  };
-}
-
-export function toArray<T>(value: T[] | null | undefined): T[] {
-  return Array.isArray(value) ? value : [];
-}
-
 export function scrollToMarkdownHeading(text: string) {
   const headings = Array.from(
     document.querySelectorAll<HTMLElement>("article h1, article h2, article h3, article h4"),
@@ -72,19 +46,11 @@ export function scrollToMarkdownHeading(text: string) {
   heading?.scrollIntoView({ block: "start", behavior: "smooth" });
 }
 
-export function buildPrompt(
-  objective: LearningObjective,
-  practicePoint: GuidePracticePoint | null,
-) {
-  if (!practicePoint) {
-    return `请用自己的话解释：${objective.title}`;
-  }
-
+export function buildPrompt(objective: LearningObjective) {
   return [
     `请用自己的话解释：${objective.title}`,
-    `本轮只判断这个复述小点：${practicePoint.title}`,
-    practicePoint.goal ? `本轮目标：${practicePoint.goal}` : "",
-    "请不要按整篇资料要求判定，只看这个小点是否讲清楚。",
+    objective.detail ? `本轮目标：${objective.detail}` : "",
+    "请只围绕当前学习小节判定，不要要求学习者一次讲完整篇资料。",
   ]
     .filter(Boolean)
     .join("\n");
