@@ -1,6 +1,6 @@
 import type { LearningObjective } from "@/api/learning";
 
-export type WorkbenchPhase = "reading" | "answering";
+export type WorkbenchPhase = "reading" | "answering" | "teaching";
 
 export type MarkdownCatalogItem = {
   line: number;

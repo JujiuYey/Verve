@@ -27,6 +27,15 @@ export function PhaseBadge({
       >
         2 复述
       </button>
+      <button
+        type="button"
+        className={`rounded px-2 py-1 ${
+          phase === "teaching" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+        }`}
+        onClick={() => onPhaseChange("teaching")}
+      >
+        3 教学
+      </button>
     </div>
   );
 }

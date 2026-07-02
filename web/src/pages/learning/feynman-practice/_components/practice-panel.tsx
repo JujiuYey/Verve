@@ -14,9 +14,8 @@ import { MessageResponse } from "@/components/ai-elements/message";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-import { masteryLabels, verdictLabels } from "../_shared";
+import { masteryLabels, verdictLabels, type WorkbenchPhase } from "../_shared";
 import { FeynmanAnswerEditor } from "./feynman-answer-editor";
 
 export function PracticePanel({
@@ -34,6 +33,7 @@ export function PracticePanel({
   onReset,
   onRequestTutorTeaching,
   onAppendTutorNote,
+  onPhaseChange,
 }: {
   answer: string;
   result: ExerciseResult | null;
@@ -49,6 +49,7 @@ export function PracticePanel({
   onReset: () => void;
   onRequestTutorTeaching: () => void;
   onAppendTutorNote: () => void;
+  onPhaseChange: (phase: WorkbenchPhase) => void;
 }) {
   return (
     <section className="flex min-h-0 flex-col overflow-hidden bg-background">
@@ -85,6 +86,7 @@ export function PracticePanel({
                 isAppendingTutorNote={isAppendingTutorNote}
                 onRequestTutorTeaching={onRequestTutorTeaching}
                 onAppendTutorNote={onAppendTutorNote}
+                onPhaseChange={onPhaseChange}
               />
             </div>
           ) : null}
@@ -102,6 +104,7 @@ function ResultPanel({
   isAppendingTutorNote,
   onRequestTutorTeaching,
   onAppendTutorNote,
+  onPhaseChange,
 }: {
   result: ExerciseResult;
   tutorAdvice: string;
@@ -110,6 +113,7 @@ function ResultPanel({
   isAppendingTutorNote: boolean;
   onRequestTutorTeaching: () => void;
   onAppendTutorNote: () => void;
+  onPhaseChange: (phase: WorkbenchPhase) => void;
 }) {
   const Icon =
     result.verdict === "pass"
@@ -143,26 +147,28 @@ function ResultPanel({
       </p>
 
       {needsTeaching ? (
-        <LearningLoopTabs
+        <RecoveryTask
           tutorAdvice={tutorAdvice}
           isTutorTeaching={isTutorTeaching}
           canAppendTutorNote={canAppendTutorNote}
           isAppendingTutorNote={isAppendingTutorNote}
           onRequestTutorTeaching={onRequestTutorTeaching}
           onAppendTutorNote={onAppendTutorNote}
+          onPhaseChange={onPhaseChange}
         />
       ) : null}
     </div>
   );
 }
 
-function LearningLoopTabs({
+function RecoveryTask({
   tutorAdvice,
   isTutorTeaching,
   canAppendTutorNote,
   isAppendingTutorNote,
   onRequestTutorTeaching,
   onAppendTutorNote,
+  onPhaseChange,
 }: {
   tutorAdvice: string;
   isTutorTeaching: boolean;
@@ -170,59 +176,117 @@ function LearningLoopTabs({
   isAppendingTutorNote: boolean;
   onRequestTutorTeaching: () => void;
   onAppendTutorNote: () => void;
+  onPhaseChange: (phase: WorkbenchPhase) => void;
 }) {
   return (
-    <Tabs defaultValue="read" className="rounded-lg bg-muted/30 p-3">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <TabsList className="grid w-full grid-cols-3 sm:w-fit">
-          <TabsTrigger value="read">
-            <NotebookPenIcon />
-            阅读
-          </TabsTrigger>
-          <TabsTrigger value="retell">
-            <Repeat2Icon />
-            复述
-          </TabsTrigger>
-          <TabsTrigger value="teach">
-            <GraduationCapIcon />
-            讲解
-          </TabsTrigger>
-        </TabsList>
+    <div className="rounded-lg bg-muted/30 p-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <LoopNote
+          title="本次任务：重新用自己的话讲"
+          description="先回到教材补齐漏掉的关键点，再把解释重新组织一遍；如果卡住，就去教学页让老师补一段可沉淀的讲解。"
+        />
         <Button
           variant="outline"
           size="sm"
-          onClick={onRequestTutorTeaching}
+          className="shrink-0"
+          onClick={() => onPhaseChange("teaching")}
+        >
+          <GraduationCapIcon data-icon="inline-start" />
+          去教学
+        </Button>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button variant="secondary" size="sm" onClick={() => onPhaseChange("reading")}>
+          <NotebookPenIcon data-icon="inline-start" />
+          回到阅读
+        </Button>
+        <Button variant="secondary" size="sm" onClick={() => onPhaseChange("answering")}>
+          <Repeat2Icon data-icon="inline-start" />
+          重新复述
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            onPhaseChange("teaching");
+            onRequestTutorTeaching();
+          }}
           disabled={isTutorTeaching}
         >
           <GraduationCapIcon data-icon="inline-start" />
           {isTutorTeaching ? "讲解中..." : tutorAdvice ? "重新讲一下" : "让老师讲解"}
         </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={onAppendTutorNote}
+          disabled={!canAppendTutorNote || !tutorAdvice.trim() || isAppendingTutorNote}
+        >
+          <NotebookPenIcon data-icon="inline-start" />
+          {isAppendingTutorNote ? "追加中..." : "追加到 Markdown"}
+        </Button>
       </div>
+    </div>
+  );
+}
 
-      <TabsContent value="read" className="mt-3">
-        <LoopNote
-          title="回到教材"
-          description="先把原文里没读透的定义、例子、边界条件重新读一遍。这里的目标不是刷进度，而是找出自己复述时卡住的那一句。"
-        />
-      </TabsContent>
-      <TabsContent value="retell" className="mt-3">
-        <LoopNote
-          title="重新用自己的话讲"
-          description="把刚才漏掉的关键点补进解释里，再提交一次。能讲出是什么、为什么、怎么用、哪里容易错，就说明这一轮可以往前走。"
-        />
-      </TabsContent>
-      <TabsContent value="teach" className="mt-3">
-        <div className="flex flex-col gap-3">
-          {tutorAdvice || isTutorTeaching ? (
-            <MessageResponse className="max-w-none text-sm leading-6 text-muted-foreground">
-              {tutorAdvice || "老师正在组织讲解..."}
-            </MessageResponse>
-          ) : (
-            <LoopNote
-              title="让老师补一段可沉淀的讲解"
-              description="讲解会按教材旁注的方式组织：先补清楚知识点，再指出你漏掉的地方，最后给出可以写回 Markdown 的用户笔记。"
-            />
-          )}
+export function TeachingPanel({
+  tutorAdvice,
+  isTutorTeaching,
+  canRequestTeaching,
+  canAppendTutorNote,
+  isAppendingTutorNote,
+  onRequestTutorTeaching,
+  onAppendTutorNote,
+}: {
+  tutorAdvice: string;
+  isTutorTeaching: boolean;
+  canRequestTeaching: boolean;
+  canAppendTutorNote: boolean;
+  isAppendingTutorNote: boolean;
+  onRequestTutorTeaching: () => void;
+  onAppendTutorNote: () => void;
+}) {
+  return (
+    <section className="flex min-h-0 flex-col overflow-hidden bg-background">
+      <ScrollArea className="min-h-0 flex-1 px-4">
+        <div className="flex min-h-full flex-col gap-4">
+          <div className="flex shrink-0 items-start justify-between gap-3 rounded-lg bg-muted/30 px-3 py-2">
+            <div className="flex items-start gap-2">
+              <GraduationCapIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+              <p className="text-sm leading-6 text-muted-foreground">
+                老师会根据刚才的复述结果补清楚关键点，再给出一段可以沉淀回 Markdown 的学习旁注。
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              onClick={onRequestTutorTeaching}
+              disabled={!canRequestTeaching || isTutorTeaching}
+            >
+              <GraduationCapIcon data-icon="inline-start" />
+              {isTutorTeaching ? "讲解中..." : tutorAdvice ? "重新讲一下" : "让老师讲解"}
+            </Button>
+          </div>
+
+          <div className="rounded-lg border bg-background p-4">
+            {tutorAdvice || isTutorTeaching ? (
+              <MessageResponse className="max-w-none text-sm leading-6 text-muted-foreground">
+                {tutorAdvice || "老师正在组织讲解..."}
+              </MessageResponse>
+            ) : (
+              <LoopNote
+                title={canRequestTeaching ? "让老师补一段可沉淀的讲解" : "先完成一次复述判定"}
+                description={
+                  canRequestTeaching
+                    ? "讲解会先补清楚知识点，再指出你漏掉的地方，最后给出可以写回 Markdown 的学习旁注。"
+                    : "教学需要基于一次复述结果来补漏。先到复述页提交一次解释，再回到这里让老师讲。"
+                }
+              />
+            )}
+          </div>
+
           <div className="rounded-md border bg-background px-3 py-2 text-xs leading-5 text-muted-foreground">
             这部分更像用户写在教材边上的笔记：不是替换原教材，而是把真实学习时踩过的坑、补上的例子和更顺手的解释沉淀回
             Markdown。
@@ -238,8 +302,8 @@ function LearningLoopTabs({
             {isAppendingTutorNote ? "追加中..." : "追加到 Markdown"}
           </Button>
         </div>
-      </TabsContent>
-    </Tabs>
+      </ScrollArea>
+    </section>
   );
 }
 

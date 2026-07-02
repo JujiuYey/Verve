@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { PhaseBadge } from "./_components/phase-badge";
-import { PracticePanel } from "./_components/practice-panel";
+import { PracticePanel, TeachingPanel } from "./_components/practice-panel";
 import { SourcePanel } from "./_components/source-panel";
 import { StudyInfoPanel } from "./_components/study-info-panel";
 import { buildPrompt, masteryLabels, type WorkbenchPhase } from "./_shared";
@@ -92,6 +92,7 @@ export function FeynmanWorkbenchPage() {
       .filter(Boolean)
       .join("\n");
 
+    setPhase("teaching");
     setTutorAdvice("");
     setIsTutorTeaching(true);
     await sessionChatStream(
@@ -189,7 +190,7 @@ export function FeynmanWorkbenchPage() {
 
       {phase === "reading" ? (
         <SourcePanel objective={objective} />
-      ) : (
+      ) : phase === "answering" ? (
         <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
           <PracticePanel
             answer={answer}
@@ -205,6 +206,20 @@ export function FeynmanWorkbenchPage() {
             onRequestTutorTeaching={requestTutorTeaching}
             canAppendTutorNote={!!objective.source_document_id}
             isAppendingTutorNote={isAppendingTutorNote}
+            onAppendTutorNote={appendTutorNoteToMarkdown}
+            onPhaseChange={setPhase}
+          />
+          <StudyInfoPanel objective={objective} result={result} sessionId={sessionId} />
+        </div>
+      ) : (
+        <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <TeachingPanel
+            tutorAdvice={tutorAdvice}
+            isTutorTeaching={isTutorTeaching}
+            canRequestTeaching={!!result}
+            canAppendTutorNote={!!objective.source_document_id}
+            isAppendingTutorNote={isAppendingTutorNote}
+            onRequestTutorTeaching={requestTutorTeaching}
             onAppendTutorNote={appendTutorNoteToMarkdown}
           />
           <StudyInfoPanel objective={objective} result={result} sessionId={sessionId} />
