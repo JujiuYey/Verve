@@ -17,9 +17,10 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { PhaseBadge } from "./_components/phase-badge";
-import { PracticePanel, TeachingPanel } from "./_components/practice-panel";
+import { PracticePanel } from "./_components/practice-panel";
 import { SourcePanel } from "./_components/source-panel";
 import { StudyInfoPanel } from "./_components/study-info-panel";
+import { TeachingPanel } from "./_components/teaching-panel";
 import { buildPrompt, masteryLabels, type WorkbenchPhase } from "./_shared";
 
 export function FeynmanWorkbenchPage() {
@@ -135,6 +136,7 @@ export function FeynmanWorkbenchPage() {
     }
   };
 
+  /* 加载骨架 */
   if (isLoading) {
     return (
       <div className="flex h-full flex-col gap-4 p-6">
@@ -148,6 +150,7 @@ export function FeynmanWorkbenchPage() {
     );
   }
 
+  /* 目标不存在 */
   if (!objective) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
@@ -162,6 +165,7 @@ export function FeynmanWorkbenchPage() {
 
   return (
     <div className="flex h-full flex-col gap-4 overflow-hidden p-6">
+      {/* 工作台头部 */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
           <Button
@@ -188,9 +192,11 @@ export function FeynmanWorkbenchPage() {
         </div>
       </div>
 
+      {/* 阅读阶段 */}
       {phase === "reading" ? (
         <SourcePanel objective={objective} />
       ) : phase === "answering" ? (
+        /* 复述阶段 */
         <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
           <PracticePanel
             answer={answer}
@@ -212,6 +218,7 @@ export function FeynmanWorkbenchPage() {
           <StudyInfoPanel objective={objective} result={result} sessionId={sessionId} />
         </div>
       ) : (
+        /* 教学阶段 */
         <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
           <TeachingPanel
             tutorAdvice={tutorAdvice}
