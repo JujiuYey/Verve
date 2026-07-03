@@ -1,0 +1,4 @@
+interface:
+  display_name: "Eino Agents"
+  short_description: "Guides Verve Eino agent changes"
+  default_prompt: "Use $eino-agents to add or modify a Verve Eino learning agent."

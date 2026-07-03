@@ -1,7 +1,7 @@
 ---
 title: refactor: Build Eino Agent Foundation
 type: refactor
-status: active
+status: completed
 date: 2026-07-04
 origin: docs/product/05-Eino改进落地路线.md
 ---
@@ -182,7 +182,7 @@ P0 changes where prompts live. P1 changes how Coach context enters prompt render
 - Existing backend service behavior remains unchanged from callers' perspective.
 - Agent constructors are shorter and no longer own prompt prose.
 
-- [ ] **Unit 3: P1 Move Coach Rendering Behind Typed Input**
+- [x] **Unit 3: P1 Move Coach Rendering Behind Typed Input**
 
 **Goal:** Refactor Coach runtime-context rendering so service code maps runtime data into a typed prompt input and prompt rendering owns the Markdown output.
 
@@ -218,7 +218,7 @@ P0 changes where prompts live. P1 changes how Coach context enters prompt render
 - `BuildCoachQuery` remains available and behaviorally compatible.
 - Coach rendering tests prove the refactor did not remove key context or action instructions.
 
-- [ ] **Unit 4: P2 Add `eino-agents` Skill**
+- [x] **Unit 4: P2 Add `eino-agents` Skill**
 
 **Goal:** Add one project-local skill that documents the live Verve convention for adding or modifying Eino agents.
 
@@ -247,7 +247,7 @@ P0 changes where prompts live. P1 changes how Coach context enters prompt render
 - The skill points to repo-relative paths that exist.
 - A future agent can follow it to identify prompt, tool, service, handler, SSE, and test locations without reading the product docs first.
 
-- [ ] **Unit 5: P3 Write Workflow Contract**
+- [x] **Unit 5: P3 Write Workflow Contract**
 
 **Goal:** Write a contract document that decides the shape and value of a future server-side learning workflow before any workflow implementation begins.
 
