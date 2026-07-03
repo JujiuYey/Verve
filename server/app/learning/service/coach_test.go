@@ -97,6 +97,22 @@ func TestBuildCoachQueryTellsAgentToGenerateObjectivesWhenDocumentsExist(t *test
 	}
 }
 
+func TestBuildCoachQueryIncludesExplicitEmptyStates(t *testing.T) {
+	query := BuildCoachQuery(CoachRuntimeContext{UserID: "user-1"}, "继续学习")
+
+	for _, want := range []string{
+		"- 暂无文件夹",
+		"- 暂无文档",
+		"- 暂无学习小节。可以建议用户先去 Wiki 补充资料。",
+		"- 暂无画像",
+		"- 暂无记录",
+	} {
+		if !strings.Contains(query, want) {
+			t.Fatalf("query does not contain %q:\n%s", want, query)
+		}
+	}
+}
+
 func TestParseCoachActionFindsNavigateAction(t *testing.T) {
 	content := "我们继续接口基础。\n\n<ACTION>{\"type\":\"navigate_to_practice\",\"objective_id\":\"obj-interface\",\"label\":\"进入练习\"}</ACTION>"
 
