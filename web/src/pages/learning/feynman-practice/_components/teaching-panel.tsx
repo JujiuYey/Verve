@@ -63,10 +63,6 @@ export function TeachingPanel({
             )}
           </div>
 
-          <div className="rounded-md border bg-background px-3 py-2 text-xs leading-5 text-muted-foreground">
-            这部分更像用户写在教材边上的笔记：不是替换原教材，而是把真实学习时踩过的坑、补上的例子和更顺手的解释沉淀回
-            Markdown。
-          </div>
           <Button
             variant="secondary"
             size="sm"

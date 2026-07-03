@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import type { ExerciseResult, LearningObjective } from "@/api/learning";
+import { MessageResponse } from "@/components/ai-elements/message";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -141,9 +142,9 @@ function ResultPanel({
           掌握度：{masteryLabels[result.mastery_after] ?? result.mastery_after}
         </Badge>
       </div>
-      <p className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
+      <MessageResponse className="max-w-none text-sm leading-6 text-muted-foreground">
         {result.feedback}
-      </p>
+      </MessageResponse>
 
       {needsTeaching ? (
         <RecoveryTask
@@ -178,20 +179,17 @@ function RecoveryTask({
   onPhaseChange: (phase: WorkbenchPhase) => void;
 }) {
   return (
-    <div className="rounded-lg bg-muted/30 p-3">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="text-sm font-medium">重新用自己的话讲</div>
+    <div className="flex flex-col gap-2">
+      <div className="text-sm font-medium">重新用自己的话讲</div>
+      <div className="flex flex-wrap gap-2 rounded-lg bg-muted/30 p-3">
         <Button
           variant="outline"
           size="sm"
-          className="shrink-0"
           onClick={() => onPhaseChange("teaching")}
         >
           <GraduationCapIcon data-icon="inline-start" />
           去教学
         </Button>
-      </div>
-      <div className="mt-3 flex flex-wrap gap-2">
         <Button variant="secondary" size="sm" onClick={() => onPhaseChange("reading")}>
           <NotebookPenIcon data-icon="inline-start" />
           回到阅读
