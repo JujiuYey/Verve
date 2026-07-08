@@ -1,6 +1,5 @@
 import {
   AgentIcon,
-  ComposeIcon,
   DashboardIcon,
   DocumentIcon,
   FolderIcon,
@@ -16,14 +15,10 @@ export type NavItem = {
 };
 
 export const learnNav: NavItem[] = [
+  { title: "知识库", url: "/wiki", icon: FolderIcon },
   { title: "费曼练习", url: "/learn/feynman", icon: AgentIcon },
   { title: "日志", url: "/learn/journal", icon: DocumentIcon },
   { title: "我的画像", url: "/learn/profile", icon: DashboardIcon },
-];
-
-export const knowledgeNav: NavItem[] = [
-  { title: "文档管理", url: "/wiki/folders", icon: FolderIcon },
-  { title: "新建文档", url: "/wiki/tiptap-editor", icon: ComposeIcon },
 ];
 
 export const systemNav: NavItem[] = [

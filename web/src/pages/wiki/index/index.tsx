@@ -24,7 +24,7 @@ import { ItemGrid } from "./_components/item-grid";
 import { UploadDialog } from "./_components/upload-dialog";
 import { getFolderContentView } from "./_shared/content-view";
 
-export function FoldersPage() {
+export function WikiIndexPage() {
   const navigate = useNavigate();
   const [data, setData] = useState<Folder[]>([]);
   const [folderTreeData, setFolderTreeData] = useState<FolderTreeNode[]>([]);

@@ -12,8 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LayoutRouteImport } from './routes/_layout'
 import { Route as LayoutIndexRouteImport } from './routes/_layout/index'
-import { Route as LayoutWikiTiptapEditorRouteImport } from './routes/_layout/wiki/tiptap-editor'
-import { Route as LayoutWikiFoldersRouteImport } from './routes/_layout/wiki/folders'
+import { Route as LayoutWikiIndexRouteImport } from './routes/_layout/wiki/index'
 import { Route as LayoutSystemUserRouteImport } from './routes/_layout/system/user'
 import { Route as LayoutSystemModelConfigRouteImport } from './routes/_layout/system/model-config'
 import { Route as LayoutLearnProfileRouteImport } from './routes/_layout/learn/profile'
@@ -38,14 +37,9 @@ const LayoutIndexRoute = LayoutIndexRouteImport.update({
   path: '/',
   getParentRoute: () => LayoutRoute,
 } as any)
-const LayoutWikiTiptapEditorRoute = LayoutWikiTiptapEditorRouteImport.update({
-  id: '/wiki/tiptap-editor',
-  path: '/wiki/tiptap-editor',
-  getParentRoute: () => LayoutRoute,
-} as any)
-const LayoutWikiFoldersRoute = LayoutWikiFoldersRouteImport.update({
-  id: '/wiki/folders',
-  path: '/wiki/folders',
+const LayoutWikiIndexRoute = LayoutWikiIndexRouteImport.update({
+  id: '/wiki/',
+  path: '/wiki/',
   getParentRoute: () => LayoutRoute,
 } as any)
 const LayoutSystemUserRoute = LayoutSystemUserRouteImport.update({
@@ -106,8 +100,7 @@ export interface FileRoutesByFullPath {
   '/learn/profile': typeof LayoutLearnProfileRoute
   '/system/model-config': typeof LayoutSystemModelConfigRoute
   '/system/user': typeof LayoutSystemUserRoute
-  '/wiki/folders': typeof LayoutWikiFoldersRoute
-  '/wiki/tiptap-editor': typeof LayoutWikiTiptapEditorRoute
+  '/wiki/': typeof LayoutWikiIndexRoute
   '/learn/feynman-practice/$documentId': typeof LayoutLearnFeynmanPracticeDocumentIdRoute
   '/learn/session/$sessionId': typeof LayoutLearnSessionSessionIdRoute
 }
@@ -121,8 +114,7 @@ export interface FileRoutesByTo {
   '/learn/profile': typeof LayoutLearnProfileRoute
   '/system/model-config': typeof LayoutSystemModelConfigRoute
   '/system/user': typeof LayoutSystemUserRoute
-  '/wiki/folders': typeof LayoutWikiFoldersRoute
-  '/wiki/tiptap-editor': typeof LayoutWikiTiptapEditorRoute
+  '/wiki': typeof LayoutWikiIndexRoute
   '/learn/feynman-practice/$documentId': typeof LayoutLearnFeynmanPracticeDocumentIdRoute
   '/learn/session/$sessionId': typeof LayoutLearnSessionSessionIdRoute
 }
@@ -138,8 +130,7 @@ export interface FileRoutesById {
   '/_layout/learn/profile': typeof LayoutLearnProfileRoute
   '/_layout/system/model-config': typeof LayoutSystemModelConfigRoute
   '/_layout/system/user': typeof LayoutSystemUserRoute
-  '/_layout/wiki/folders': typeof LayoutWikiFoldersRoute
-  '/_layout/wiki/tiptap-editor': typeof LayoutWikiTiptapEditorRoute
+  '/_layout/wiki/': typeof LayoutWikiIndexRoute
   '/_layout/learn/feynman-practice/$documentId': typeof LayoutLearnFeynmanPracticeDocumentIdRoute
   '/_layout/learn/session/$sessionId': typeof LayoutLearnSessionSessionIdRoute
 }
@@ -155,8 +146,7 @@ export interface FileRouteTypes {
     | '/learn/profile'
     | '/system/model-config'
     | '/system/user'
-    | '/wiki/folders'
-    | '/wiki/tiptap-editor'
+    | '/wiki/'
     | '/learn/feynman-practice/$documentId'
     | '/learn/session/$sessionId'
   fileRoutesByTo: FileRoutesByTo
@@ -170,8 +160,7 @@ export interface FileRouteTypes {
     | '/learn/profile'
     | '/system/model-config'
     | '/system/user'
-    | '/wiki/folders'
-    | '/wiki/tiptap-editor'
+    | '/wiki'
     | '/learn/feynman-practice/$documentId'
     | '/learn/session/$sessionId'
   id:
@@ -186,8 +175,7 @@ export interface FileRouteTypes {
     | '/_layout/learn/profile'
     | '/_layout/system/model-config'
     | '/_layout/system/user'
-    | '/_layout/wiki/folders'
-    | '/_layout/wiki/tiptap-editor'
+    | '/_layout/wiki/'
     | '/_layout/learn/feynman-practice/$documentId'
     | '/_layout/learn/session/$sessionId'
   fileRoutesById: FileRoutesById
@@ -220,18 +208,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutIndexRouteImport
       parentRoute: typeof LayoutRoute
     }
-    '/_layout/wiki/tiptap-editor': {
-      id: '/_layout/wiki/tiptap-editor'
-      path: '/wiki/tiptap-editor'
-      fullPath: '/wiki/tiptap-editor'
-      preLoaderRoute: typeof LayoutWikiTiptapEditorRouteImport
-      parentRoute: typeof LayoutRoute
-    }
-    '/_layout/wiki/folders': {
-      id: '/_layout/wiki/folders'
-      path: '/wiki/folders'
-      fullPath: '/wiki/folders'
-      preLoaderRoute: typeof LayoutWikiFoldersRouteImport
+    '/_layout/wiki/': {
+      id: '/_layout/wiki/'
+      path: '/wiki'
+      fullPath: '/wiki/'
+      preLoaderRoute: typeof LayoutWikiIndexRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/system/user': {
@@ -309,8 +290,7 @@ interface LayoutRouteChildren {
   LayoutLearnProfileRoute: typeof LayoutLearnProfileRoute
   LayoutSystemModelConfigRoute: typeof LayoutSystemModelConfigRoute
   LayoutSystemUserRoute: typeof LayoutSystemUserRoute
-  LayoutWikiFoldersRoute: typeof LayoutWikiFoldersRoute
-  LayoutWikiTiptapEditorRoute: typeof LayoutWikiTiptapEditorRoute
+  LayoutWikiIndexRoute: typeof LayoutWikiIndexRoute
   LayoutLearnFeynmanPracticeDocumentIdRoute: typeof LayoutLearnFeynmanPracticeDocumentIdRoute
   LayoutLearnSessionSessionIdRoute: typeof LayoutLearnSessionSessionIdRoute
 }
@@ -324,8 +304,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutLearnProfileRoute: LayoutLearnProfileRoute,
   LayoutSystemModelConfigRoute: LayoutSystemModelConfigRoute,
   LayoutSystemUserRoute: LayoutSystemUserRoute,
-  LayoutWikiFoldersRoute: LayoutWikiFoldersRoute,
-  LayoutWikiTiptapEditorRoute: LayoutWikiTiptapEditorRoute,
+  LayoutWikiIndexRoute: LayoutWikiIndexRoute,
   LayoutLearnFeynmanPracticeDocumentIdRoute:
     LayoutLearnFeynmanPracticeDocumentIdRoute,
   LayoutLearnSessionSessionIdRoute: LayoutLearnSessionSessionIdRoute,
