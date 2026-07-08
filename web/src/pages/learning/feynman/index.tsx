@@ -3,7 +3,7 @@ import type { ChatStatus } from "ai";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { coachChatStream, type LearningCoachAction } from "@/api/learning";
+import { coachChatStream, objectiveApi, type LearningCoachAction } from "@/api/learning";
 import { PromptInputProvider } from "@/components/ai-elements/prompt-input";
 
 import { CoachWorkspace, type CoachMessage, type ToolEvent } from "./_components/coach-workspace";
@@ -108,12 +108,22 @@ export function FeynmanExercisePage() {
     );
   };
 
-  const enterPractice = () => {
+  const enterPractice = async () => {
     if (action?.type !== "navigate_to_practice" || !action.objective_id) return;
-    navigate({
-      to: "/learn/feynman-practice/$objectiveId",
-      params: { objectiveId: action.objective_id },
-    });
+    try {
+      const objective = await objectiveApi.detail(action.objective_id);
+      if (!objective.source_document_id) {
+        toast.error("这个小节没有关联文档");
+        return;
+      }
+      navigate({
+        to: "/learn/feynman-practice/$documentId",
+        params: { documentId: objective.source_document_id },
+        search: { objectiveId: objective.id },
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "进入练习失败");
+    }
   };
 
   return (
@@ -121,7 +131,7 @@ export function FeynmanExercisePage() {
       <CoachWorkspace
         action={action}
         messages={messages}
-        onEnterPractice={enterPractice}
+        onEnterPractice={() => void enterPractice()}
         onSend={(message) => void send(message)}
         status={status}
       />

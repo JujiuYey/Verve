@@ -12,6 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Spinner } from "@/components/ui/spinner";
 
 import { getDocumentIconAsset } from "../_shared/file-icons";
 
@@ -19,9 +20,10 @@ export interface DocumentCardProps {
   document: Document;
   onDelete: (document: Document) => void;
   onOpen?: (document: Document) => void;
+  opening?: boolean;
 }
 
-export function DocumentCard({ document, onDelete, onOpen }: DocumentCardProps) {
+export function DocumentCard({ document, onDelete, onOpen, opening }: DocumentCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const iconAsset = getDocumentIconAsset({
@@ -61,12 +63,16 @@ export function DocumentCard({ document, onDelete, onOpen }: DocumentCardProps) 
 
   return (
     <div
-      className="group relative flex flex-col rounded-lg border bg-card p-3 transition-all hover:border-primary hover:shadow-md cursor-pointer"
+      className="group relative flex cursor-pointer flex-col rounded-lg border bg-card p-3 transition-all hover:border-primary hover:shadow-md"
       onClick={handleClick}
     >
       <div className="flex items-center gap-3 pr-9">
         <div className="rounded-lg bg-muted p-2">
-          <img src={iconAsset.src} alt={iconAsset.alt} className="h-6 w-6 object-contain" />
+          {opening ? (
+            <Spinner className="size-6" />
+          ) : (
+            <img src={iconAsset.src} alt={iconAsset.alt} className="size-6 object-contain" />
+          )}
         </div>
         <div className="min-w-0 flex-1">
           <h3

@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
 import {
   BookOpenTextIcon,
   ListChecksIcon,
@@ -10,7 +9,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { useObjectives, type LearningObjective } from "@/api/learning";
+import type { LearningObjective } from "@/api/learning";
 import { documentApi } from "@/api/wiki/document";
 import { MessageResponse } from "@/components/ai-elements/message";
 import { Badge } from "@/components/ui/badge";
@@ -22,9 +21,19 @@ import { cn } from "@/lib/utils";
 import { extractMarkdownCatalog, scrollToMarkdownHeading } from "../_shared";
 import { ObjectiveOutline } from "./objective-outline";
 
-export function SourcePanel({ objective }: { objective: LearningObjective }) {
-  const navigate = useNavigate();
-  const documentId = objective.source_document_id;
+export function SourcePanel({
+  documentId,
+  objective,
+  objectives,
+  isObjectivesLoading,
+  onOpenObjective,
+}: {
+  documentId: string;
+  objective: LearningObjective;
+  objectives: LearningObjective[];
+  isObjectivesLoading: boolean;
+  onOpenObjective: (id: string) => void;
+}) {
   const [catalogOpen, setCatalogOpen] = useState(true);
   const [objectivesOpen, setObjectivesOpen] = useState(true);
   const {
@@ -33,20 +42,15 @@ export function SourcePanel({ objective }: { objective: LearningObjective }) {
     isError: isSourceError,
   } = useQuery({
     queryKey: ["feynman-source-document", documentId],
-    queryFn: () => documentApi.getContent(documentId as string),
+    queryFn: () => documentApi.getContent(documentId),
     enabled: !!documentId,
-  });
-  const { data: documentObjectives = [], isLoading: isObjectivesLoading } = useObjectives({
-    document_id: documentId,
   });
   const sourceMarkdown = sourceDocument?.content?.trim() || "";
   const catalog = useMemo(() => extractMarkdownCatalog(sourceMarkdown), [sourceMarkdown]);
-  const currentIndex = documentObjectives.findIndex((item) => item.id === objective.id);
-  const previousObjective = currentIndex > 0 ? documentObjectives[currentIndex - 1] : null;
+  const currentIndex = objectives.findIndex((item) => item.id === objective.id);
+  const previousObjective = currentIndex > 0 ? objectives[currentIndex - 1] : null;
   const nextObjective =
-    currentIndex >= 0 && currentIndex < documentObjectives.length - 1
-      ? documentObjectives[currentIndex + 1]
-      : null;
+    currentIndex >= 0 && currentIndex < objectives.length - 1 ? objectives[currentIndex + 1] : null;
   const readingGridClassName = cn(
     "grid min-h-0 flex-1 gap-4",
     catalogOpen && objectivesOpen
@@ -57,14 +61,6 @@ export function SourcePanel({ objective }: { objective: LearningObjective }) {
           ? "lg:grid-cols-[minmax(0,1fr)] xl:grid-cols-[minmax(0,1fr)_340px]"
           : "lg:grid-cols-[minmax(0,1fr)]",
   );
-
-  const openObjective = (id: string) => {
-    if (id === objective.id) return;
-    navigate({
-      to: "/learn/feynman-practice/$objectiveId",
-      params: { objectiveId: id },
-    });
-  };
 
   return (
     <div className={readingGridClassName}>
@@ -167,17 +163,17 @@ export function SourcePanel({ objective }: { objective: LearningObjective }) {
             <ListChecksIcon className="size-4 text-muted-foreground" />
             <div className="truncate text-sm font-medium">学习小节</div>
             <Badge variant="outline" className="ml-auto">
-              {documentObjectives.length || 1}
+              {objectives.length || 1}
             </Badge>
           </div>
           <ScrollArea className="h-[calc(100%-45px)]">
             <ObjectiveOutline
               objective={objective}
-              objectives={documentObjectives}
+              objectives={objectives}
               isLoading={isObjectivesLoading}
               previousObjective={previousObjective}
               nextObjective={nextObjective}
-              onOpenObjective={openObjective}
+              onOpenObjective={onOpenObjective}
             />
           </ScrollArea>
         </aside>

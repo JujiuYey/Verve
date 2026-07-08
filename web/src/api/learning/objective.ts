@@ -18,11 +18,24 @@ export interface LearningObjective {
   mastery_level: string;
 }
 
+export interface EnsureObjectivesByDocumentResponse {
+  document_id: string;
+  first_objective_id: string;
+  created_count: number;
+  reused: boolean;
+  objectives: LearningObjective[];
+}
+
 const api = {
   list: (params?: { document_id?: string; folder_id?: string }) =>
     request.get<LearningObjective[]>(`${BASE}/objective/`, { params }),
 
   detail: (id: string) => request.get<LearningObjective>(`${BASE}/objective/${id}`),
+
+  ensureByDocument: (documentId: string) =>
+    request.post<EnsureObjectivesByDocumentResponse>(`${BASE}/objective/ensure-by-document`, {
+      document_id: documentId,
+    }),
 };
 
 export const objectiveKeys = {

@@ -1,7 +1,9 @@
 import { IconPlus, IconRefresh, IconSearch, IconUpload } from "@tabler/icons-react";
+import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { objectiveApi } from "@/api/learning";
 import type { Document } from "@/api/wiki/document";
 import { documentApi } from "@/api/wiki/document";
 import {
@@ -23,6 +25,7 @@ import { UploadDialog } from "./_components/upload-dialog";
 import { getFolderContentView } from "./_shared/content-view";
 
 export function FoldersPage() {
+  const navigate = useNavigate();
   const [data, setData] = useState<Folder[]>([]);
   const [folderTreeData, setFolderTreeData] = useState<FolderTreeNode[]>([]);
   const [loading, setLoading] = useState(false);
@@ -49,6 +52,7 @@ export function FoldersPage() {
 
   const [uploadOpen, setUploadOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Folder | null>(null);
+  const [openingDocumentId, setOpeningDocumentId] = useState("");
 
   // 获取当前文件夹ID（面包屑最后一个）
   const currentFolderId = breadcrumb.length > 0 ? breadcrumb[breadcrumb.length - 1].id : undefined;
@@ -105,6 +109,36 @@ export function FoldersPage() {
   const handleDeleteDocument = useCallback((doc: Document) => {
     setDeleteDocumentTarget(doc);
   }, []);
+
+  const handleOpenDocument = useCallback(
+    async (doc: Document) => {
+      if (openingDocumentId) return;
+      setOpeningDocumentId(doc.id);
+      try {
+        const res = await objectiveApi.ensureByDocument(doc.id);
+        if (!res.first_objective_id) {
+          toast.error("这篇文档还没有可练习的小节");
+          return;
+        }
+        if (!res.reused) {
+          toast.success("已生成学习小节");
+        }
+        const firstObjective = res.objectives.find(
+          (objective) => objective.id === res.first_objective_id,
+        );
+        navigate({
+          to: "/learn/feynman-practice/$documentId",
+          params: { documentId: firstObjective?.source_document_id || doc.id },
+          search: { objectiveId: res.first_objective_id },
+        });
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "准备费曼练习失败");
+      } finally {
+        setOpeningDocumentId("");
+      }
+    },
+    [navigate, openingDocumentId],
+  );
 
   const handleConfirmDeleteDocument = async () => {
     if (!deleteDocumentTarget) return;
@@ -322,6 +356,8 @@ export function FoldersPage() {
               onDeleteFolder={handleDelete}
               onEnterFolder={handleEnterFolder}
               onDeleteDocument={handleDeleteDocument}
+              onOpenDocument={(document) => void handleOpenDocument(document)}
+              openingDocumentId={openingDocumentId}
             />
           </div>
         </div>

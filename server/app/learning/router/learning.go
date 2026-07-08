@@ -14,7 +14,7 @@ func SetupLearningRoutes(router fiber.Router, dbService *database.DatabaseServic
 	journalHandler := learning_handlers.NewJournalHandler(dbService)
 	exerciseHandler := learning_handlers.NewExerciseHandler(dbService)
 	guideHandler := learning_handlers.NewGuideHandler(dbService)
-	objectiveHandler := learning_handlers.NewObjectiveHandler(dbService)
+	objectiveHandler := learning_handlers.NewObjectiveHandler(dbService, minioService)
 	coachHandler := learning_handlers.NewCoachHandler(dbService, minioService)
 
 	learning := router.Group("/learning")
@@ -44,6 +44,7 @@ func SetupLearningRoutes(router fiber.Router, dbService *database.DatabaseServic
 		objective := learning.Group("/objective")
 		{
 			objective.Get("/", objectiveHandler.List)
+			objective.Post("/ensure-by-document", objectiveHandler.EnsureByDocument)
 			objective.Get("/:id", objectiveHandler.FindOne)
 		}
 

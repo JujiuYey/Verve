@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useNavigate, useParams } from "@tanstack/react-router";
+import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { ArrowLeftIcon, CircleAlertIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import {
   sessionChatStream,
   useCreateSession,
-  useObjectiveDetail,
+  useObjectives,
   useSubmitExercise,
   type ExerciseResult,
 } from "@/api/learning";
@@ -23,12 +23,15 @@ import { StudyInfoPanel } from "./_components/study-info-panel";
 import { TeachingPanel } from "./_components/teaching-panel";
 import { buildPrompt, masteryLabels, type WorkbenchPhase } from "./_shared";
 
+const routeApi = getRouteApi("/_layout/learn/feynman-practice/$documentId");
+
 export function FeynmanWorkbenchPage() {
   const navigate = useNavigate();
-  const { objectiveId } = useParams({
-    from: "/_layout/learn/feynman-practice/$objectiveId",
-  });
-  const { data: objective, isLoading } = useObjectiveDetail(objectiveId);
+  const { documentId } = routeApi.useParams();
+  const { objectiveId } = routeApi.useSearch();
+  const { data: objectives = [], isLoading } = useObjectives({ document_id: documentId });
+  const objective = objectives.find((item) => item.id === objectiveId) || objectives[0];
+  const selectedObjectiveId = objective?.id || "";
   const createSession = useCreateSession();
   const queryClient = useQueryClient();
 
@@ -42,21 +45,32 @@ export function FeynmanWorkbenchPage() {
   const submitExercise = useSubmitExercise(sessionId);
 
   useEffect(() => {
-    if (!objectiveId || sessionId || createSession.isPending) return;
+    if (!selectedObjectiveId || sessionId || createSession.isPending) return;
     createSession
-      .mutateAsync({ objective_id: objectiveId })
+      .mutateAsync({ objective_id: selectedObjectiveId })
       .then((res) => setSessionId(res.session_id))
       .catch(() => toast.error("创建练习会话失败"));
-  }, [createSession, objectiveId, sessionId]);
+  }, [createSession, selectedObjectiveId, sessionId]);
 
   useEffect(() => {
+    setSessionId("");
     setPhase("reading");
     setAnswer("");
     setResult(null);
     setTutorAdvice("");
     setIsTutorTeaching(false);
     setIsAppendingTutorNote(false);
-  }, [objectiveId]);
+  }, [selectedObjectiveId]);
+
+  const openObjective = (id: string) => {
+    if (id === selectedObjectiveId) return;
+    navigate({
+      to: "/learn/feynman-practice/$documentId",
+      params: { documentId },
+      search: { objectiveId: id },
+      replace: true,
+    });
+  };
 
   const submit = async () => {
     if (!sessionId || !objective || !answer.trim()) return;
@@ -115,18 +129,18 @@ export function FeynmanWorkbenchPage() {
   };
 
   const appendTutorNoteToMarkdown = async () => {
-    if (!objective?.source_document_id || !tutorAdvice.trim() || isAppendingTutorNote) return;
+    if (!documentId || !objective || !tutorAdvice.trim() || isAppendingTutorNote) return;
 
     setIsAppendingTutorNote(true);
     try {
-      const sourceDocument = await documentApi.getContent(objective.source_document_id);
+      const sourceDocument = await documentApi.getContent(documentId);
       const title = objective.title;
       const note = ["", "---", "", `## 学习旁注：${title}`, "", tutorAdvice.trim(), ""].join("\n");
       const nextContent = `${sourceDocument.content?.trimEnd() || ""}${note}`;
 
-      await documentApi.updateContent(objective.source_document_id, { content: nextContent });
+      await documentApi.updateContent(documentId, { content: nextContent });
       await queryClient.invalidateQueries({
-        queryKey: ["feynman-source-document", objective.source_document_id],
+        queryKey: ["feynman-source-document", documentId],
       });
       toast.success("学习旁注已追加到 Markdown");
     } catch (error) {
@@ -194,7 +208,13 @@ export function FeynmanWorkbenchPage() {
 
       {/* 阅读阶段 */}
       {phase === "reading" ? (
-        <SourcePanel objective={objective} />
+        <SourcePanel
+          documentId={documentId}
+          objective={objective}
+          objectives={objectives}
+          isObjectivesLoading={isLoading}
+          onOpenObjective={openObjective}
+        />
       ) : phase === "answering" ? (
         /* 复述阶段 */
         <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
@@ -210,7 +230,7 @@ export function FeynmanWorkbenchPage() {
             tutorAdvice={tutorAdvice}
             isTutorTeaching={isTutorTeaching}
             onRequestTutorTeaching={requestTutorTeaching}
-            canAppendTutorNote={!!objective.source_document_id}
+            canAppendTutorNote={!!documentId}
             isAppendingTutorNote={isAppendingTutorNote}
             onAppendTutorNote={appendTutorNoteToMarkdown}
             onPhaseChange={setPhase}
@@ -224,7 +244,7 @@ export function FeynmanWorkbenchPage() {
             tutorAdvice={tutorAdvice}
             isTutorTeaching={isTutorTeaching}
             canRequestTeaching={!!result}
-            canAppendTutorNote={!!objective.source_document_id}
+            canAppendTutorNote={!!documentId}
             isAppendingTutorNote={isAppendingTutorNote}
             onRequestTutorTeaching={requestTutorTeaching}
             onAppendTutorNote={appendTutorNoteToMarkdown}

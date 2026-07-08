@@ -22,6 +22,8 @@ interface ItemGridProps {
   onDeleteFolder: (folder: Folder) => void;
   onEnterFolder: (folder: Folder) => void;
   onDeleteDocument: (document: Document) => void;
+  onOpenDocument?: (document: Document) => void;
+  openingDocumentId?: string;
 }
 
 export function ItemGrid({
@@ -33,6 +35,8 @@ export function ItemGrid({
   onDeleteFolder,
   onEnterFolder,
   onDeleteDocument,
+  onOpenDocument,
+  openingDocumentId,
 }: ItemGridProps) {
   const folderGridClassName = "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4";
   const documentGridClassName = "grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3";
@@ -109,7 +113,13 @@ export function ItemGrid({
           </h3>
           <div className={documentGridClassName}>
             {displayDocuments.map((doc) => (
-              <DocumentCard key={doc.id} document={doc} onDelete={onDeleteDocument} />
+              <DocumentCard
+                key={doc.id}
+                document={doc}
+                onDelete={onDeleteDocument}
+                onOpen={onOpenDocument}
+                opening={openingDocumentId === doc.id}
+              />
             ))}
           </div>
         </div>
