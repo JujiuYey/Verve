@@ -7,16 +7,9 @@ interface FolderContentViewInput {
   searchKeyword: string;
 }
 
-interface FolderContentCounts {
-  all: number;
-  folders: number;
-  documents: number;
-}
-
 interface FolderContentView {
   folders: Folder[];
   documents: Document[];
-  counts: FolderContentCounts;
 }
 
 function normalizeKeyword(value: string) {
@@ -52,10 +45,5 @@ export function getFolderContentView({
   return {
     folders: filteredFolders,
     documents: filteredDocuments,
-    counts: {
-      all: filteredFolders.length + filteredDocuments.length,
-      folders: filteredFolders.length,
-      documents: filteredDocuments.length,
-    },
   };
 }

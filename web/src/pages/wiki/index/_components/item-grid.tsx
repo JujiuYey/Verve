@@ -17,7 +17,6 @@ interface ItemGridProps {
   folders: Folder[];
   documents: Document[];
   loading?: boolean;
-  activeTab: "all" | "folders" | "documents";
   onEditFolder: (folder: Folder) => void;
   onDeleteFolder: (folder: Folder) => void;
   onEnterFolder: (folder: Folder) => void;
@@ -30,7 +29,6 @@ export function ItemGrid({
   folders,
   documents,
   loading,
-  activeTab,
   onEditFolder,
   onDeleteFolder,
   onEnterFolder,
@@ -41,15 +39,7 @@ export function ItemGrid({
   const folderGridClassName = "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4";
   const documentGridClassName = "grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3";
 
-  // 根据 tab 过滤显示
-  const showFolders = activeTab === "all" || activeTab === "folders";
-  const showDocuments = activeTab === "all" || activeTab === "documents";
-
-  // 获取要显示的项目
-  const displayFolders = showFolders ? folders : [];
-  const displayDocuments = showDocuments ? documents : [];
-
-  const isEmpty = displayFolders.length === 0 && displayDocuments.length === 0;
+  const isEmpty = folders.length === 0 && documents.length === 0;
 
   if (loading) {
     return (
@@ -62,20 +52,14 @@ export function ItemGrid({
   }
 
   if (isEmpty) {
-    const emptyMessage = {
-      all: { title: "暂无内容", description: "创建文件夹或上传文档开始使用" },
-      folders: { title: "暂无文件夹", description: "创建一个新文件夹开始使用" },
-      documents: { title: "暂无文档", description: "上传文档开始使用" },
-    };
-
     return (
       <Empty className="border border-dashed">
         <EmptyHeader>
           <EmptyMedia variant="icon">
             <IconFolder />
           </EmptyMedia>
-          <EmptyTitle>{emptyMessage[activeTab].title}</EmptyTitle>
-          <EmptyDescription>{emptyMessage[activeTab].description}</EmptyDescription>
+          <EmptyTitle>暂无内容</EmptyTitle>
+          <EmptyDescription>创建文件夹或上传文档开始使用</EmptyDescription>
         </EmptyHeader>
       </Empty>
     );
@@ -84,14 +68,14 @@ export function ItemGrid({
   return (
     <div className="space-y-6">
       {/* 文件夹区域 */}
-      {showFolders && displayFolders.length > 0 && (
+      {folders.length > 0 && (
         <div>
           <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
             <IconFolder className="h-4 w-4" />
-            文件夹 ({displayFolders.length})
+            文件夹 ({folders.length})
           </h3>
           <div className={folderGridClassName}>
-            {displayFolders.map((folder) => (
+            {folders.map((folder) => (
               <FolderCard
                 key={folder.id}
                 folder={folder}
@@ -105,14 +89,14 @@ export function ItemGrid({
       )}
 
       {/* 文档区域 */}
-      {showDocuments && displayDocuments.length > 0 && (
+      {documents.length > 0 && (
         <div>
           <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
             <IconFile className="h-4 w-4" />
-            文档 ({displayDocuments.length})
+            文档 ({documents.length})
           </h3>
           <div className={documentGridClassName}>
-            {displayDocuments.map((doc) => (
+            {documents.map((doc) => (
               <DocumentCard
                 key={doc.id}
                 document={doc}

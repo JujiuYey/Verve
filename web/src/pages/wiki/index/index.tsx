@@ -14,7 +14,6 @@ import {
   type UpdateFolderRequest,
 } from "@/api/wiki/folder";
 import { ConfirmDialog } from "@/components/sag-ui";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -35,9 +34,6 @@ export function WikiIndexPage() {
   const [documentsLoading, setDocumentsLoading] = useState(false);
   const [deleteDocumentTarget, setDeleteDocumentTarget] = useState<Document | null>(null);
   // const [deletingDocument, setDeletingDocument] = useState(false);
-
-  // Tab 切换状态
-  const [activeTab, setActiveTab] = useState<"all" | "folders" | "documents">("all");
 
   // 面包屑导航状态
   const [breadcrumb, setBreadcrumb] = useState<{ id?: string; name: string }[]>([]);
@@ -304,54 +300,10 @@ export function WikiIndexPage() {
               <BreadcrumbNav items={breadcrumb} onNavigate={handleBreadcrumbNavigate} />
             )}
 
-            {/* Tab 切换 */}
-            <div className="flex items-center gap-1 border-b">
-              <button
-                className={`px-4 py-2 text-sm font-medium transition-colors ${
-                  activeTab === "all"
-                    ? "border-b-2 border-primary text-primary"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-                onClick={() => setActiveTab("all")}
-              >
-                全部
-                <Badge variant="secondary" className="ml-2">
-                  {contentView.counts.all}
-                </Badge>
-              </button>
-              <button
-                className={`px-4 py-2 text-sm font-medium transition-colors ${
-                  activeTab === "folders"
-                    ? "border-b-2 border-primary text-primary"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-                onClick={() => setActiveTab("folders")}
-              >
-                文件夹
-                <Badge variant="secondary" className="ml-2">
-                  {contentView.counts.folders}
-                </Badge>
-              </button>
-              <button
-                className={`px-4 py-2 text-sm font-medium transition-colors ${
-                  activeTab === "documents"
-                    ? "border-b-2 border-primary text-primary"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-                onClick={() => setActiveTab("documents")}
-              >
-                文档
-                <Badge variant="secondary" className="ml-2">
-                  {contentView.counts.documents}
-                </Badge>
-              </button>
-            </div>
-
             <ItemGrid
               folders={contentView.folders}
               documents={contentView.documents}
               loading={loading || documentsLoading}
-              activeTab={activeTab}
               onEditFolder={handleEdit}
               onDeleteFolder={handleDelete}
               onEnterFolder={handleEnterFolder}
