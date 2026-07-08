@@ -15,12 +15,9 @@ import { ConfirmDialog } from "@/components/sag-ui";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 
 import { BreadcrumbNav } from "./_components/breadcrumb-nav";
-import { FolderDetailPanel } from "./_components/folder-detail-panel";
 import { FolderFormModal } from "./_components/folder-form-modal";
-import { FolderTree } from "./_components/folder-tree";
 import { ItemGrid } from "./_components/item-grid";
 import { UploadDialog } from "./_components/upload-dialog";
 import { getFolderContentView } from "./_shared/content-view";
@@ -168,36 +165,6 @@ export function FoldersPage() {
     [],
   );
 
-  // 树形导航选择文件夹
-  const handleTreeSelect = useCallback(
-    async (folder: FolderTreeNode | null) => {
-      if (folder === null) {
-        // 返回根目录
-        setBreadcrumb([]);
-        setCurrentFolder(null);
-        return;
-      }
-
-      // 检查是否在当前面包屑路径中
-      const existingIndex = breadcrumb.findIndex((item) => item.id === folder.id);
-      if (existingIndex !== -1) {
-        // 已在路径中，导航到该位置
-        handleBreadcrumbNavigate({ id: folder.id, name: folder.name }, existingIndex);
-      } else {
-        // 不在路径中，进入该文件夹
-        setBreadcrumb([{ id: folder.id, name: folder.name }]);
-        // 获取完整文件夹信息用于右侧面板
-        try {
-          const fullFolder = await folderApi.findOne(folder.id);
-          setCurrentFolder(fullFolder);
-        } catch (error) {
-          console.error("获取文件夹详情失败:", error);
-        }
-      }
-    },
-    [breadcrumb, handleBreadcrumbNavigate],
-  );
-
   const handleCreate = () => {
     setFormMode("create");
     setSelectedFolder(null);
@@ -263,34 +230,11 @@ export function FoldersPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <ResizablePanelGroup
+      <div
         key={currentFolder ? "with-detail" : "without-detail"}
-        orientation="horizontal"
-        className="min-h-0 flex-1 overflow-hidden border rounded-xl"
+        className="min-h-0 flex-1 overflow-hidden"
       >
-        {/* 左侧文件夹树形导航 */}
-        <ResizablePanel
-          id="folder-tree-panel"
-          defaultSize="20%"
-          minSize="15%"
-          maxSize="30%"
-          className="min-w-0 overflow-y-auto"
-        >
-          <FolderTree
-            data={folderTreeData}
-            selectedId={currentFolderId}
-            onSelect={handleTreeSelect}
-          />
-        </ResizablePanel>
-
-        <ResizableHandle withHandle />
-
-        <ResizablePanel
-          id="folder-content-panel"
-          defaultSize={currentFolder ? "65%" : "80%"}
-          minSize="45%"
-          className="min-w-0 overflow-y-auto"
-        >
+        <div id="folder-content-panel" className="min-w-0 overflow-y-auto">
           <div className="flex h-full min-h-0 flex-col gap-4 p-2">
             <div className="flex items-center justify-between gap-4">
               <div className="relative max-w-sm flex-1">
@@ -380,23 +324,8 @@ export function FoldersPage() {
               onDeleteDocument={handleDeleteDocument}
             />
           </div>
-        </ResizablePanel>
-
-        {currentFolder && (
-          <>
-            <ResizableHandle withHandle />
-            <ResizablePanel
-              id="folder-detail-panel"
-              defaultSize="25%"
-              minSize="20%"
-              maxSize="35%"
-              className="min-w-0 overflow-y-auto bg-background"
-            >
-              <FolderDetailPanel folder={currentFolder} onEdit={handleEdit} />
-            </ResizablePanel>
-          </>
-        )}
-      </ResizablePanelGroup>
+        </div>
+      </div>
 
       <FolderFormModal
         open={formOpen}
