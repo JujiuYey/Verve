@@ -54,17 +54,21 @@ func (r *Retriever) Search(ctx context.Context, rootFolderID, query string, limi
 	for _, point := range points {
 		pointIDs = append(pointIDs, point.PointID)
 	}
-	chunks, err := r.chunks.FindByPointIDs(ctx, pointIDs)
+	chunks, err := r.chunks.FindByPointIDs(ctx, pointIDLookupCandidates(pointIDs))
 	if err != nil {
 		return nil, err
 	}
 	byPointID := make(map[string]*rag_db.WikiChunk, len(chunks))
 	for _, chunk := range chunks {
 		byPointID[chunk.VectorPointID] = chunk
+		byPointID[normalizePointID(chunk.VectorPointID)] = chunk
 	}
 	results := make([]rag_payload.SearchResult, 0, len(points))
 	for _, point := range points {
 		chunk, ok := byPointID[point.PointID]
+		if !ok {
+			chunk, ok = byPointID[normalizePointID(point.PointID)]
+		}
 		if !ok {
 			continue
 		}
@@ -81,6 +85,25 @@ func (r *Retriever) Search(ctx context.Context, rootFolderID, query string, limi
 		})
 	}
 	return results, nil
+}
+
+func pointIDLookupCandidates(pointIDs []string) []string {
+	candidates := make([]string, 0, len(pointIDs)*2)
+	seen := make(map[string]bool, len(pointIDs)*2)
+	for _, pointID := range pointIDs {
+		for _, candidate := range []string{pointID, normalizePointID(pointID)} {
+			if candidate == "" || seen[candidate] {
+				continue
+			}
+			seen[candidate] = true
+			candidates = append(candidates, candidate)
+		}
+	}
+	return candidates
+}
+
+func normalizePointID(pointID string) string {
+	return strings.ReplaceAll(pointID, "-", "")
 }
 
 func normalizeSearchLimit(limit int) int {

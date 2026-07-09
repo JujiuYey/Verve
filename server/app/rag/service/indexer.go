@@ -161,7 +161,7 @@ func (s *Indexer) processDocumentWithJob(ctx context.Context, job *rag_db.IndexJ
 	points := make([]vector.Point, 0, len(markdownChunks))
 	records := make([]*rag_db.WikiChunk, 0, len(markdownChunks))
 	for i, chunk := range markdownChunks {
-		pointID := compactPointID()
+		pointID := uuid.New().String()
 		points = append(points, vector.Point{
 			ID:     pointID,
 			Vector: embedded.Embeddings[i],

@@ -10,12 +10,16 @@ import (
 )
 
 type CoachRuntimeContext struct {
-	UserID     string
-	Folders    []*wiki_db.Folder
-	Documents  []*wiki_db.Document
-	Objectives []*learning_db.LearningObjective
-	Profiles   []*learning_db.LearningProfile
-	Journals   []*learning_db.LearningJournal
+	UserID          string
+	AgentInstanceID string
+	AgentName       string
+	RootFolderID    string
+	RootFolderName  string
+	Folders         []*wiki_db.Folder
+	Documents       []*wiki_db.Document
+	Objectives      []*learning_db.LearningObjective
+	Profiles        []*learning_db.LearningProfile
+	Journals        []*learning_db.LearningJournal
 }
 
 type CoachAction struct {
@@ -30,7 +34,13 @@ type CoachAction struct {
 // Service 层只负责把数据库模型映射成 prompt input; Markdown 渲染和回复约束由 prompts 包维护。
 func BuildCoachQuery(ctx CoachRuntimeContext, message string) string {
 	return prompts.CoachQueryPrompt(prompts.CoachQueryInput{
-		Message:    message,
+		Message: message,
+		AgentContext: &prompts.CoachAgentContext{
+			AgentInstanceID: ctx.AgentInstanceID,
+			AgentName:       ctx.AgentName,
+			RootFolderID:    ctx.RootFolderID,
+			RootFolderName:  ctx.RootFolderName,
+		},
 		Folders:    mapCoachFolders(ctx.Folders),
 		Documents:  mapCoachDocuments(ctx.Documents),
 		Objectives: mapCoachObjectives(ctx.Objectives),

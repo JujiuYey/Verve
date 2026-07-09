@@ -17,6 +17,7 @@ import (
 	rag_repo "verve/app/rag/repository"
 	system_db "verve/app/system/models/db"
 	system_repo "verve/app/system/repository"
+	wiki_db "verve/app/wiki/models/db"
 	wiki_repo "verve/app/wiki/repository"
 )
 
@@ -37,8 +38,9 @@ type DatabaseService struct {
 	Guides     *learning_repo.GuideRepository
 
 	// Wiki Repositories
-	Folders   wiki_repo.FolderRepository
-	Documents *wiki_repo.DocumentRepository
+	Folders    wiki_repo.FolderRepository
+	Documents  *wiki_repo.DocumentRepository
+	WikiAgents *wiki_repo.AgentInstanceRepository
 
 	// RAG Repositories
 	RAGChunks *rag_repo.ChunkRepository
@@ -73,6 +75,9 @@ func NewDatabaseService(dsn string) (*DatabaseService, error) {
 	db.RegisterModel((*learning_db.LearningGuide)(nil))
 	db.RegisterModel((*rag_db.WikiChunk)(nil))
 	db.RegisterModel((*rag_db.IndexJob)(nil))
+	db.RegisterModel((*wiki_db.Folder)(nil))
+	db.RegisterModel((*wiki_db.Document)(nil))
+	db.RegisterModel((*wiki_db.AgentInstance)(nil))
 
 	// 添加查询钩子（开发环境下打印 SQL）
 	db.AddQueryHook(bundebug.NewQueryHook(
@@ -106,8 +111,9 @@ func NewDatabaseService(dsn string) (*DatabaseService, error) {
 		Guides:     learning_repo.NewGuideRepository(db),
 
 		// Wiki Repositories
-		Folders:   wiki_repo.NewFolderRepository(db),
-		Documents: wiki_repo.NewDocumentRepository(db),
+		Folders:    wiki_repo.NewFolderRepository(db),
+		Documents:  wiki_repo.NewDocumentRepository(db),
+		WikiAgents: wiki_repo.NewAgentInstanceRepository(db),
 
 		// RAG Repositories
 		RAGChunks: rag_repo.NewChunkRepository(db),

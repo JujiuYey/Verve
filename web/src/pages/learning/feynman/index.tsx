@@ -1,4 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
+import { getRouteApi } from "@tanstack/react-router";
 import type { ChatStatus } from "ai";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -9,6 +10,7 @@ import { PromptInputProvider } from "@/components/ai-elements/prompt-input";
 import { CoachWorkspace, type CoachMessage, type ToolEvent } from "./_components/coach-workspace";
 
 const STRIP_ACTIONS = /<ACTION>[\s\S]*?<\/ACTION>/g;
+const routeApi = getRouteApi("/_layout/learn/feynman");
 
 function stripAction(content: string): string {
   return content.replace(STRIP_ACTIONS, "").trimEnd();
@@ -16,6 +18,7 @@ function stripAction(content: string): string {
 
 export function FeynmanExercisePage() {
   const navigate = useNavigate();
+  const search = routeApi.useSearch();
   const [messages, setMessages] = useState<CoachMessage[]>([]);
   const [status, setStatus] = useState<ChatStatus>("ready");
   const [action, setAction] = useState<LearningCoachAction | null>(null);
@@ -105,6 +108,10 @@ export function FeynmanExercisePage() {
         setStatus("error");
         toast.error(error.message);
       },
+      {
+        agent_instance_id: search.agentInstanceId,
+        root_folder_id: search.rootFolderId,
+      },
     );
   };
 
@@ -130,6 +137,7 @@ export function FeynmanExercisePage() {
     <PromptInputProvider initialInput="继续学习">
       <CoachWorkspace
         action={action}
+        agentName={search.rootFolderName ? `${search.rootFolderName} 学习 Agent` : undefined}
         messages={messages}
         onEnterPractice={() => void enterPractice()}
         onSend={(message) => void send(message)}

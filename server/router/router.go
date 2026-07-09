@@ -66,6 +66,7 @@ func SetupRouter(
 		// 知识库路由
 		wiki_router.SetupFolderRoutes(protected.Group("/"), dbService)
 		wiki_router.SetupDocumentRoutes(protected.Group("/"), dbService, minioService, indexer)
+		wiki_router.SetupAgentInstanceRoutes(protected.Group("/"), dbService)
 
 		// RAG 路由
 		rag_router.SetupRAGRoutes(

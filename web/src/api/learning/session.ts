@@ -86,6 +86,11 @@ export interface LearningCoachAction {
   label?: string;
 }
 
+export interface CoachChatOptions {
+  agent_instance_id?: string;
+  root_folder_id?: string;
+}
+
 const api = {
   create: (data: CreateSessionRequest) =>
     request.post<{ session_id: string }>(`${BASE}/session`, data),
@@ -194,6 +199,7 @@ export async function coachChatStream(
   onMessage: (event: LearningStreamEvent) => void,
   onComplete?: () => void,
   onError?: (error: Error) => void,
+  options?: CoachChatOptions,
 ): Promise<void> {
   try {
     const { accessToken } = useAuthStore.getState();
@@ -205,7 +211,11 @@ export async function coachChatStream(
     const response = await fetch(`${API_BASE_URL}${BASE}/coach/chat`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({
+        message,
+        agent_instance_id: options?.agent_instance_id,
+        root_folder_id: options?.root_folder_id,
+      }),
     });
 
     if (!response.ok) {

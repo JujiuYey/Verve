@@ -17,10 +17,12 @@ func (f fakeEmbedder) EmbedTexts(ctx context.Context, texts []string) (Embedding
 }
 
 type fakeChunkFinder struct {
-	chunks []*rag_db.WikiChunk
+	chunks   []*rag_db.WikiChunk
+	pointIDs []string
 }
 
-func (f fakeChunkFinder) FindByPointIDs(ctx context.Context, pointIDs []string) ([]*rag_db.WikiChunk, error) {
+func (f *fakeChunkFinder) FindByPointIDs(ctx context.Context, pointIDs []string) ([]*rag_db.WikiChunk, error) {
+	f.pointIDs = pointIDs
 	return f.chunks, nil
 }
 
@@ -56,7 +58,7 @@ func TestRetrieverPreservesVectorScoreOrder(t *testing.T) {
 		{PointID: "p1", Score: 0.8},
 	}}
 	retriever := NewRetriever(
-		fakeChunkFinder{chunks: []*rag_db.WikiChunk{
+		&fakeChunkFinder{chunks: []*rag_db.WikiChunk{
 			{ID: "c1", VectorPointID: "p1", RootFolderID: "root", DocumentTitle: "one.md"},
 			{ID: "c2", VectorPointID: "p2", RootFolderID: "root", DocumentTitle: "two.md"},
 		}},
@@ -73,5 +75,37 @@ func TestRetrieverPreservesVectorScoreOrder(t *testing.T) {
 	}
 	if len(results) != 2 || results[0].ChunkID != "c2" || results[1].ChunkID != "c1" {
 		t.Fatalf("results = %#v", results)
+	}
+}
+
+func TestRetrieverMatchesQdrantNormalizedUUIDPointID(t *testing.T) {
+	store := &fakeVectorStore{searchResults: []vector.ScoredPoint{
+		{PointID: "001928ba-3d04-4986-b359-36ccd62380d1", Score: 0.9},
+	}}
+	finder := &fakeChunkFinder{chunks: []*rag_db.WikiChunk{
+		{
+			ID:            "c1",
+			VectorPointID: "001928ba3d044986b35936ccd62380d1",
+			RootFolderID:  "root",
+			DocumentTitle: "one.md",
+		},
+	}}
+	retriever := NewRetriever(
+		finder,
+		fakeEmbedder{result: EmbeddingResult{Model: "embed", Dimension: 2, Embeddings: [][]float32{{0.1, 0.2}}}},
+		store,
+	)
+
+	results, err := retriever.Search(context.Background(), "root", "channel", 6)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 1 || results[0].ChunkID != "c1" {
+		t.Fatalf("results = %#v", results)
+	}
+	if len(finder.pointIDs) != 2 ||
+		finder.pointIDs[0] != "001928ba-3d04-4986-b359-36ccd62380d1" ||
+		finder.pointIDs[1] != "001928ba3d044986b35936ccd62380d1" {
+		t.Fatalf("point id candidates = %#v", finder.pointIDs)
 	}
 }

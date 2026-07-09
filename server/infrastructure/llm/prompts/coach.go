@@ -17,12 +17,20 @@ func CoachPrompt(input Input) string {
 }
 
 type CoachQueryInput struct {
-	Message    string
-	Folders    []CoachFolder
-	Documents  []CoachDocument
-	Objectives []CoachObjective
-	Profiles   []CoachProfile
-	Journals   []CoachJournal
+	Message      string
+	AgentContext *CoachAgentContext
+	Folders      []CoachFolder
+	Documents    []CoachDocument
+	Objectives   []CoachObjective
+	Profiles     []CoachProfile
+	Journals     []CoachJournal
+}
+
+type CoachAgentContext struct {
+	AgentInstanceID string
+	AgentName       string
+	RootFolderID    string
+	RootFolderName  string
 }
 
 type CoachFolder struct {
@@ -70,6 +78,7 @@ func CoachQueryPrompt(input CoachQueryInput) string {
 	sb.WriteString(strings.TrimSpace(input.Message))
 	sb.WriteString("\n\n")
 
+	renderCoachAgentContext(&sb, input.AgentContext)
 	renderCoachFolders(&sb, input.Folders)
 	renderCoachDocuments(&sb, input.Documents)
 	renderCoachObjectives(&sb, input.Objectives, len(input.Documents) > 0)
@@ -77,6 +86,32 @@ func CoachQueryPrompt(input CoachQueryInput) string {
 	renderCoachJournals(&sb, input.Journals)
 	renderCoachReplyContract(&sb)
 	return sb.String()
+}
+
+func renderCoachAgentContext(sb *strings.Builder, agent *CoachAgentContext) {
+	if agent == nil || strings.TrimSpace(agent.RootFolderID) == "" {
+		return
+	}
+	sb.WriteString("## 当前 Wiki Agent\n")
+	if strings.TrimSpace(agent.AgentName) != "" {
+		sb.WriteString("- agent: ")
+		sb.WriteString(strings.TrimSpace(agent.AgentName))
+		sb.WriteString("\n")
+	}
+	if strings.TrimSpace(agent.AgentInstanceID) != "" {
+		sb.WriteString("- agent_instance_id: ")
+		sb.WriteString(strings.TrimSpace(agent.AgentInstanceID))
+		sb.WriteString("\n")
+	}
+	sb.WriteString("- root_folder_id: ")
+	sb.WriteString(strings.TrimSpace(agent.RootFolderID))
+	if strings.TrimSpace(agent.RootFolderName) != "" {
+		sb.WriteString(" (")
+		sb.WriteString(strings.TrimSpace(agent.RootFolderName))
+		sb.WriteString(")")
+	}
+	sb.WriteString("\n")
+	sb.WriteString("- 后续规划必须优先围绕这个 root_folder_id; 需要内容依据时调用 search_wiki_knowledge 并传入这个 root_folder_id。\n\n")
 }
 
 func renderCoachFolders(sb *strings.Builder, folders []CoachFolder) {

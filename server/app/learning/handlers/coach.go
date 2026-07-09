@@ -41,7 +41,9 @@ func NewCoachHandler(db *database.DatabaseService, minio *storage.MinIOService, 
 func (h *CoachHandler) Chat(c *fiber.Ctx) error {
 	userID, _ := c.Locals("user_id").(string)
 	var req struct {
-		Message string `json:"message"`
+		Message         string `json:"message"`
+		AgentInstanceID string `json:"agent_instance_id"`
+		RootFolderID    string `json:"root_folder_id"`
 	}
 	_ = c.BodyParser(&req)
 	message := strings.TrimSpace(req.Message)
@@ -49,7 +51,7 @@ func (h *CoachHandler) Chat(c *fiber.Ctx) error {
 		message = "继续学习"
 	}
 
-	runtimeContext, err := h.buildRuntimeContext(c.Context(), userID)
+	runtimeContext, err := h.buildRuntimeContext(c.Context(), userID, strings.TrimSpace(req.AgentInstanceID), strings.TrimSpace(req.RootFolderID))
 	if err != nil {
 		log.Printf("❌ 构建学习调度上下文失败: user_id=%s err=%v", userID, err)
 		return response.InternalServerCtx(c, "构建学习上下文失败")
@@ -82,16 +84,40 @@ func (h *CoachHandler) Chat(c *fiber.Ctx) error {
 
 // buildRuntimeContext 聚合陪练 agent 所需的运行时上下文:用户文件夹(已过滤)、
 // 文档、最近 objective、每个文件夹的 LearningProfile、最近 journal。
-func (h *CoachHandler) buildRuntimeContext(ctx context.Context, userID string) (learning_service.CoachRuntimeContext, error) {
+func (h *CoachHandler) buildRuntimeContext(ctx context.Context, userID string, agentInstanceID string, rootFolderID string) (learning_service.CoachRuntimeContext, error) {
 	folders, err := h.db.Folders.List(ctx, map[string]interface{}{})
 	if err != nil {
 		return learning_service.CoachRuntimeContext{}, err
 	}
 	folders = filterFoldersForUser(folders, userID)
 
+	agentName := ""
+	rootFolderName := ""
+	if agentInstanceID != "" {
+		for _, folder := range folders {
+			instance, err := h.db.WikiAgents.FindByRoot(ctx, userID, folder.ID)
+			if err == nil && instance.ID == agentInstanceID {
+				rootFolderID = instance.RootFolderID
+				agentName = instance.Name
+				break
+			}
+		}
+	}
+	if rootFolderID != "" {
+		if rootFolder, err := h.db.Folders.FindOne(ctx, rootFolderID); err == nil {
+			rootFolderName = rootFolder.Name
+		}
+	}
+
 	docs, err := h.db.Documents.List(ctx, "", "")
 	if err != nil {
 		return learning_service.CoachRuntimeContext{}, err
+	}
+	if rootFolderID != "" {
+		docs, err = h.filterDocumentsByRoot(ctx, docs, rootFolderID)
+		if err != nil {
+			return learning_service.CoachRuntimeContext{}, err
+		}
 	}
 
 	objectives, err := h.db.Objectives.FindRecentByUser(ctx, userID, 50)
@@ -120,13 +146,35 @@ func (h *CoachHandler) buildRuntimeContext(ctx context.Context, userID string) (
 	}
 
 	return learning_service.CoachRuntimeContext{
-		UserID:     userID,
-		Folders:    folders,
-		Documents:  docs,
-		Objectives: objectives,
-		Profiles:   profiles,
-		Journals:   journals,
+		UserID:          userID,
+		AgentInstanceID: agentInstanceID,
+		AgentName:       agentName,
+		RootFolderID:    rootFolderID,
+		RootFolderName:  rootFolderName,
+		Folders:         folders,
+		Documents:       docs,
+		Objectives:      objectives,
+		Profiles:        profiles,
+		Journals:        journals,
 	}, nil
+}
+
+func (h *CoachHandler) filterDocumentsByRoot(ctx context.Context, docs []*wiki_db.Document, rootFolderID string) ([]*wiki_db.Document, error) {
+	folderIDs, err := h.db.Folders.GetAllSubFolderIDs(ctx, rootFolderID)
+	if err != nil {
+		return nil, err
+	}
+	allowed := make(map[string]bool, len(folderIDs))
+	for _, folderID := range folderIDs {
+		allowed[folderID] = true
+	}
+	result := make([]*wiki_db.Document, 0, len(docs))
+	for _, doc := range docs {
+		if allowed[doc.FolderID] {
+			result = append(result, doc)
+		}
+	}
+	return result, nil
 }
 
 // filterFoldersForUser 过滤出归属当前用户的文件夹;未归属(folder.UserID 为空)

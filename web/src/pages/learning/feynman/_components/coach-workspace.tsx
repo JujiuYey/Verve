@@ -48,6 +48,7 @@ export type CoachMessage = {
 };
 
 export type CoachWorkspaceProps = {
+  agentName?: string;
   messages: CoachMessage[];
   status: ChatStatus;
   action: LearningCoachAction | null;
@@ -65,6 +66,7 @@ function safeJson(input: string | undefined): unknown {
 }
 
 export function CoachWorkspace({
+  agentName,
   messages,
   status,
   action,
@@ -82,12 +84,11 @@ export function CoachWorkspace({
     <div className="flex h-full min-h-0 flex-col gap-4 overflow-hidden p-6">
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl font-bold">费曼学习 Agent</h1>
+          <h1 className="text-2xl font-bold">{agentName || "费曼学习 Agent"}</h1>
           <Badge variant="secondary">真实上下文</Badge>
         </div>
         <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-          直接说继续学习。Agent 会查询 Wiki
-          文件夹、文档、学习记录和用户画像，再决定下一步进入哪一个小节。
+          直接说继续学习。Agent 会查询 Wiki 文件夹、文档、学习记录和用户画像，再决定下一步进入哪一个小节。
         </p>
       </div>
 
