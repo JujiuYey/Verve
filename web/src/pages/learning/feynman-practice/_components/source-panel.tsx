@@ -1,11 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import {
-  BookOpenTextIcon,
-  ListChecksIcon,
-  PanelLeftCloseIcon,
-  PanelLeftOpenIcon,
-  PanelRightCloseIcon,
-  PanelRightOpenIcon,
+  NotebookTabsIcon,
+  TableOfContentsIcon,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -67,7 +63,7 @@ export function SourcePanel({
       {catalogOpen ? (
         <aside className="hidden min-h-0 overflow-hidden rounded-2xl border bg-muted/20 lg:block">
           <div className="flex h-[45px] items-center gap-2 border-b px-3">
-            <BookOpenTextIcon className="size-4 text-muted-foreground" />
+            <TableOfContentsIcon className="size-4 text-muted-foreground" />
             <div className="truncate text-sm font-medium">目录</div>
           </div>
           <ScrollArea className="h-[calc(100%-45px)]">
@@ -102,33 +98,21 @@ export function SourcePanel({
                 variant="ghost"
                 size="icon"
                 className="hidden size-8 shrink-0 lg:inline-flex"
+                aria-label={catalogOpen ? "收起目录" : "展开目录"}
                 onClick={() => setCatalogOpen((open) => !open)}
               >
-                {catalogOpen ? (
-                  <PanelLeftCloseIcon className="size-4" />
-                ) : (
-                  <PanelLeftOpenIcon className="size-4" />
-                )}
+                <TableOfContentsIcon className="size-4" />
               </Button>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <BookOpenTextIcon className="size-3.5" />
-                  Markdown 阅读
-                </div>
-                <div className="mt-1 truncate text-base font-semibold">{objective.title}</div>
-              </div>
+              <div className="min-w-0 truncate text-base font-semibold">{objective.title}</div>
             </div>
             <Button
               variant="ghost"
               size="icon"
               className="size-8 shrink-0"
+              aria-label={objectivesOpen ? "收起学习小节" : "展开学习小节"}
               onClick={() => setObjectivesOpen((open) => !open)}
             >
-              {objectivesOpen ? (
-                <PanelRightCloseIcon className="size-4" />
-              ) : (
-                <PanelRightOpenIcon className="size-4" />
-              )}
+              <NotebookTabsIcon className="size-4" />
             </Button>
           </div>
 
@@ -160,7 +144,7 @@ export function SourcePanel({
       {objectivesOpen ? (
         <aside className="min-h-0 overflow-hidden rounded-2xl border bg-muted/10">
           <div className="flex h-[45px] items-center gap-2 border-b px-3">
-            <ListChecksIcon className="size-4 text-muted-foreground" />
+            <NotebookTabsIcon className="size-4 text-muted-foreground" />
             <div className="truncate text-sm font-medium">学习小节</div>
             <Badge variant="outline" className="ml-auto">
               {objectives.length || 1}

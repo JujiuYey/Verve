@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
-import { ArrowLeftIcon, CircleAlertIcon } from "lucide-react";
+import { CircleAlertIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -181,27 +181,19 @@ export function FeynmanWorkbenchPage() {
     <div className="flex h-full flex-col gap-4 overflow-hidden p-6">
       {/* 工作台头部 */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="min-w-0">
-          <Button
-            variant="ghost"
-            className="mb-2 px-0"
-            onClick={() => navigate({ to: "/learn/feynman" })}
-          >
-            <ArrowLeftIcon className="size-4" />
-            返回费曼练习
-          </Button>
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="secondary">{objective.stage_title || "学习阶段"}</Badge>
-            <Badge variant="outline">
-              {masteryLabels[objective.mastery_level] ?? objective.mastery_level}
-            </Badge>
-          </div>
+        <div className=" min-w-0 flex flex-wrap items-center gap-2">
           <h1 className="mt-2 truncate text-2xl font-bold">{objective.title}</h1>
+          <Badge variant="outline">
+            {masteryLabels[objective.mastery_level] ?? objective.mastery_level}
+          </Badge>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <PhaseBadge phase={phase} onPhaseChange={setPhase} />
-          <Button variant="outline" onClick={() => navigate({ to: "/wiki/folders" })}>
+          <Button variant="outline" onClick={() => navigate({ to: "/wiki" })}>
             返回 Wiki
+          </Button>
+          <Button variant="secondary" onClick={() => navigate({ to: "/learn/feynman" })}>
+            返回费曼练习
           </Button>
         </div>
       </div>
