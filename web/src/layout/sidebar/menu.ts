@@ -22,7 +22,7 @@ export const learnNav: NavItem[] = [
 ];
 
 export const systemNav: NavItem[] = [
-	{ title: "用户管理", url: "/system/user", icon: UserManageIcon },
-	{ title: "模型配置", url: "/system/model-config", icon: ModelConfigIcon },
-	{ title: "Agent 配置", url: "/system/agent-config", icon: AgentIcon },
+  { title: "用户管理", url: "/system/user", icon: UserManageIcon },
+  { title: "模型配置", url: "/system/model-config", icon: ModelConfigIcon },
+  { title: "Agent 配置", url: "/system/agent-config", icon: AgentIcon },
 ];

@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import type { AIModel } from "./models";
 import { request } from "@/utils/request";
+
+import type { AIModel } from "./models";
 
 const RESOURCE_PATH = "/api/system/agent-model-configs";
 
