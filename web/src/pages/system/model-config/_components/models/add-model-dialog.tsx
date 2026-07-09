@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
 
-import type { ModelType } from "@/api";
 import { useCreateAIModel } from "@/api";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,7 +13,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
 
 interface AddModelDialogProps {
   open: boolean;
@@ -31,7 +29,6 @@ export function AddModelDialog({
 }: AddModelDialogProps) {
   const createModelMutation = useCreateAIModel();
   const [modelId, setModelId] = useState("");
-  const [modelType, setModelType] = useState<ModelType>("chat");
 
   const handleAdd = async () => {
     const id = modelId.trim();
@@ -45,10 +42,6 @@ export function AddModelDialog({
       platform_id: platformId,
       model_name: id,
       display_name: id,
-      model_type: modelType,
-      capabilities:
-        modelType === "embedding" ? ["embedding"] : modelType === "rerank" ? ["rerank"] : [],
-      source: "manual",
     });
     setModelId("");
     onOpenChange(false);
@@ -77,27 +70,6 @@ export function AddModelDialog({
               spellCheck={false}
               className="h-10"
             />
-          </div>
-
-          <div className="space-y-2">
-            <Label>类型</Label>
-            <div className="grid grid-cols-3 gap-2">
-              {(["chat", "embedding", "rerank"] as const).map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => setModelType(type)}
-                  className={cn(
-                    "rounded-md border py-2 text-sm font-medium transition-colors",
-                    modelType === type
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border text-muted-foreground hover:border-primary/50",
-                  )}
-                >
-                  {type === "chat" ? "对话" : type === "embedding" ? "向量" : "重排"}
-                </button>
-              ))}
-            </div>
           </div>
         </div>
 

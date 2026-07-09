@@ -36,31 +36,16 @@ CREATE TABLE IF NOT EXISTS sys_models (
   platform_id VARCHAR(32) NOT NULL REFERENCES sys_model_platforms(id) ON DELETE CASCADE,
   model_name VARCHAR(200) NOT NULL,
   display_name VARCHAR(200) NOT NULL,
-  model_type VARCHAR(30) NOT NULL DEFAULT 'chat',
-  capabilities JSONB,
-  source VARCHAR(20) NOT NULL DEFAULT 'remote',
   status VARCHAR(20) NOT NULL DEFAULT 'active',
-  is_default BOOLEAN NOT NULL DEFAULT FALSE,
-  temperature DECIMAL(3,2) NOT NULL DEFAULT 0.7,
-  top_p DECIMAL(3,2) NOT NULL DEFAULT 0.9,
-  max_tokens INTEGER,
-  top_k INTEGER,
   last_synced_at TIMESTAMP,
-  metadata JSONB,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT uk_sys_models_platform_model_name UNIQUE (platform_id, model_name),
-  CONSTRAINT chk_sys_models_model_type CHECK (model_type IN ('chat', 'embedding', 'rerank')),
-  CONSTRAINT chk_sys_models_source CHECK (source IN ('remote', 'manual')),
   CONSTRAINT chk_sys_models_status CHECK (status IN ('active', 'inactive'))
 );
 
-CREATE INDEX IF NOT EXISTS idx_sys_models_platform_type_status
-ON sys_models(platform_id, model_type, status);
-
-CREATE UNIQUE INDEX IF NOT EXISTS idx_sys_models_type_default
-ON sys_models(model_type)
-WHERE is_default = TRUE;
+CREATE INDEX IF NOT EXISTS idx_sys_models_platform_status
+ON sys_models(platform_id, status);
 
 -- ============================================
 -- 表注释
@@ -88,14 +73,5 @@ COMMENT ON COLUMN sys_model_platforms.metadata IS '平台扩展信息';
 COMMENT ON COLUMN sys_models.platform_id IS '所属模型平台 ID';
 COMMENT ON COLUMN sys_models.model_name IS 'API 调用模型名称';
 COMMENT ON COLUMN sys_models.display_name IS '前端展示名称';
-COMMENT ON COLUMN sys_models.model_type IS '模型类型：chat/embedding/rerank';
-COMMENT ON COLUMN sys_models.capabilities IS '模型能力标签';
-COMMENT ON COLUMN sys_models.source IS '模型来源：remote/manual';
 COMMENT ON COLUMN sys_models.status IS '模型状态：active/inactive';
-COMMENT ON COLUMN sys_models.is_default IS '是否为该模型类型的默认模型';
-COMMENT ON COLUMN sys_models.temperature IS '随机性/创造性，chat 模型使用';
-COMMENT ON COLUMN sys_models.top_p IS '核采样，chat 模型使用';
-COMMENT ON COLUMN sys_models.max_tokens IS '单次响应最大 token 数，chat 模型使用';
-COMMENT ON COLUMN sys_models.top_k IS '采样时考虑的最高概率 token 数，chat 模型使用';
 COMMENT ON COLUMN sys_models.last_synced_at IS '最近同步时间';
-COMMENT ON COLUMN sys_models.metadata IS '模型扩展信息';

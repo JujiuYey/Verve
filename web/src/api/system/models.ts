@@ -5,23 +5,12 @@ import { request } from "@/utils/request";
 
 const RESOURCE_PATH = "/api/system/models";
 
-export type ModelType = "chat" | "embedding" | "rerank";
-export type ModelCapability = "vision" | "reasoning" | "tool" | "embedding" | "rerank";
-
 export interface AIModel {
   id: string;
   platform_id: string;
   model_name: string;
   display_name: string;
-  model_type: ModelType;
-  capabilities: ModelCapability[];
   status: "active" | "inactive";
-  source: "manual" | "remote";
-  is_default?: boolean;
-  temperature?: number;
-  top_p?: number;
-  max_tokens?: number;
-  top_k?: number;
   created_at?: string;
   updated_at?: string;
 }
@@ -30,20 +19,11 @@ export interface CreateAIModelRequest {
   platform_id: string;
   model_name: string;
   display_name: string;
-  model_type: ModelType;
-  capabilities: ModelCapability[];
-  source?: "manual" | "remote";
-  is_default?: boolean;
-  temperature?: number;
-  top_p?: number;
-  max_tokens?: number;
-  top_k?: number;
 }
 
 export interface UpdateAIModelRequest {
   status?: "active" | "inactive";
   display_name?: string;
-  capabilities?: ModelCapability[];
 }
 
 export const systemModelKeys = {

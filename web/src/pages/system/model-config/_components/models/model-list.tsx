@@ -1,7 +1,7 @@
 import { IconPlus, IconRefresh, IconSearch } from "@tabler/icons-react";
 import { useMemo, useState } from "react";
 
-import type { AIModel, ModelType } from "@/api";
+import type { AIModel } from "@/api";
 import { useSyncModels } from "@/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,10 +33,7 @@ export function ModelList({ platform, enabledModels, initials, accent }: ModelLi
       (model): CandidateModel => ({
         id: model.model_name,
         name: model.display_name || model.model_name,
-        type: model.model_type as ModelType,
         enabled: model.status === "active",
-        capabilities: model.capabilities ?? [],
-        source: "enabled",
         dbId: model.id,
       }),
     );

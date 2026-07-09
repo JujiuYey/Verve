@@ -2,9 +2,7 @@ import { IconTrash } from "@tabler/icons-react";
 import { useState } from "react";
 
 import { useDeleteAIModel, useUpdateAIModel } from "@/api";
-import type { ModelCapability, ModelType } from "@/api";
 import { ConfirmDialog } from "@/components/sag-ui";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -14,42 +12,8 @@ import { cn } from "@/lib/utils";
 export type CandidateModel = {
   id: string;
   name: string;
-  type: ModelType;
   enabled: boolean;
-  capabilities: ModelCapability[];
-  source: "enabled";
   dbId?: string;
-};
-
-const capabilityMeta: Record<
-  ModelCapability,
-  { label: string; className: string; icon: React.ComponentType<{ className?: string }> }
-> = {
-  vision: {
-    label: "视觉",
-    className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
-    icon: () => null,
-  },
-  reasoning: {
-    label: "推理",
-    className: "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300",
-    icon: () => null,
-  },
-  tool: {
-    label: "工具",
-    className: "bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300",
-    icon: () => null,
-  },
-  embedding: {
-    label: "向量",
-    className: "bg-cyan-100 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-300",
-    icon: () => null,
-  },
-  rerank: {
-    label: "重排",
-    className: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
-    icon: () => null,
-  },
 };
 
 interface ModelRowProps {
@@ -108,12 +72,6 @@ export function ModelRow({ model, initials, accent }: ModelRowProps) {
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
-          {model.capabilities?.map((capability) => (
-            <CapabilityPill key={capability} capability={capability} />
-          ))}
-          <Badge variant={model.type === "chat" ? "secondary" : "outline"}>
-            {model.type === "chat" ? "对话" : model.type === "embedding" ? "向量" : "重排"}
-          </Badge>
           <Switch
             checked={model.enabled}
             onCheckedChange={toggleStatus}
@@ -147,26 +105,5 @@ export function ModelRow({ model, initials, accent }: ModelRowProps) {
         />
       </div>
     </TooltipProvider>
-  );
-}
-
-function CapabilityPill({ capability }: { capability: ModelCapability }) {
-  const meta = capabilityMeta[capability];
-  if (!meta) return null;
-
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span
-          className={cn(
-            "inline-flex h-7 w-9 items-center justify-center rounded-md",
-            meta.className,
-          )}
-        >
-          <span className="text-xs">{meta.label[0]}</span>
-        </span>
-      </TooltipTrigger>
-      <TooltipContent>{meta.label}</TooltipContent>
-    </Tooltip>
   );
 }

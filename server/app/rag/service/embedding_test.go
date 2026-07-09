@@ -12,18 +12,16 @@ import (
 )
 
 type fakeDefaultEmbeddingModelRepo struct {
-	model     *system_db.SysModel
-	platform  *system_db.SysModelPlatform
-	agentKey  string
-	sceneKey  string
-	modelType string
-	err       error
+	model    *system_db.SysModel
+	platform *system_db.SysModelPlatform
+	agentKey string
+	sceneKey string
+	err      error
 }
 
-func (r *fakeDefaultEmbeddingModelRepo) FindAgentModelWithPlatform(ctx context.Context, agentKey string, sceneKey string, modelType string) (*system_db.SysModel, *system_db.SysModelPlatform, error) {
+func (r *fakeDefaultEmbeddingModelRepo) FindAgentModelWithPlatform(ctx context.Context, agentKey string, sceneKey string) (*system_db.SysModel, *system_db.SysModelPlatform, error) {
 	r.agentKey = agentKey
 	r.sceneKey = sceneKey
-	r.modelType = modelType
 	if r.err != nil {
 		return nil, nil, r.err
 	}
@@ -73,8 +71,8 @@ func TestOpenAICompatibleEmbedderRequestShape(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if repo.agentKey != "wiki_rag" || repo.sceneKey != "embedding" || repo.modelType != "embedding" {
-		t.Fatalf("model usage = %s/%s/%s", repo.agentKey, repo.sceneKey, repo.modelType)
+	if repo.agentKey != "wiki_rag" || repo.sceneKey != "embedding" {
+		t.Fatalf("model usage = %s/%s", repo.agentKey, repo.sceneKey)
 	}
 	if result.Model != "text-embedding-3-small" {
 		t.Fatalf("result model = %q", result.Model)

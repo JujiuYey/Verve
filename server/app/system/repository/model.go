@@ -12,13 +12,7 @@ import (
 	system_db "verve/app/system/models/db"
 )
 
-const (
-	ModelTypeChat      = "chat"
-	ModelTypeEmbedding = "embedding"
-	ModelTypeRerank    = "rerank"
-
-	modelStatusActive = "active"
-)
+const modelStatusActive = "active"
 
 // ModelConfigRepository 模型平台与已启用模型的数据访问接口
 type ModelConfigRepository interface {
@@ -32,9 +26,8 @@ type ModelConfigRepository interface {
 
 	// SysModel 模型 CRUD
 	FindModels(ctx context.Context) ([]*system_db.SysModel, error)
-	FindDefaultModelWithPlatform(ctx context.Context, modelType string) (*system_db.SysModel, *system_db.SysModelPlatform, error)
 	FindAgentModelConfigs(ctx context.Context) ([]*system_db.AgentModelConfig, error)
-	FindAgentModelWithPlatform(ctx context.Context, agentKey, sceneKey, modelType string) (*system_db.SysModel, *system_db.SysModelPlatform, error)
+	FindAgentModelWithPlatform(ctx context.Context, agentKey, sceneKey string) (*system_db.SysModel, *system_db.SysModelPlatform, error)
 	UpsertAgentModelConfig(ctx context.Context, config *system_db.AgentModelConfig) (*system_db.AgentModelConfig, error)
 	ModelExistsByPlatformAndName(ctx context.Context, platformID, modelName string) (bool, error)
 	CreateModel(ctx context.Context, model *system_db.SysModel) error
@@ -44,9 +37,8 @@ type ModelConfigRepository interface {
 
 // ModelUpdate 模型可更新字段集合
 type ModelUpdate struct {
-	Status       *string
-	DisplayName  *string
-	Capabilities []string
+	Status      *string
+	DisplayName *string
 }
 
 // modelConfigRepository ModelConfigRepository 的实现
@@ -71,29 +63,6 @@ func (r *modelConfigRepository) FindModels(ctx context.Context) ([]*system_db.Sy
 	return models, err
 }
 
-func (r *modelConfigRepository) FindDefaultModelWithPlatform(ctx context.Context, modelType string) (*system_db.SysModel, *system_db.SysModelPlatform, error) {
-	model := new(system_db.SysModel)
-	err := r.db.NewSelect().
-		Model(model).
-		Where("model_type = ?", modelType).
-		Where("status = ?", modelStatusActive).
-		Where("is_default = ?", true).
-		Order("created_at DESC").
-		Limit(1).
-		Scan(ctx)
-	if err != nil {
-		return nil, nil, err
-	}
-	platform, err := r.FindPlatform(ctx, model.PlatformID)
-	if err != nil {
-		return nil, nil, err
-	}
-	if !platform.Enabled {
-		return nil, nil, fmt.Errorf("default %s model platform is disabled", modelType)
-	}
-	return model, platform, nil
-}
-
 func (r *modelConfigRepository) FindAgentModelConfigs(ctx context.Context) ([]*system_db.AgentModelConfig, error) {
 	var configs []*system_db.AgentModelConfig
 	err := r.db.NewSelect().
@@ -104,7 +73,7 @@ func (r *modelConfigRepository) FindAgentModelConfigs(ctx context.Context) ([]*s
 	return configs, err
 }
 
-func (r *modelConfigRepository) FindAgentModelWithPlatform(ctx context.Context, agentKey, sceneKey, modelType string) (*system_db.SysModel, *system_db.SysModelPlatform, error) {
+func (r *modelConfigRepository) FindAgentModelWithPlatform(ctx context.Context, agentKey, sceneKey string) (*system_db.SysModel, *system_db.SysModelPlatform, error) {
 	config := new(system_db.AgentModelConfig)
 	err := r.db.NewSelect().
 		Model(config).
@@ -119,9 +88,6 @@ func (r *modelConfigRepository) FindAgentModelWithPlatform(ctx context.Context, 
 	}
 	if config.Model == nil {
 		return nil, nil, fmt.Errorf("agent model config %s.%s has no model", agentKey, sceneKey)
-	}
-	if config.Model.ModelType != modelType {
-		return nil, nil, fmt.Errorf("agent model config %s.%s requires %s model, got %s", agentKey, sceneKey, modelType, config.Model.ModelType)
 	}
 	if config.Model.Status != modelStatusActive {
 		return nil, nil, fmt.Errorf("agent model config %s.%s model is inactive", agentKey, sceneKey)
@@ -189,7 +155,7 @@ func (r *modelConfigRepository) CreateModel(ctx context.Context, model *system_d
 	return err
 }
 
-// UpdateModel 按 ModelUpdate 选择性更新模型状态、显示名称、能力标签
+// UpdateModel 按 ModelUpdate 选择性更新模型状态、显示名称
 func (r *modelConfigRepository) UpdateModel(ctx context.Context, modelID string, update ModelUpdate) (*system_db.SysModel, error) {
 	var model system_db.SysModel
 	if err := r.db.NewSelect().Model(&model).Where("id = ?", modelID).Scan(ctx); err != nil {
@@ -200,9 +166,6 @@ func (r *modelConfigRepository) UpdateModel(ctx context.Context, modelID string,
 	}
 	if update.DisplayName != nil {
 		model.DisplayName = strings.TrimSpace(*update.DisplayName)
-	}
-	if update.Capabilities != nil {
-		model.Capabilities = update.Capabilities
 	}
 	if _, err := r.db.NewUpdate().Model(&model).WherePK().Exec(ctx); err != nil {
 		return nil, err

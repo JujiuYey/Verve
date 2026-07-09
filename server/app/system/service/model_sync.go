@@ -6,12 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
 
 	system_db "verve/app/system/models/db"
-	system_repository "verve/app/system/repository"
 )
 
 var ErrModelPlatformNotFound = errors.New("model platform not found")
@@ -35,9 +35,35 @@ type ModelSyncService struct {
 }
 
 type openAIModelListResponse struct {
-	Data []struct {
-		ID string `json:"id"`
-	} `json:"data"`
+	Data []openAIModelListItem `json:"data"`
+}
+
+type openAIModelListItem struct {
+	ID        string                 `json:"id"`
+	Object    string                 `json:"object,omitempty"`
+	Created   int64                  `json:"created,omitempty"`
+	OwnedBy   string                 `json:"owned_by,omitempty"`
+	RawFields map[string]interface{} `json:"-"`
+}
+
+func (m *openAIModelListResponse) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		Data []json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	m.Data = make([]openAIModelListItem, 0, len(raw.Data))
+	for _, itemBytes := range raw.Data {
+		var item openAIModelListItem
+		if err := json.Unmarshal(itemBytes, &item); err != nil {
+			return err
+		}
+		_ = json.Unmarshal(itemBytes, &item.RawFields)
+		m.Data = append(m.Data, item)
+	}
+	return nil
 }
 
 func NewModelSyncService(repo ModelSyncRepository) *ModelSyncService {
@@ -86,9 +112,6 @@ func (s *ModelSyncService) SyncModels(ctx context.Context, platformID string) (*
 			PlatformID:   platform.ID,
 			ModelName:    modelName,
 			DisplayName:  modelName,
-			ModelType:    system_repository.ModelTypeChat,
-			Capabilities: []string{},
-			Source:       "remote",
 			Status:       "active",
 			LastSyncedAt: &now,
 		}); err != nil {
@@ -155,14 +178,59 @@ func (s *ModelSyncService) fetchModels(ctx context.Context, platform *system_db.
 	}
 	defer resp.Body.Close()
 
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("读取模型列表响应失败: %w", err)
+	}
+	log.Printf("🤖 模型同步响应: platform_id=%s platform=%q url=%s status=%d body_bytes=%d body_preview=%q",
+		platform.ID,
+		platform.Name,
+		baseURL+modelListPath,
+		resp.StatusCode,
+		len(body),
+		truncateForModelSyncLog(string(body), 4000),
+	)
+
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		body, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("模型提供方返回 %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
 	var result openAIModelListResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, fmt.Errorf("解析模型列表失败: %w", err)
 	}
+	log.Printf("🤖 模型同步解析: platform_id=%s model_count=%d sample=%s",
+		platform.ID,
+		len(result.Data),
+		formatModelSyncSample(result.Data, 8),
+	)
 	return &result, nil
+}
+
+func truncateForModelSyncLog(text string, limit int) string {
+	if len(text) <= limit {
+		return text
+	}
+	return fmt.Sprintf("%s...(truncated %d bytes)", text[:limit], len(text)-limit)
+}
+
+func formatModelSyncSample(models []openAIModelListItem, limit int) string {
+	if len(models) == 0 {
+		return "[]"
+	}
+	if limit > len(models) {
+		limit = len(models)
+	}
+	sample := make([]map[string]interface{}, 0, limit)
+	for i := 0; i < limit; i++ {
+		sample = append(sample, models[i].RawFields)
+	}
+	data, err := json.Marshal(sample)
+	if err != nil {
+		return fmt.Sprintf("%+v", sample)
+	}
+	if len(models) > limit {
+		return fmt.Sprintf("%s...(and %d more)", string(data), len(models)-limit)
+	}
+	return string(data)
 }

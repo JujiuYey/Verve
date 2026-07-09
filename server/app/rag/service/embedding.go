@@ -12,7 +12,6 @@ import (
 	"time"
 
 	system_db "verve/app/system/models/db"
-	system_repo "verve/app/system/repository"
 )
 
 type Embedder interface {
@@ -35,7 +34,7 @@ const (
 )
 
 type AgentModelRepository interface {
-	FindAgentModelWithPlatform(ctx context.Context, agentKey string, sceneKey string, modelType string) (*system_db.SysModel, *system_db.SysModelPlatform, error)
+	FindAgentModelWithPlatform(ctx context.Context, agentKey string, sceneKey string) (*system_db.SysModel, *system_db.SysModelPlatform, error)
 }
 
 type OpenAICompatibleEmbedder struct {
@@ -58,7 +57,7 @@ func NewOpenAICompatibleEmbedderWithClient(models AgentModelRepository, client *
 }
 
 func (e *OpenAICompatibleEmbedder) CheckReady(ctx context.Context) error {
-	_, platform, err := e.models.FindAgentModelWithPlatform(ctx, AgentKeyWikiRAG, SceneKeyRAGEmbedding, system_repo.ModelTypeEmbedding)
+	_, platform, err := e.models.FindAgentModelWithPlatform(ctx, AgentKeyWikiRAG, SceneKeyRAGEmbedding)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return errors.New("未配置知识库 embedding 模型，请先在 Agent 配置中设置 wiki_rag.embedding")
@@ -75,7 +74,7 @@ func (e *OpenAICompatibleEmbedder) EmbedTexts(ctx context.Context, texts []strin
 	if len(texts) == 0 {
 		return EmbeddingResult{}, nil
 	}
-	model, platform, err := e.models.FindAgentModelWithPlatform(ctx, AgentKeyWikiRAG, SceneKeyRAGEmbedding, system_repo.ModelTypeEmbedding)
+	model, platform, err := e.models.FindAgentModelWithPlatform(ctx, AgentKeyWikiRAG, SceneKeyRAGEmbedding)
 	if err != nil {
 		return EmbeddingResult{}, err
 	}

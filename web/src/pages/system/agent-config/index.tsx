@@ -13,7 +13,7 @@ import {
 } from "@tabler/icons-react";
 import { useEffect, useMemo, useState } from "react";
 
-import type { AIModel, AIPlatform, ModelType } from "@/api";
+import type { AIModel, AIPlatform } from "@/api";
 import {
   useAgentModelConfigs,
   useAIModels,
@@ -43,7 +43,6 @@ import { cn } from "@/lib/utils";
 type SceneDefinition = {
   key: string;
   name: string;
-  type: ModelType;
   required?: boolean;
   description: string;
 };
@@ -70,7 +69,6 @@ const AGENTS: AgentDefinition[] = [
       {
         key: "default",
         name: "默认模型",
-        type: "chat",
         required: true,
         description: "用于生成导学摘要、掌握目标和练习重点。",
       },
@@ -87,7 +85,6 @@ const AGENTS: AgentDefinition[] = [
       {
         key: "default",
         name: "默认模型",
-        type: "chat",
         required: true,
         description: "用于结构化生成学习小节和练习入口。",
       },
@@ -104,7 +101,6 @@ const AGENTS: AgentDefinition[] = [
       {
         key: "default",
         name: "默认模型",
-        type: "chat",
         required: true,
         description: "用于对话、工具调用决策和下一步动作规划。",
       },
@@ -121,7 +117,6 @@ const AGENTS: AgentDefinition[] = [
       {
         key: "default",
         name: "默认模型",
-        type: "chat",
         required: true,
         description: "用于费曼练习中的追问、反馈和引导。",
       },
@@ -138,7 +133,6 @@ const AGENTS: AgentDefinition[] = [
       {
         key: "default",
         name: "默认模型",
-        type: "chat",
         required: true,
         description: "用于评估作答质量和生成判定结果。",
       },
@@ -155,18 +149,12 @@ const AGENTS: AgentDefinition[] = [
       {
         key: "embedding",
         name: "向量化模型",
-        type: "embedding",
         required: true,
         description: "解析知识库时生成文档块向量；未配置时不会创建解析任务。",
       },
     ],
   },
 ];
-
-const modelTypeLabel: Partial<Record<ModelType, string>> = {
-  chat: "对话",
-  embedding: "向量",
-};
 
 function getSceneKey(agentKey: string, sceneKey: string) {
   return `${agentKey}.${sceneKey}`;
@@ -201,14 +189,6 @@ export function AgentConfigPage() {
     const config = configsByScene.get(getSceneKey(agent.key, scene.key));
     return Boolean(config?.model_id && config.enabled);
   });
-  const activeModelCountByType = activeModels.reduce<Partial<Record<ModelType, number>>>(
-    (acc, model) => {
-      acc[model.model_type] = (acc[model.model_type] ?? 0) + 1;
-      return acc;
-    },
-    {},
-  );
-
   const handleModelChange = (agentKey: string, scene: SceneDefinition, modelId: string) => {
     const current = configsByScene.get(getSceneKey(agentKey, scene.key));
     upsertConfig.mutate({
@@ -258,10 +238,6 @@ export function AgentConfigPage() {
                   value={`${configuredRequiredScenes.length}/${totalRequiredScenes.length}`}
                 />
                 <Metric label="模型" value={activeModels.length} />
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                <span>对话 {activeModelCountByType.chat ?? 0}</span>
-                <span>向量 {activeModelCountByType.embedding ?? 0}</span>
               </div>
             </div>
 
@@ -423,7 +399,6 @@ function AgentDetail({
             <div className="flex flex-col rounded-md border">
               {agent.scenes.map((scene, index) => {
                 const config = configsByScene.get(getSceneKey(agent.key, scene.key));
-                const sceneModels = activeModels.filter((model) => model.model_type === scene.type);
                 return (
                   <div key={scene.key}>
                     {index > 0 ? <Separator /> : null}
@@ -432,7 +407,7 @@ function AgentDetail({
                       scene={scene}
                       configModelId={config?.model_id}
                       enabled={config?.enabled ?? true}
-                      models={sceneModels}
+                      models={activeModels}
                       platforms={platforms}
                       saving={saving}
                       onModelChange={onModelChange}
@@ -486,7 +461,6 @@ function SceneRow({
           <Badge variant={scene.required ? "default" : "secondary"}>
             {scene.required ? "必需" : "可选"}
           </Badge>
-          <Badge variant="outline">{modelTypeLabel[scene.type] ?? scene.type}</Badge>
         </div>
         <div className="mt-1 truncate font-mono text-xs text-muted-foreground">
           {agentKey}.{scene.key}
@@ -600,10 +574,7 @@ function ModelPickerDialog({
       <DialogContent className="max-w-4xl p-0">
         <DialogHeader className="border-b px-6 py-4">
           <DialogTitle>选择{scene.name}</DialogTitle>
-          <DialogDescription>
-            先选择模型厂商，再从该厂商已启用的{modelTypeLabel[scene.type] ?? scene.type}
-            模型中选择。
-          </DialogDescription>
+          <DialogDescription>先选择模型厂商，再从该厂商已启用的模型中选择。</DialogDescription>
         </DialogHeader>
 
         <div className="grid min-h-[520px] grid-cols-[280px_minmax(0,1fr)] overflow-hidden">
@@ -696,9 +667,6 @@ function ModelPickerDialog({
                           {model.model_name}
                         </span>
                       </span>
-                      <Badge variant="outline">
-                        {modelTypeLabel[model.model_type] ?? model.model_type}
-                      </Badge>
                       {selected ? <IconCheck className="text-primary" /> : null}
                     </button>
                   );

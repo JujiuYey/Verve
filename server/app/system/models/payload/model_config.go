@@ -19,21 +19,12 @@ type UpdateAIPlatformConfigRequest struct {
 }
 
 type CreateAIModelRequest struct {
-	PlatformID   string   `json:"platform_id"`
-	ModelName    string   `json:"model_name"`
-	DisplayName  string   `json:"display_name"`
-	ModelType    string   `json:"model_type"`
-	Capabilities []string `json:"capabilities,omitempty"`
-	Source       string   `json:"source"`
-	IsDefault    bool     `json:"is_default"`
-	Temperature  float32  `json:"temperature"`
-	TopP         float32  `json:"top_p"`
-	MaxTokens    *int64   `json:"max_tokens,omitempty"`
-	TopK         *int64   `json:"top_k,omitempty"`
+	PlatformID  string `json:"platform_id"`
+	ModelName   string `json:"model_name"`
+	DisplayName string `json:"display_name"`
 }
 
 type UpdateAIModelRequest struct {
-	Status       *string  `json:"status,omitempty"`
-	DisplayName  *string  `json:"display_name,omitempty"`
-	Capabilities []string `json:"capabilities,omitempty"`
+	Status      *string `json:"status,omitempty"`
+	DisplayName *string `json:"display_name,omitempty"`
 }

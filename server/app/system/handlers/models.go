@@ -38,23 +38,12 @@ func (h *ModelHandler) CreateModel(c *fiber.Ctx) error {
 	if strings.TrimSpace(req.PlatformID) == "" || strings.TrimSpace(req.ModelName) == "" {
 		return response.BadRequestCtx(c, "平台 ID 和模型名称不能为空")
 	}
-	if !isValidModelType(req.ModelType) {
-		return response.BadRequestCtx(c, "Invalid model_type, must be 'chat', 'embedding' or 'rerank'")
-	}
 
 	model := &system_db.SysModel{
-		PlatformID:   strings.TrimSpace(req.PlatformID),
-		ModelName:    strings.TrimSpace(req.ModelName),
-		DisplayName:  strings.TrimSpace(req.DisplayName),
-		ModelType:    req.ModelType,
-		Capabilities: req.Capabilities,
-		Source:       req.Source,
-		Status:       "active",
-		IsDefault:    req.IsDefault,
-		Temperature:  req.Temperature,
-		TopP:         req.TopP,
-		MaxTokens:    req.MaxTokens,
-		TopK:         req.TopK,
+		PlatformID:  strings.TrimSpace(req.PlatformID),
+		ModelName:   strings.TrimSpace(req.ModelName),
+		DisplayName: strings.TrimSpace(req.DisplayName),
+		Status:      "active",
 	}
 
 	if err := h.repo.CreateModel(c.Context(), model); err != nil {
@@ -74,9 +63,8 @@ func (h *ModelHandler) UpdateModel(c *fiber.Ctx) error {
 	}
 
 	model, err := h.repo.UpdateModel(c.Context(), id, system_repository.ModelUpdate{
-		Status:       req.Status,
-		DisplayName:  req.DisplayName,
-		Capabilities: req.Capabilities,
+		Status:      req.Status,
+		DisplayName: req.DisplayName,
 	})
 	if err != nil {
 		return response.InternalServerCtx(c, "更新模型失败")
@@ -90,8 +78,4 @@ func (h *ModelHandler) DeleteModel(c *fiber.Ctx) error {
 		return response.InternalServerCtx(c, "删除模型失败")
 	}
 	return response.SuccessCtx(c, "模型删除成功")
-}
-
-func isValidModelType(modelType string) bool {
-	return modelType == system_repository.ModelTypeChat || modelType == system_repository.ModelTypeEmbedding || modelType == "rerank"
 }
