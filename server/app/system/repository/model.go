@@ -15,6 +15,7 @@ import (
 const (
 	ModelTypeChat      = "chat"
 	ModelTypeEmbedding = "embedding"
+	ModelTypeRerank    = "rerank"
 
 	modelStatusActive = "active"
 )
@@ -32,6 +33,9 @@ type ModelConfigRepository interface {
 	// SysModel 模型 CRUD
 	FindModels(ctx context.Context) ([]*system_db.SysModel, error)
 	FindDefaultModelWithPlatform(ctx context.Context, modelType string) (*system_db.SysModel, *system_db.SysModelPlatform, error)
+	FindAgentModelConfigs(ctx context.Context) ([]*system_db.AgentModelConfig, error)
+	FindAgentModelWithPlatform(ctx context.Context, agentKey, sceneKey, modelType string) (*system_db.SysModel, *system_db.SysModelPlatform, error)
+	UpsertAgentModelConfig(ctx context.Context, config *system_db.AgentModelConfig) (*system_db.AgentModelConfig, error)
 	ModelExistsByPlatformAndName(ctx context.Context, platformID, modelName string) (bool, error)
 	CreateModel(ctx context.Context, model *system_db.SysModel) error
 	UpdateModel(ctx context.Context, modelID string, update ModelUpdate) (*system_db.SysModel, error)
@@ -88,6 +92,82 @@ func (r *modelConfigRepository) FindDefaultModelWithPlatform(ctx context.Context
 		return nil, nil, fmt.Errorf("default %s model platform is disabled", modelType)
 	}
 	return model, platform, nil
+}
+
+func (r *modelConfigRepository) FindAgentModelConfigs(ctx context.Context) ([]*system_db.AgentModelConfig, error) {
+	var configs []*system_db.AgentModelConfig
+	err := r.db.NewSelect().
+		Model(&configs).
+		Relation("Model").
+		Order("agent_key ASC", "scene_key ASC").
+		Scan(ctx)
+	return configs, err
+}
+
+func (r *modelConfigRepository) FindAgentModelWithPlatform(ctx context.Context, agentKey, sceneKey, modelType string) (*system_db.SysModel, *system_db.SysModelPlatform, error) {
+	config := new(system_db.AgentModelConfig)
+	err := r.db.NewSelect().
+		Model(config).
+		Relation("Model").
+		Where("samc.agent_key = ?", strings.TrimSpace(agentKey)).
+		Where("samc.scene_key = ?", strings.TrimSpace(sceneKey)).
+		Where("samc.enabled = ?", true).
+		Limit(1).
+		Scan(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	if config.Model == nil {
+		return nil, nil, fmt.Errorf("agent model config %s.%s has no model", agentKey, sceneKey)
+	}
+	if config.Model.ModelType != modelType {
+		return nil, nil, fmt.Errorf("agent model config %s.%s requires %s model, got %s", agentKey, sceneKey, modelType, config.Model.ModelType)
+	}
+	if config.Model.Status != modelStatusActive {
+		return nil, nil, fmt.Errorf("agent model config %s.%s model is inactive", agentKey, sceneKey)
+	}
+	platform, err := r.FindPlatform(ctx, config.Model.PlatformID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !platform.Enabled {
+		return nil, nil, fmt.Errorf("agent model config %s.%s platform is disabled", agentKey, sceneKey)
+	}
+	return config.Model, platform, nil
+}
+
+func (r *modelConfigRepository) UpsertAgentModelConfig(ctx context.Context, config *system_db.AgentModelConfig) (*system_db.AgentModelConfig, error) {
+	config.AgentKey = strings.TrimSpace(config.AgentKey)
+	config.SceneKey = strings.TrimSpace(config.SceneKey)
+	config.ModelID = strings.TrimSpace(config.ModelID)
+	if config.ID == "" {
+		config.ID = newID()
+	}
+	if config.Params == nil {
+		config.Params = map[string]interface{}{}
+	}
+	_, err := r.db.NewInsert().
+		Model(config).
+		On("CONFLICT (agent_key, scene_key) DO UPDATE").
+		Set("model_id = EXCLUDED.model_id").
+		Set("params = EXCLUDED.params").
+		Set("enabled = EXCLUDED.enabled").
+		Set("updated_at = CURRENT_TIMESTAMP").
+		Exec(ctx)
+	if err != nil {
+		return nil, err
+	}
+	updated := new(system_db.AgentModelConfig)
+	err = r.db.NewSelect().
+		Model(updated).
+		Relation("Model").
+		Where("agent_key = ?", config.AgentKey).
+		Where("scene_key = ?", config.SceneKey).
+		Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return updated, nil
 }
 
 // ModelExistsByPlatformAndName 判断指定平台下是否存在同名模型

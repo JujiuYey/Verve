@@ -3,6 +3,7 @@ package service
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -28,23 +29,28 @@ type EmbeddingResult struct {
 	Embeddings [][]float32
 }
 
-type DefaultEmbeddingModelRepository interface {
-	FindDefaultModelWithPlatform(ctx context.Context, modelType string) (*system_db.SysModel, *system_db.SysModelPlatform, error)
+const (
+	AgentKeyWikiRAG      = "wiki_rag"
+	SceneKeyRAGEmbedding = "embedding"
+)
+
+type AgentModelRepository interface {
+	FindAgentModelWithPlatform(ctx context.Context, agentKey string, sceneKey string, modelType string) (*system_db.SysModel, *system_db.SysModelPlatform, error)
 }
 
 type OpenAICompatibleEmbedder struct {
-	models DefaultEmbeddingModelRepository
+	models AgentModelRepository
 	client *http.Client
 }
 
-func NewOpenAICompatibleEmbedder(models DefaultEmbeddingModelRepository) *OpenAICompatibleEmbedder {
+func NewOpenAICompatibleEmbedder(models AgentModelRepository) *OpenAICompatibleEmbedder {
 	return &OpenAICompatibleEmbedder{
 		models: models,
 		client: &http.Client{Timeout: 30 * time.Second},
 	}
 }
 
-func NewOpenAICompatibleEmbedderWithClient(models DefaultEmbeddingModelRepository, client *http.Client) *OpenAICompatibleEmbedder {
+func NewOpenAICompatibleEmbedderWithClient(models AgentModelRepository, client *http.Client) *OpenAICompatibleEmbedder {
 	if client == nil {
 		client = &http.Client{Timeout: 30 * time.Second}
 	}
@@ -52,12 +58,15 @@ func NewOpenAICompatibleEmbedderWithClient(models DefaultEmbeddingModelRepositor
 }
 
 func (e *OpenAICompatibleEmbedder) CheckReady(ctx context.Context) error {
-	_, platform, err := e.models.FindDefaultModelWithPlatform(ctx, system_repo.ModelTypeEmbedding)
+	_, platform, err := e.models.FindAgentModelWithPlatform(ctx, AgentKeyWikiRAG, SceneKeyRAGEmbedding, system_repo.ModelTypeEmbedding)
 	if err != nil {
-		return fmt.Errorf("未配置默认 embedding 模型，请先在系统模型配置中启用一个默认 embedding 模型: %w", err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return errors.New("未配置知识库 embedding 模型，请先在 Agent 配置中设置 wiki_rag.embedding")
+		}
+		return fmt.Errorf("未配置知识库 embedding 模型，请先在 Agent 配置中设置 wiki_rag.embedding: %w", err)
 	}
 	if strings.TrimSpace(platform.APIKeyCiphertext) == "" {
-		return errors.New("默认 embedding 模型平台未配置 API Key")
+		return errors.New("知识库 embedding 模型平台未配置 API Key")
 	}
 	return nil
 }
@@ -66,7 +75,7 @@ func (e *OpenAICompatibleEmbedder) EmbedTexts(ctx context.Context, texts []strin
 	if len(texts) == 0 {
 		return EmbeddingResult{}, nil
 	}
-	model, platform, err := e.models.FindDefaultModelWithPlatform(ctx, system_repo.ModelTypeEmbedding)
+	model, platform, err := e.models.FindAgentModelWithPlatform(ctx, AgentKeyWikiRAG, SceneKeyRAGEmbedding, system_repo.ModelTypeEmbedding)
 	if err != nil {
 		return EmbeddingResult{}, err
 	}

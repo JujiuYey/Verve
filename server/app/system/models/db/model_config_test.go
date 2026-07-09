@@ -11,6 +11,7 @@ func TestSystemModelTablesUseSysPrefix(t *testing.T) {
 
 	assertBunTable(t, SysModelPlatform{}, "sys_model_platforms")
 	assertBunTable(t, SysModel{}, "sys_models")
+	assertBunTable(t, AgentModelConfig{}, "sys_agent_model_configs")
 }
 
 func assertBunTable(t *testing.T, model any, tableName string) {

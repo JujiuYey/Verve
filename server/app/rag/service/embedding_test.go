@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -11,11 +12,21 @@ import (
 )
 
 type fakeDefaultEmbeddingModelRepo struct {
-	model    *system_db.SysModel
-	platform *system_db.SysModelPlatform
+	model     *system_db.SysModel
+	platform  *system_db.SysModelPlatform
+	agentKey  string
+	sceneKey  string
+	modelType string
+	err       error
 }
 
-func (r fakeDefaultEmbeddingModelRepo) FindDefaultModelWithPlatform(ctx context.Context, modelType string) (*system_db.SysModel, *system_db.SysModelPlatform, error) {
+func (r *fakeDefaultEmbeddingModelRepo) FindAgentModelWithPlatform(ctx context.Context, agentKey string, sceneKey string, modelType string) (*system_db.SysModel, *system_db.SysModelPlatform, error) {
+	r.agentKey = agentKey
+	r.sceneKey = sceneKey
+	r.modelType = modelType
+	if r.err != nil {
+		return nil, nil, r.err
+	}
 	return r.model, r.platform, nil
 }
 
@@ -47,7 +58,7 @@ func TestOpenAICompatibleEmbedderRequestShape(t *testing.T) {
 	}))
 	defer server.Close()
 
-	embedder := NewOpenAICompatibleEmbedderWithClient(fakeDefaultEmbeddingModelRepo{
+	repo := &fakeDefaultEmbeddingModelRepo{
 		model: &system_db.SysModel{
 			ModelName: "text-embedding-3-small",
 		},
@@ -55,16 +66,34 @@ func TestOpenAICompatibleEmbedderRequestShape(t *testing.T) {
 			BaseURL:          server.URL,
 			APIKeyCiphertext: "test-key",
 		},
-	}, server.Client())
+	}
+	embedder := NewOpenAICompatibleEmbedderWithClient(repo, server.Client())
 
 	result, err := embedder.EmbedTexts(context.Background(), []string{"chunk one", "chunk two"})
 	if err != nil {
 		t.Fatal(err)
+	}
+	if repo.agentKey != "wiki_rag" || repo.sceneKey != "embedding" || repo.modelType != "embedding" {
+		t.Fatalf("model usage = %s/%s/%s", repo.agentKey, repo.sceneKey, repo.modelType)
 	}
 	if result.Model != "text-embedding-3-small" {
 		t.Fatalf("result model = %q", result.Model)
 	}
 	if result.Dimension != 2 {
 		t.Fatalf("dimension = %d", result.Dimension)
+	}
+}
+
+func TestOpenAICompatibleEmbedderCheckReadyHidesNoRowsDetail(t *testing.T) {
+	embedder := NewOpenAICompatibleEmbedderWithClient(&fakeDefaultEmbeddingModelRepo{
+		err: sql.ErrNoRows,
+	}, nil)
+
+	err := embedder.CheckReady(context.Background())
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if err.Error() != "未配置知识库 embedding 模型，请先在 Agent 配置中设置 wiki_rag.embedding" {
+		t.Fatalf("error = %q", err.Error())
 	}
 }

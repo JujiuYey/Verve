@@ -15,6 +15,7 @@ import { Route as LayoutIndexRouteImport } from './routes/_layout/index'
 import { Route as LayoutWikiIndexRouteImport } from './routes/_layout/wiki/index'
 import { Route as LayoutSystemUserRouteImport } from './routes/_layout/system/user'
 import { Route as LayoutSystemModelConfigRouteImport } from './routes/_layout/system/model-config'
+import { Route as LayoutSystemAgentConfigRouteImport } from './routes/_layout/system/agent-config'
 import { Route as LayoutLearnProfileRouteImport } from './routes/_layout/learn/profile'
 import { Route as LayoutLearnJournalRouteImport } from './routes/_layout/learn/journal'
 import { Route as LayoutLearnFeynmanRouteImport } from './routes/_layout/learn/feynman'
@@ -50,6 +51,11 @@ const LayoutSystemUserRoute = LayoutSystemUserRouteImport.update({
 const LayoutSystemModelConfigRoute = LayoutSystemModelConfigRouteImport.update({
   id: '/system/model-config',
   path: '/system/model-config',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutSystemAgentConfigRoute = LayoutSystemAgentConfigRouteImport.update({
+  id: '/system/agent-config',
+  path: '/system/agent-config',
   getParentRoute: () => LayoutRoute,
 } as any)
 const LayoutLearnProfileRoute = LayoutLearnProfileRouteImport.update({
@@ -98,6 +104,7 @@ export interface FileRoutesByFullPath {
   '/learn/feynman': typeof LayoutLearnFeynmanRoute
   '/learn/journal': typeof LayoutLearnJournalRoute
   '/learn/profile': typeof LayoutLearnProfileRoute
+  '/system/agent-config': typeof LayoutSystemAgentConfigRoute
   '/system/model-config': typeof LayoutSystemModelConfigRoute
   '/system/user': typeof LayoutSystemUserRoute
   '/wiki/': typeof LayoutWikiIndexRoute
@@ -112,6 +119,7 @@ export interface FileRoutesByTo {
   '/learn/feynman': typeof LayoutLearnFeynmanRoute
   '/learn/journal': typeof LayoutLearnJournalRoute
   '/learn/profile': typeof LayoutLearnProfileRoute
+  '/system/agent-config': typeof LayoutSystemAgentConfigRoute
   '/system/model-config': typeof LayoutSystemModelConfigRoute
   '/system/user': typeof LayoutSystemUserRoute
   '/wiki': typeof LayoutWikiIndexRoute
@@ -128,6 +136,7 @@ export interface FileRoutesById {
   '/_layout/learn/feynman': typeof LayoutLearnFeynmanRoute
   '/_layout/learn/journal': typeof LayoutLearnJournalRoute
   '/_layout/learn/profile': typeof LayoutLearnProfileRoute
+  '/_layout/system/agent-config': typeof LayoutSystemAgentConfigRoute
   '/_layout/system/model-config': typeof LayoutSystemModelConfigRoute
   '/_layout/system/user': typeof LayoutSystemUserRoute
   '/_layout/wiki/': typeof LayoutWikiIndexRoute
@@ -144,6 +153,7 @@ export interface FileRouteTypes {
     | '/learn/feynman'
     | '/learn/journal'
     | '/learn/profile'
+    | '/system/agent-config'
     | '/system/model-config'
     | '/system/user'
     | '/wiki/'
@@ -158,6 +168,7 @@ export interface FileRouteTypes {
     | '/learn/feynman'
     | '/learn/journal'
     | '/learn/profile'
+    | '/system/agent-config'
     | '/system/model-config'
     | '/system/user'
     | '/wiki'
@@ -173,6 +184,7 @@ export interface FileRouteTypes {
     | '/_layout/learn/feynman'
     | '/_layout/learn/journal'
     | '/_layout/learn/profile'
+    | '/_layout/system/agent-config'
     | '/_layout/system/model-config'
     | '/_layout/system/user'
     | '/_layout/wiki/'
@@ -227,6 +239,13 @@ declare module '@tanstack/react-router' {
       path: '/system/model-config'
       fullPath: '/system/model-config'
       preLoaderRoute: typeof LayoutSystemModelConfigRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/system/agent-config': {
+      id: '/_layout/system/agent-config'
+      path: '/system/agent-config'
+      fullPath: '/system/agent-config'
+      preLoaderRoute: typeof LayoutSystemAgentConfigRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/learn/profile': {
@@ -288,6 +307,7 @@ interface LayoutRouteChildren {
   LayoutLearnFeynmanRoute: typeof LayoutLearnFeynmanRoute
   LayoutLearnJournalRoute: typeof LayoutLearnJournalRoute
   LayoutLearnProfileRoute: typeof LayoutLearnProfileRoute
+  LayoutSystemAgentConfigRoute: typeof LayoutSystemAgentConfigRoute
   LayoutSystemModelConfigRoute: typeof LayoutSystemModelConfigRoute
   LayoutSystemUserRoute: typeof LayoutSystemUserRoute
   LayoutWikiIndexRoute: typeof LayoutWikiIndexRoute
@@ -302,6 +322,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutLearnFeynmanRoute: LayoutLearnFeynmanRoute,
   LayoutLearnJournalRoute: LayoutLearnJournalRoute,
   LayoutLearnProfileRoute: LayoutLearnProfileRoute,
+  LayoutSystemAgentConfigRoute: LayoutSystemAgentConfigRoute,
   LayoutSystemModelConfigRoute: LayoutSystemModelConfigRoute,
   LayoutSystemUserRoute: LayoutSystemUserRoute,
   LayoutWikiIndexRoute: LayoutWikiIndexRoute,

@@ -64,6 +64,7 @@ func NewDatabaseService(dsn string) (*DatabaseService, error) {
 	db.RegisterModel((*system_db.User)(nil))
 	db.RegisterModel((*system_db.SysModelPlatform)(nil))
 	db.RegisterModel((*system_db.SysModel)(nil))
+	db.RegisterModel((*system_db.AgentModelConfig)(nil))
 	db.RegisterModel((*learning_db.LearningObjective)(nil))
 	db.RegisterModel((*learning_db.LearningSession)(nil))
 	db.RegisterModel((*learning_db.LearningMessage)(nil))
