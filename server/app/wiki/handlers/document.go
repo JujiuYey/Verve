@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
+	rag_service "verve/app/rag/service"
 	wiki_db "verve/app/wiki/models/db"
 	wiki_payload "verve/app/wiki/models/payload"
 	wiki_repo "verve/app/wiki/repository"
@@ -30,13 +31,15 @@ type documentRepository interface {
 type DocumentHandler struct {
 	documentRepository documentRepository
 	minioService       *storage.MinIOService
+	indexer            *rag_service.Indexer
 }
 
 // 创建文档处理器
-func NewDocumentHandler(dbService *database.DatabaseService, minioService *storage.MinIOService) *DocumentHandler {
+func NewDocumentHandler(dbService *database.DatabaseService, minioService *storage.MinIOService, indexer *rag_service.Indexer) *DocumentHandler {
 	return &DocumentHandler{
 		documentRepository: wiki_repo.NewDocumentRepository(dbService.GetDB()),
 		minioService:       minioService,
+		indexer:            indexer,
 	}
 }
 
@@ -144,6 +147,7 @@ func (h *DocumentHandler) Upload(c *fiber.Ctx) error {
 		return response.InternalServerCtx(c, "创建文档记录失败: "+err.Error())
 	}
 	log.Printf("✅ 文档上传成功，ID: %s", doc.ID)
+	h.indexDocumentAsync(doc.ID)
 
 	return response.SuccessCtx(c, doc)
 }
@@ -223,6 +227,7 @@ func (h *DocumentHandler) UpdateContent(c *fiber.Ctx) error {
 	}
 
 	log.Printf("✅ 文档内容已更新: %s", docID)
+	h.indexDocumentAsync(docID)
 	return response.SuccessMsgCtx(c, "文档内容已保存")
 }
 
@@ -245,6 +250,22 @@ func (h *DocumentHandler) Delete(c *fiber.Ctx) error {
 	if err := h.documentRepository.Delete(c.Context(), docID); err != nil {
 		return response.InternalServerCtx(c, "删除文档失败")
 	}
+	if h.indexer != nil {
+		if err := h.indexer.DeleteDocumentIndex(c.Context(), docID); err != nil {
+			log.Printf("⚠️  删除文档索引失败: %v", err)
+		}
+	}
 
 	return response.SuccessMsgCtx(c, "文档删除成功")
+}
+
+func (h *DocumentHandler) indexDocumentAsync(documentID string) {
+	if h.indexer == nil {
+		return
+	}
+	go func() {
+		if err := h.indexer.IndexDocument(context.Background(), documentID); err != nil {
+			log.Printf("⚠️  文档索引失败: document_id=%s err=%v", documentID, err)
+		}
+	}()
 }

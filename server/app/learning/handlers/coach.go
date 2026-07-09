@@ -14,6 +14,7 @@ import (
 	learning_db "verve/app/learning/models/db"
 	learning_service "verve/app/learning/service"
 	learning_tools "verve/app/learning/tools"
+	rag_service "verve/app/rag/service"
 	wiki_db "verve/app/wiki/models/db"
 	"verve/common/response"
 	"verve/infrastructure/database"
@@ -22,13 +23,14 @@ import (
 )
 
 type CoachHandler struct {
-	db    *database.DatabaseService
-	minio *storage.MinIOService
+	db        *database.DatabaseService
+	minio     *storage.MinIOService
+	retriever *rag_service.Retriever
 }
 
 // NewCoachHandler 构造陪练 handler,持有 db 供 runtime context 与 tools 共用。
-func NewCoachHandler(db *database.DatabaseService, minio *storage.MinIOService) *CoachHandler {
-	return &CoachHandler{db: db, minio: minio}
+func NewCoachHandler(db *database.DatabaseService, minio *storage.MinIOService, retriever *rag_service.Retriever) *CoachHandler {
+	return &CoachHandler{db: db, minio: minio, retriever: retriever}
 }
 
 // Chat 处理 POST /api/learning/coach/chat 陪练对话请求(SSE)。
@@ -53,7 +55,7 @@ func (h *CoachHandler) Chat(c *fiber.Ctx) error {
 		return response.InternalServerCtx(c, "构建学习上下文失败")
 	}
 
-	tools := learning_tools.NewCoachTools(h.db, h.minio, userID)
+	tools := learning_tools.NewCoachTools(h.db, h.minio, h.retriever, userID)
 	agent, err := llm.NewCoachAgent(c.Context(), tools)
 	if err != nil {
 		return response.InternalServerCtx(c, "学习 agent 初始化失败: "+err.Error())

@@ -13,6 +13,8 @@ import (
 
 	learning_db "verve/app/learning/models/db"
 	learning_repo "verve/app/learning/repository"
+	rag_db "verve/app/rag/models/db"
+	rag_repo "verve/app/rag/repository"
 	system_db "verve/app/system/models/db"
 	system_repo "verve/app/system/repository"
 	wiki_repo "verve/app/wiki/repository"
@@ -37,6 +39,10 @@ type DatabaseService struct {
 	// Wiki Repositories
 	Folders   wiki_repo.FolderRepository
 	Documents *wiki_repo.DocumentRepository
+
+	// RAG Repositories
+	RAGChunks *rag_repo.ChunkRepository
+	RAGJobs   *rag_repo.IndexJobRepository
 }
 
 // 创建数据库服务
@@ -64,6 +70,8 @@ func NewDatabaseService(dsn string) (*DatabaseService, error) {
 	db.RegisterModel((*learning_db.LearningProfile)(nil))
 	db.RegisterModel((*learning_db.LearningJournal)(nil))
 	db.RegisterModel((*learning_db.LearningGuide)(nil))
+	db.RegisterModel((*rag_db.WikiChunk)(nil))
+	db.RegisterModel((*rag_db.IndexJob)(nil))
 
 	// 添加查询钩子（开发环境下打印 SQL）
 	db.AddQueryHook(bundebug.NewQueryHook(
@@ -99,6 +107,10 @@ func NewDatabaseService(dsn string) (*DatabaseService, error) {
 		// Wiki Repositories
 		Folders:   wiki_repo.NewFolderRepository(db),
 		Documents: wiki_repo.NewDocumentRepository(db),
+
+		// RAG Repositories
+		RAGChunks: rag_repo.NewChunkRepository(db),
+		RAGJobs:   rag_repo.NewIndexJobRepository(db),
 	}, nil
 }
 

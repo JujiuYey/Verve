@@ -4,18 +4,19 @@ import (
 	"github.com/gofiber/fiber/v2"
 
 	learning_handlers "verve/app/learning/handlers"
+	rag_service "verve/app/rag/service"
 	"verve/infrastructure/database"
 	"verve/infrastructure/storage"
 )
 
 // 配置学习平台路由(/api/learning/*)
-func SetupLearningRoutes(router fiber.Router, dbService *database.DatabaseService, minioService *storage.MinIOService) {
+func SetupLearningRoutes(router fiber.Router, dbService *database.DatabaseService, minioService *storage.MinIOService, retriever *rag_service.Retriever) {
 	sessionHandler := learning_handlers.NewSessionHandler(dbService)
 	journalHandler := learning_handlers.NewJournalHandler(dbService)
 	exerciseHandler := learning_handlers.NewExerciseHandler(dbService)
 	guideHandler := learning_handlers.NewGuideHandler(dbService)
 	objectiveHandler := learning_handlers.NewObjectiveHandler(dbService, minioService)
-	coachHandler := learning_handlers.NewCoachHandler(dbService, minioService)
+	coachHandler := learning_handlers.NewCoachHandler(dbService, minioService, retriever)
 
 	learning := router.Group("/learning")
 	{

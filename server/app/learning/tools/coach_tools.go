@@ -11,6 +11,7 @@ import (
 
 	learning_db "verve/app/learning/models/db"
 	learning_service "verve/app/learning/service"
+	rag_service "verve/app/rag/service"
 	"verve/infrastructure/database"
 	"verve/infrastructure/storage"
 )
@@ -45,6 +46,16 @@ type CreateLearningObjectivesInput struct {
 	DocumentID string `json:"document_id" jsonschema_description:"要从哪篇 Wiki 文档生成学习小节"`
 }
 
+type SearchWikiKnowledgeInput struct {
+	RootFolderID string `json:"root_folder_id" jsonschema_description:"限定检索的 Wiki 根目录 ID"`
+	Query        string `json:"query" jsonschema_description:"要检索的学习问题或概念"`
+	Limit        int    `json:"limit" jsonschema_description:"最多返回多少个片段,默认 6"`
+}
+
+type SearchWikiKnowledgeOutput struct {
+	Results []map[string]interface{} `json:"results"`
+}
+
 type CreateLearningObjectivesOutput struct {
 	DocumentID       string                   `json:"document_id"`
 	CreatedCount     int                      `json:"created_count"`
@@ -68,8 +79,8 @@ type CompleteTaskOutput struct {
 	Status  string `json:"status"`
 }
 
-func NewCoachTools(db *database.DatabaseService, minio *storage.MinIOService, userID string) []tool.BaseTool {
-	return []tool.BaseTool{
+func NewCoachTools(db *database.DatabaseService, minio *storage.MinIOService, retriever *rag_service.Retriever, userID string) []tool.BaseTool {
+	tools := []tool.BaseTool{
 		newListFoldersTool(db, userID),
 		newListDocumentsTool(db),
 		newListObjectivesTool(db, userID),
@@ -79,6 +90,35 @@ func NewCoachTools(db *database.DatabaseService, minio *storage.MinIOService, us
 		newCreatePracticeSessionTool(db, userID),
 		newCompleteTaskTool(),
 	}
+	if retriever != nil {
+		tools = append(tools, newSearchWikiKnowledgeTool(retriever))
+	}
+	return tools
+}
+
+func newSearchWikiKnowledgeTool(retriever *rag_service.Retriever) tool.InvokableTool {
+	t, err := utils.InferTool("search_wiki_knowledge", "按 Wiki 根目录检索真实文档片段,用于回答概念问题或决定下一步学习内容",
+		func(ctx context.Context, input *SearchWikiKnowledgeInput) (*SearchWikiKnowledgeOutput, error) {
+			results, err := retriever.Search(ctx, input.RootFolderID, input.Query, input.Limit)
+			if err != nil {
+				return nil, err
+			}
+			out := &SearchWikiKnowledgeOutput{Results: make([]map[string]interface{}, 0, len(results))}
+			for _, result := range results {
+				out.Results = append(out.Results, map[string]interface{}{
+					"document_title": result.DocumentTitle,
+					"folder_path":    result.FolderPath,
+					"heading_path":   result.HeadingPath,
+					"content":        result.Content,
+					"score":          result.Score,
+				})
+			}
+			return out, nil
+		})
+	if err != nil {
+		log.Fatal(err)
+	}
+	return t
 }
 
 func newListFoldersTool(db *database.DatabaseService, userID string) tool.InvokableTool {

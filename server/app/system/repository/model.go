@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -30,6 +31,7 @@ type ModelConfigRepository interface {
 
 	// SysModel 模型 CRUD
 	FindModels(ctx context.Context) ([]*system_db.SysModel, error)
+	FindDefaultModelWithPlatform(ctx context.Context, modelType string) (*system_db.SysModel, *system_db.SysModelPlatform, error)
 	ModelExistsByPlatformAndName(ctx context.Context, platformID, modelName string) (bool, error)
 	CreateModel(ctx context.Context, model *system_db.SysModel) error
 	UpdateModel(ctx context.Context, modelID string, update ModelUpdate) (*system_db.SysModel, error)
@@ -63,6 +65,29 @@ func (r *modelConfigRepository) FindModels(ctx context.Context) ([]*system_db.Sy
 	var models []*system_db.SysModel
 	err := r.db.NewSelect().Model(&models).Order("created_at DESC").Scan(ctx)
 	return models, err
+}
+
+func (r *modelConfigRepository) FindDefaultModelWithPlatform(ctx context.Context, modelType string) (*system_db.SysModel, *system_db.SysModelPlatform, error) {
+	model := new(system_db.SysModel)
+	err := r.db.NewSelect().
+		Model(model).
+		Where("model_type = ?", modelType).
+		Where("status = ?", modelStatusActive).
+		Where("is_default = ?", true).
+		Order("created_at DESC").
+		Limit(1).
+		Scan(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	platform, err := r.FindPlatform(ctx, model.PlatformID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !platform.Enabled {
+		return nil, nil, fmt.Errorf("default %s model platform is disabled", modelType)
+	}
+	return model, platform, nil
 }
 
 // ModelExistsByPlatformAndName 判断指定平台下是否存在同名模型

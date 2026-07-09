@@ -20,6 +20,8 @@ interface ItemGridProps {
   onEditFolder: (folder: Folder) => void;
   onDeleteFolder: (folder: Folder) => void;
   onEnterFolder: (folder: Folder) => void;
+  onIndexFolder?: (folder: Folder) => void;
+  indexingFolderId?: string;
   onDeleteDocument: (document: Document) => void;
   onOpenDocument?: (document: Document) => void;
   openingDocumentId?: string;
@@ -32,6 +34,8 @@ export function ItemGrid({
   onEditFolder,
   onDeleteFolder,
   onEnterFolder,
+  onIndexFolder,
+  indexingFolderId,
   onDeleteDocument,
   onOpenDocument,
   openingDocumentId,
@@ -82,6 +86,8 @@ export function ItemGrid({
                 onEdit={onEditFolder}
                 onDelete={onDeleteFolder}
                 onEnter={onEnterFolder}
+                onIndex={onIndexFolder}
+                indexing={indexingFolderId === folder.id}
               />
             ))}
           </div>

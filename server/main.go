@@ -11,6 +11,7 @@ import (
 	"verve/config"
 	"verve/infrastructure/database"
 	"verve/infrastructure/storage"
+	"verve/infrastructure/vector"
 	"verve/router"
 )
 
@@ -39,8 +40,10 @@ func main() {
 		log.Fatalf("❌ MinIO 初始化失败: %v", err)
 	}
 
+	vectorStore := vector.NewQdrantStore(config.GetQdrantConfig())
+
 	// 设置路由
-	app := router.SetupRouter(dbService, minioService)
+	app := router.SetupRouter(dbService, minioService, vectorStore)
 
 	// 优雅关闭
 	quit := make(chan os.Signal, 1)

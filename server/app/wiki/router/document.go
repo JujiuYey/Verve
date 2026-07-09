@@ -3,6 +3,7 @@ package router
 import (
 	"github.com/gofiber/fiber/v2"
 
+	rag_service "verve/app/rag/service"
 	wiki_handlers "verve/app/wiki/handlers"
 	"verve/infrastructure/database"
 	"verve/infrastructure/storage"
@@ -13,8 +14,9 @@ func SetupDocumentRoutes(
 	router fiber.Router,
 	dbService *database.DatabaseService,
 	minioService *storage.MinIOService,
+	indexer *rag_service.Indexer,
 ) {
-	docHandler := wiki_handlers.NewDocumentHandler(dbService, minioService)
+	docHandler := wiki_handlers.NewDocumentHandler(dbService, minioService, indexer)
 
 	docs := router.Group("/wiki/documents")
 	{

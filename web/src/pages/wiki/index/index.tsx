@@ -1,4 +1,4 @@
-import { IconPlus, IconRefresh, IconSearch, IconUpload } from "@tabler/icons-react";
+import { IconActivity, IconPlus, IconRefresh, IconSearch, IconUpload } from "@tabler/icons-react";
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { objectiveApi } from "@/api/learning";
 import type { Document } from "@/api/wiki/document";
 import { documentApi } from "@/api/wiki/document";
+import { ragApi } from "@/api/wiki/rag";
 import {
   type CreateFolderRequest,
   type Folder,
@@ -19,6 +20,7 @@ import { Input } from "@/components/ui/input";
 
 import { BreadcrumbNav } from "./_components/breadcrumb-nav";
 import { FolderFormModal } from "./_components/folder-form-modal";
+import { IndexProgressPanel } from "./_components/index-progress-panel";
 import { ItemGrid } from "./_components/item-grid";
 import { UploadDialog } from "./_components/upload-dialog";
 import { getFolderContentView } from "./_shared/content-view";
@@ -49,6 +51,14 @@ export function WikiIndexPage() {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Folder | null>(null);
   const [openingDocumentId, setOpeningDocumentId] = useState("");
+  const [indexingFolderId, setIndexingFolderId] = useState("");
+  const [progressOpen, setProgressOpen] = useState(false);
+  const [progressFolder, setProgressFolder] = useState<Folder | null>(null);
+  const [indexBatch, setIndexBatch] = useState<{
+    rootFolderId: string;
+    total: number;
+    startedAt: string;
+  } | null>(null);
 
   // 获取当前文件夹ID（面包屑最后一个）
   const currentFolderId = breadcrumb.length > 0 ? breadcrumb[breadcrumb.length - 1].id : undefined;
@@ -211,6 +221,26 @@ export function WikiIndexPage() {
     setDeleteTarget(folder);
   };
 
+  const handleIndexFolder = useCallback(async (folder: Folder) => {
+    if (indexingFolderId) return;
+    setIndexingFolderId(folder.id);
+    setProgressFolder(folder);
+    setProgressOpen(true);
+    try {
+      const result = await ragApi.indexFolder(folder.id);
+      setIndexBatch({
+        rootFolderId: result.root_folder_id,
+        total: result.document_count,
+        startedAt: result.started_at,
+      });
+      toast.success(`已开始解析 ${result.document_count} 篇文档`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "启动解析失败");
+    } finally {
+      setIndexingFolderId("");
+    }
+  }, [indexingFolderId]);
+
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
     try {
@@ -288,6 +318,12 @@ export function WikiIndexPage() {
                     </Button>
                   </>
                 )}
+                {progressFolder && (
+                  <Button size="sm" variant="outline" onClick={() => setProgressOpen(true)}>
+                    <IconActivity className="h-4 w-4" />
+                    解析进度
+                  </Button>
+                )}
                 <Button onClick={handleCreate}>
                   <IconPlus className="mr-2 h-4 w-4" />
                   添加文件夹
@@ -307,6 +343,8 @@ export function WikiIndexPage() {
               onEditFolder={handleEdit}
               onDeleteFolder={handleDelete}
               onEnterFolder={handleEnterFolder}
+              onIndexFolder={!currentFolderId ? (folder) => void handleIndexFolder(folder) : undefined}
+              indexingFolderId={indexingFolderId}
               onDeleteDocument={handleDeleteDocument}
               onOpenDocument={(document) => void handleOpenDocument(document)}
               openingDocumentId={openingDocumentId}
@@ -334,6 +372,13 @@ export function WikiIndexPage() {
             setDocuments((prev) => [...prev, { ...document, folder_id: folderId }]);
           }
         }}
+      />
+
+      <IndexProgressPanel
+        open={progressOpen}
+        folder={progressFolder}
+        batch={indexBatch}
+        onOpenChange={setProgressOpen}
       />
 
       <ConfirmDialog

@@ -8,10 +8,13 @@ import (
 
 	file_router "verve/app/file/router"
 	learning_router "verve/app/learning/router"
+	rag_router "verve/app/rag/router"
+	rag_service "verve/app/rag/service"
 	system_router "verve/app/system/router"
 	wiki_router "verve/app/wiki/router"
 	"verve/infrastructure/database"
 	"verve/infrastructure/storage"
+	"verve/infrastructure/vector"
 	"verve/middleware"
 )
 
@@ -19,6 +22,7 @@ import (
 func SetupRouter(
 	dbService *database.DatabaseService,
 	minioService *storage.MinIOService,
+	vectorStore vector.Store,
 ) *fiber.App {
 	app := fiber.New(fiber.Config{
 		AppName:      "Verve",
@@ -37,6 +41,9 @@ func SetupRouter(
 
 	// 路由组
 	api := app.Group("/api")
+	embedder := rag_service.NewOpenAICompatibleEmbedder(dbService.ModelConfigs)
+	indexer := rag_service.NewIndexer(dbService.RAGChunks, dbService.RAGJobs, dbService.Folders, dbService.Documents, minioService, embedder, vectorStore)
+	retriever := rag_service.NewRetriever(dbService.RAGChunks, embedder, vectorStore)
 
 	// 文件访问路由（公开访问，通过后端代理 MinIO）
 	file_router.SetupFileRoutes(api.Group("/"), minioService)
@@ -57,10 +64,20 @@ func SetupRouter(
 
 		// 知识库路由
 		wiki_router.SetupFolderRoutes(protected.Group("/"), dbService)
-		wiki_router.SetupDocumentRoutes(protected.Group("/"), dbService, minioService)
+		wiki_router.SetupDocumentRoutes(protected.Group("/"), dbService, minioService, indexer)
+
+		// RAG 路由
+		rag_router.SetupRAGRoutes(
+			protected.Group("/"),
+			indexer,
+			retriever,
+			dbService.Folders,
+			dbService.Documents,
+			dbService.RAGJobs,
+		)
 
 		// 学习平台路由
-		learning_router.SetupLearningRoutes(protected.Group("/"), dbService, minioService)
+		learning_router.SetupLearningRoutes(protected.Group("/"), dbService, minioService, retriever)
 	}
 
 	return app

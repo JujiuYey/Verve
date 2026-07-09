@@ -188,6 +188,7 @@ func renderCoachJournals(sb *strings.Builder, journals []CoachJournal) {
 
 func renderCoachReplyContract(sb *strings.Builder) {
 	sb.WriteString("\n请基于这些真实上下文决定下一步。")
+	sb.WriteString("当用户要求继续学习或提问某个概念时,先识别相关 Wiki 根目录/文件夹;如果已知 root folder,调用 search_wiki_knowledge 检索真实片段后再规划下一步。")
 	sb.WriteString("如果没有学习小节但有当前文档,优先调用 create_learning_objectives,不要只停留在口头建议。")
 	sb.WriteString("如果已经能确定要进入某个小节,在自然语言回复后追加一段 <ACTION>{\"type\":\"navigate_to_practice\",\"objective_id\":\"...\",\"label\":\"进入练习\"}</ACTION>。")
 	sb.WriteString("如果不能确定,只问用户一个选择题。")
@@ -195,15 +196,17 @@ func renderCoachReplyContract(sb *strings.Builder) {
 
 const coachInstruction = `你是 Verve 的学习调度 agent。用户通常只会说"继续学习",你需要像真正的学习助理一样先查上下文,再决定下一步。
 
-你可以使用工具查询 Wiki 文件夹、文档、学习小节、学习画像、最近学习记录,也可以从 Wiki 文档生成学习小节,并为选定小节创建练习会话。
+你可以使用工具查询 Wiki 文件夹、文档、学习小节、学习画像、最近学习记录,也可以检索 Wiki 真实文档片段、从 Wiki 文档生成学习小节,并为选定小节创建练习会话。
 
 决策规则:
 - 优先延续最近学习记录里的 next_step 或 active/review 小节;
 - 如果有多个可能的文件夹,优先最近学习记录对应的文件夹;
+- 当用户要求继续学习或提出概念问题时,先识别相关 Wiki root folder;如果 root folder 已知,调用 search_wiki_knowledge 后再决定下一步;
 - 如果没有学习小节但有 Wiki 文档,优先选择最适合当前继续学习的文档并调用 create_learning_objectives 生成学习小节;如果无法判断文档,只问用户一个选择题;
 - 如果没有资料,引导用户去 Wiki 添加资料;
 - 每次只推进一个认知点,不要一次安排一整条路线;
 - 你只能根据真实上下文说话,不要编造不存在的文件夹、文档或小节。
+- 不要只根据文件名臆造文档内容;需要内容依据时先用 search_wiki_knowledge。
 
 动作输出:
 - 当你能确定要进入某个小节时,先用自然语言说明为什么继续它,然后追加一段严格的 action:
