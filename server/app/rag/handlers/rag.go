@@ -1,36 +1,32 @@
 package handlers
 
 import (
-	"context"
-	"log"
 	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 
 	rag_payload "verve/app/rag/models/payload"
+	rag_queue "verve/app/rag/queue"
 	rag_repo "verve/app/rag/repository"
 	rag_service "verve/app/rag/service"
-	wiki_repo "verve/app/wiki/repository"
 	"verve/common/response"
 )
 
 type RAGHandler struct {
 	indexer   *rag_service.Indexer
 	retriever *rag_service.Retriever
-	folders   wiki_repo.FolderRepository
-	docs      *wiki_repo.DocumentRepository
 	jobs      *rag_repo.IndexJobRepository
+	enqueuer  *rag_queue.Enqueuer
 }
 
 func NewRAGHandler(
 	indexer *rag_service.Indexer,
 	retriever *rag_service.Retriever,
-	folders wiki_repo.FolderRepository,
-	docs *wiki_repo.DocumentRepository,
 	jobs *rag_repo.IndexJobRepository,
+	enqueuer *rag_queue.Enqueuer,
 ) *RAGHandler {
-	return &RAGHandler{indexer: indexer, retriever: retriever, folders: folders, docs: docs, jobs: jobs}
+	return &RAGHandler{indexer: indexer, retriever: retriever, jobs: jobs, enqueuer: enqueuer}
 }
 
 func (h *RAGHandler) IndexDocument(c *fiber.Ctx) error {
@@ -75,26 +71,15 @@ func (h *RAGHandler) IndexFolder(c *fiber.Ctx) error {
 	if err := h.indexer.CheckReady(c.Context()); err != nil {
 		return response.BadRequestCtx(c, err.Error())
 	}
-	folderIDs, err := h.folders.GetAllSubFolderIDs(c.Context(), folderID)
+	batch, count, err := h.enqueuer.EnqueueFolder(c.Context(), folderID)
 	if err != nil {
-		return response.InternalServerCtx(c, "获取文件夹文档失败: "+err.Error())
+		return response.InternalServerCtx(c, "启动解析队列失败: "+err.Error())
 	}
-	docs, err := h.docs.GetDocumentsByFolderIDs(c.Context(), folderIDs)
-	if err != nil {
-		return response.InternalServerCtx(c, "获取文件夹文档失败: "+err.Error())
-	}
-	startedAt := time.Now()
-	go func() {
-		for _, doc := range docs {
-			if err := h.indexer.IndexDocument(context.Background(), doc.ID); err != nil {
-				log.Printf("⚠️  批量解析文档失败: folder_id=%s document_id=%s err=%v", folderID, doc.ID, err)
-			}
-		}
-	}()
 	return response.SuccessCtx(c, rag_payload.IndexFolderResponse{
+		BatchID:       batch.ID,
 		RootFolderID:  folderID,
-		DocumentCount: len(docs),
-		StartedAt:     startedAt.Format(time.RFC3339),
+		DocumentCount: count,
+		StartedAt:     batch.CreatedAt.Format(time.RFC3339),
 	})
 }
 

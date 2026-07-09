@@ -224,17 +224,20 @@ export function WikiIndexPage() {
   const handleIndexFolder = useCallback(async (folder: Folder) => {
     if (indexingFolderId) return;
     setIndexingFolderId(folder.id);
-    setProgressFolder(folder);
-    setProgressOpen(true);
     try {
       const result = await ragApi.indexFolder(folder.id);
+      setProgressFolder(folder);
       setIndexBatch({
         rootFolderId: result.root_folder_id,
         total: result.document_count,
         startedAt: result.started_at,
       });
+      setProgressOpen(true);
       toast.success(`已开始解析 ${result.document_count} 篇文档`);
     } catch (error) {
+      setProgressOpen(false);
+      setProgressFolder(null);
+      setIndexBatch(null);
       toast.error(error instanceof Error ? error.message : "启动解析失败");
     } finally {
       setIndexingFolderId("");

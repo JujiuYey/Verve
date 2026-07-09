@@ -41,8 +41,9 @@ type DatabaseService struct {
 	Documents *wiki_repo.DocumentRepository
 
 	// RAG Repositories
-	RAGChunks *rag_repo.ChunkRepository
-	RAGJobs   *rag_repo.IndexJobRepository
+	RAGChunks  *rag_repo.ChunkRepository
+	RAGJobs    *rag_repo.IndexJobRepository
+	RAGBatches *rag_repo.IndexBatchRepository
 }
 
 // 创建数据库服务
@@ -72,6 +73,7 @@ func NewDatabaseService(dsn string) (*DatabaseService, error) {
 	db.RegisterModel((*learning_db.LearningGuide)(nil))
 	db.RegisterModel((*rag_db.WikiChunk)(nil))
 	db.RegisterModel((*rag_db.IndexJob)(nil))
+	db.RegisterModel((*rag_db.IndexBatch)(nil))
 
 	// 添加查询钩子（开发环境下打印 SQL）
 	db.AddQueryHook(bundebug.NewQueryHook(
@@ -109,8 +111,9 @@ func NewDatabaseService(dsn string) (*DatabaseService, error) {
 		Documents: wiki_repo.NewDocumentRepository(db),
 
 		// RAG Repositories
-		RAGChunks: rag_repo.NewChunkRepository(db),
-		RAGJobs:   rag_repo.NewIndexJobRepository(db),
+		RAGChunks:  rag_repo.NewChunkRepository(db),
+		RAGJobs:    rag_repo.NewIndexJobRepository(db),
+		RAGBatches: rag_repo.NewIndexBatchRepository(db),
 	}, nil
 }
 

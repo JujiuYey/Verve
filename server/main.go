@@ -5,9 +5,13 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
+	"github.com/hibiken/asynq"
 	"github.com/joho/godotenv"
 
+	rag_queue "verve/app/rag/queue"
+	rag_service "verve/app/rag/service"
 	"verve/config"
 	"verve/infrastructure/database"
 	"verve/infrastructure/storage"
@@ -41,9 +45,43 @@ func main() {
 	}
 
 	vectorStore := vector.NewQdrantStore(config.GetQdrantConfig())
+	embedder := rag_service.NewOpenAICompatibleEmbedder(dbService.ModelConfigs)
+	indexer := rag_service.NewIndexer(dbService.RAGChunks, dbService.RAGJobs, dbService.Folders, dbService.Documents, minioService, embedder, vectorStore)
+
+	redisConfig := config.GetRedisConfig()
+	redisOpt := asynq.RedisClientOpt{
+		Addr:     redisConfig.Addr,
+		Password: redisConfig.Password,
+		DB:       redisConfig.DB,
+	}
+	asynqClient := asynq.NewClient(redisOpt)
+	defer asynqClient.Close()
+	ragEnqueuer := rag_queue.NewEnqueuer(
+		asynqClient,
+		dbService.RAGBatches,
+		dbService.RAGJobs,
+		dbService.Folders,
+		dbService.Documents,
+		indexer,
+	)
+	ragProcessor := rag_queue.NewProcessor(indexer, dbService.RAGBatches)
+	ragWorker := asynq.NewServer(redisOpt, asynq.Config{
+		Concurrency: 1,
+		Queues:      map[string]int{rag_queue.QueueRAG: 1},
+		RetryDelayFunc: func(n int, err error, task *asynq.Task) time.Duration {
+			return asynq.DefaultRetryDelayFunc(n, err, task)
+		},
+	})
+	ragMux := asynq.NewServeMux()
+	ragMux.HandleFunc(rag_queue.TypeIndexDocument, ragProcessor.HandleIndexDocument)
+	go func() {
+		if err := ragWorker.Run(ragMux); err != nil {
+			log.Printf("⚠️  RAG 队列 worker 已停止: %v", err)
+		}
+	}()
 
 	// 设置路由
-	app := router.SetupRouter(dbService, minioService, vectorStore)
+	app := router.SetupRouter(dbService, minioService, vectorStore, ragEnqueuer)
 
 	// 优雅关闭
 	quit := make(chan os.Signal, 1)
@@ -59,4 +97,5 @@ func main() {
 
 	<-quit
 	log.Println("⏹️  服务器正在关闭...")
+	ragWorker.Shutdown()
 }

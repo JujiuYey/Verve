@@ -33,11 +33,17 @@ type fakeJobs struct{}
 func (f fakeJobs) CreatePending(ctx context.Context, documentID string) (*rag_db.IndexJob, error) {
 	return &rag_db.IndexJob{ID: "job", DocumentID: documentID}, nil
 }
+func (f fakeJobs) FindOne(ctx context.Context, jobID string) (*rag_db.IndexJob, error) {
+	return &rag_db.IndexJob{ID: jobID, DocumentID: "doc", AttemptCount: 1, MaxAttempts: 3}, nil
+}
 func (f fakeJobs) MarkRunning(ctx context.Context, jobID string, rootFolderID string) error {
 	return nil
 }
 func (f fakeJobs) MarkCompleted(ctx context.Context, jobID string, chunkCount int) error { return nil }
-func (f fakeJobs) MarkFailed(ctx context.Context, jobID string, message string) error    { return nil }
+func (f fakeJobs) MarkPendingRetry(ctx context.Context, jobID string, message string) error {
+	return nil
+}
+func (f fakeJobs) MarkFailed(ctx context.Context, jobID string, message string) error { return nil }
 
 type countingJobs struct {
 	created int
@@ -47,10 +53,16 @@ func (f *countingJobs) CreatePending(ctx context.Context, documentID string) (*r
 	f.created++
 	return &rag_db.IndexJob{ID: "job", DocumentID: documentID}, nil
 }
+func (f *countingJobs) FindOne(ctx context.Context, jobID string) (*rag_db.IndexJob, error) {
+	return &rag_db.IndexJob{ID: jobID, DocumentID: "doc", AttemptCount: 1, MaxAttempts: 3}, nil
+}
 func (f *countingJobs) MarkRunning(ctx context.Context, jobID string, rootFolderID string) error {
 	return nil
 }
 func (f *countingJobs) MarkCompleted(ctx context.Context, jobID string, chunkCount int) error {
+	return nil
+}
+func (f *countingJobs) MarkPendingRetry(ctx context.Context, jobID string, message string) error {
 	return nil
 }
 func (f *countingJobs) MarkFailed(ctx context.Context, jobID string, message string) error {

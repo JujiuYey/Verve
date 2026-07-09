@@ -21,11 +21,45 @@ func NewIndexJobRepository(db *bun.DB) *IndexJobRepository {
 
 func (r *IndexJobRepository) CreatePending(ctx context.Context, documentID string) (*rag_db.IndexJob, error) {
 	job := &rag_db.IndexJob{
-		ID:         compactUUID(),
-		DocumentID: documentID,
-		Status:     "pending",
+		ID:          compactUUID(),
+		DocumentID:  documentID,
+		Status:      "pending",
+		MaxAttempts: 3,
 	}
 	_, err := r.db.NewInsert().Model(job).Exec(ctx)
+	return job, err
+}
+
+func (r *IndexJobRepository) CreateQueued(ctx context.Context, batchID string, rootFolderID string, documentID string, maxAttempts int) (*rag_db.IndexJob, error) {
+	if maxAttempts <= 0 {
+		maxAttempts = 3
+	}
+	job := &rag_db.IndexJob{
+		ID:           compactUUID(),
+		DocumentID:   documentID,
+		RootFolderID: &rootFolderID,
+		BatchID:      &batchID,
+		Status:       "pending",
+		MaxAttempts:  maxAttempts,
+	}
+	_, err := r.db.NewInsert().Model(job).Exec(ctx)
+	return job, err
+}
+
+func (r *IndexJobRepository) SetTaskID(ctx context.Context, jobID string, taskID string) error {
+	now := time.Now()
+	_, err := r.db.NewUpdate().
+		Model((*rag_db.IndexJob)(nil)).
+		Set("asynq_task_id = ?", taskID).
+		Set("updated_at = ?", now).
+		Where("id = ?", jobID).
+		Exec(ctx)
+	return err
+}
+
+func (r *IndexJobRepository) FindOne(ctx context.Context, jobID string) (*rag_db.IndexJob, error) {
+	job := new(rag_db.IndexJob)
+	err := r.db.NewSelect().Model(job).Where("id = ?", jobID).Scan(ctx)
 	return job, err
 }
 
@@ -35,6 +69,7 @@ func (r *IndexJobRepository) MarkRunning(ctx context.Context, jobID string, root
 		Model((*rag_db.IndexJob)(nil)).
 		Set("status = ?", "running").
 		Set("root_folder_id = ?", rootFolderID).
+		Set("attempt_count = attempt_count + 1").
 		Set("started_at = ?", now).
 		Set("updated_at = ?", now).
 		Where("id = ?", jobID).
@@ -49,6 +84,18 @@ func (r *IndexJobRepository) MarkCompleted(ctx context.Context, jobID string, ch
 		Set("status = ?", "completed").
 		Set("chunk_count = ?", chunkCount).
 		Set("finished_at = ?", now).
+		Set("updated_at = ?", now).
+		Where("id = ?", jobID).
+		Exec(ctx)
+	return err
+}
+
+func (r *IndexJobRepository) MarkPendingRetry(ctx context.Context, jobID string, message string) error {
+	now := time.Now()
+	_, err := r.db.NewUpdate().
+		Model((*rag_db.IndexJob)(nil)).
+		Set("status = ?", "pending").
+		Set("error_message = ?", message).
 		Set("updated_at = ?", now).
 		Where("id = ?", jobID).
 		Exec(ctx)

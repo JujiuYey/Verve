@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -41,8 +42,10 @@ type chunkWriter interface {
 
 type jobWriter interface {
 	CreatePending(ctx context.Context, documentID string) (*rag_db.IndexJob, error)
+	FindOne(ctx context.Context, jobID string) (*rag_db.IndexJob, error)
 	MarkRunning(ctx context.Context, jobID string, rootFolderID string) error
 	MarkCompleted(ctx context.Context, jobID string, chunkCount int) error
+	MarkPendingRetry(ctx context.Context, jobID string, message string) error
 	MarkFailed(ctx context.Context, jobID string, message string) error
 }
 
@@ -82,8 +85,35 @@ func (s *Indexer) IndexDocument(ctx context.Context, documentID string) error {
 	if err != nil {
 		return err
 	}
+	return s.processDocumentWithJob(ctx, job, documentID, true)
+}
+
+func (s *Indexer) ProcessJob(ctx context.Context, jobID string) error {
+	if err := s.CheckReady(ctx); err != nil {
+		return err
+	}
+	job, err := s.jobs.FindOne(ctx, jobID)
+	if err != nil {
+		return err
+	}
+	err = s.processDocumentWithJob(ctx, job, job.DocumentID, false)
+	if err == nil {
+		return nil
+	}
+	latest, findErr := s.jobs.FindOne(ctx, jobID)
+	if findErr == nil && latest.AttemptCount < latest.MaxAttempts {
+		_ = s.jobs.MarkPendingRetry(ctx, jobID, err.Error())
+		return err
+	}
+	_ = s.jobs.MarkFailed(ctx, jobID, err.Error())
+	return fmt.Errorf("%w: %v", ErrJobAttemptsExhausted, err)
+}
+
+func (s *Indexer) processDocumentWithJob(ctx context.Context, job *rag_db.IndexJob, documentID string, markFailedImmediately bool) error {
 	fail := func(err error) error {
-		_ = s.jobs.MarkFailed(ctx, job.ID, err.Error())
+		if markFailedImmediately {
+			_ = s.jobs.MarkFailed(ctx, job.ID, err.Error())
+		}
 		return err
 	}
 
@@ -173,6 +203,8 @@ func (s *Indexer) IndexDocument(ctx context.Context, documentID string) error {
 	}
 	return s.jobs.MarkCompleted(ctx, job.ID, len(records))
 }
+
+var ErrJobAttemptsExhausted = errors.New("job attempts exhausted")
 
 func (s *Indexer) CheckReady(ctx context.Context) error {
 	if checker, ok := s.embedder.(ReadyChecker); ok {

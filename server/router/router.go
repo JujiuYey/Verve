@@ -8,6 +8,7 @@ import (
 
 	file_router "verve/app/file/router"
 	learning_router "verve/app/learning/router"
+	rag_queue "verve/app/rag/queue"
 	rag_router "verve/app/rag/router"
 	rag_service "verve/app/rag/service"
 	system_router "verve/app/system/router"
@@ -23,6 +24,7 @@ func SetupRouter(
 	dbService *database.DatabaseService,
 	minioService *storage.MinIOService,
 	vectorStore vector.Store,
+	ragEnqueuer *rag_queue.Enqueuer,
 ) *fiber.App {
 	app := fiber.New(fiber.Config{
 		AppName:      "Verve",
@@ -71,9 +73,8 @@ func SetupRouter(
 			protected.Group("/"),
 			indexer,
 			retriever,
-			dbService.Folders,
-			dbService.Documents,
 			dbService.RAGJobs,
+			ragEnqueuer,
 		)
 
 		// 学习平台路由

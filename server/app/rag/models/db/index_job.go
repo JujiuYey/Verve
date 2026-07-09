@@ -12,9 +12,13 @@ type IndexJob struct {
 	ID           string     `bun:"id,pk,type:varchar(32)" json:"id"`
 	DocumentID   string     `bun:"document_id,type:varchar(32),notnull" json:"document_id"`
 	RootFolderID *string    `bun:"root_folder_id,type:varchar(32)" json:"root_folder_id"`
+	BatchID      *string    `bun:"batch_id,type:varchar(32)" json:"batch_id"`
+	AsynqTaskID  *string    `bun:"asynq_task_id" json:"asynq_task_id"`
 	Status       string     `bun:"status,notnull" json:"status"`
 	ErrorMessage *string    `bun:"error_message" json:"error_message"`
 	ChunkCount   int        `bun:"chunk_count,notnull" json:"chunk_count"`
+	AttemptCount int        `bun:"attempt_count,notnull" json:"attempt_count"`
+	MaxAttempts  int        `bun:"max_attempts,notnull" json:"max_attempts"`
 	StartedAt    *time.Time `bun:"started_at" json:"started_at"`
 	FinishedAt   *time.Time `bun:"finished_at" json:"finished_at"`
 	CreatedAt    time.Time  `bun:"created_at,nullzero,notnull,default:current_timestamp" json:"created_at"`
