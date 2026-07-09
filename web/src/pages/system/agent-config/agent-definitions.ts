@@ -125,7 +125,7 @@ export const AGENTS: AgentDefinition[] = [
         key: "embedding",
         name: "向量化模型",
         required: true,
-        description: "解析知识库时生成文档块向量；未配置时不会创建解析任务。",
+        description: "上传或保存文档时生成文档块向量；未配置时不会创建解析任务。",
       },
     ],
   },

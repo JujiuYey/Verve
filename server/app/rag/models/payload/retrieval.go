@@ -18,13 +18,6 @@ type SearchResult struct {
 	Content       string  `json:"content"`
 }
 
-type IndexFolderResponse struct {
-	BatchID       string `json:"batch_id"`
-	RootFolderID  string `json:"root_folder_id"`
-	DocumentCount int    `json:"document_count"`
-	StartedAt     string `json:"started_at"`
-}
-
 type IndexJobProgress struct {
 	ID           string  `json:"id"`
 	DocumentID   string  `json:"document_id"`

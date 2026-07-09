@@ -1,4 +1,4 @@
-import { IconDotsVertical, IconPencil, IconRefresh, IconTrash } from "@tabler/icons-react";
+import { IconDotsVertical, IconPencil, IconTrash } from "@tabler/icons-react";
 import { useState } from "react";
 
 import type { Folder } from "@/api/wiki/folder";
@@ -18,11 +18,9 @@ export interface FolderCardProps {
   onEdit: (folder: Folder) => void;
   onDelete: (folder: Folder) => void;
   onEnter?: (folder: Folder) => void;
-  onIndex?: (folder: Folder) => void;
-  indexing?: boolean;
 }
 
-export function FolderCard({ folder, onEdit, onDelete, onEnter, onIndex, indexing }: FolderCardProps) {
+export function FolderCard({ folder, onEdit, onDelete, onEnter }: FolderCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const handleClick = () => {
@@ -41,12 +39,6 @@ export function FolderCard({ folder, onEdit, onDelete, onEnter, onIndex, indexin
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
     onDelete(folder);
-  };
-
-  const handleIndex = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onIndex?.(folder);
-    setMenuOpen(false);
   };
 
   return (
@@ -81,15 +73,6 @@ export function FolderCard({ folder, onEdit, onDelete, onEnter, onIndex, indexin
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          {onIndex && (
-            <>
-              <DropdownMenuItem onClick={handleIndex} disabled={indexing}>
-                <IconRefresh className="mr-2 h-4 w-4" />
-                {indexing ? "解析中..." : "解析知识库"}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-            </>
-          )}
           <DropdownMenuItem onClick={handleEdit}>
             <IconPencil className="mr-2 h-4 w-4" />
             编辑

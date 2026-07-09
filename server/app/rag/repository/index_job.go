@@ -30,33 +30,6 @@ func (r *IndexJobRepository) CreatePending(ctx context.Context, documentID strin
 	return job, err
 }
 
-func (r *IndexJobRepository) CreateQueued(ctx context.Context, batchID string, rootFolderID string, documentID string, maxAttempts int) (*rag_db.IndexJob, error) {
-	if maxAttempts <= 0 {
-		maxAttempts = 3
-	}
-	job := &rag_db.IndexJob{
-		ID:           compactUUID(),
-		DocumentID:   documentID,
-		RootFolderID: &rootFolderID,
-		BatchID:      &batchID,
-		Status:       "pending",
-		MaxAttempts:  maxAttempts,
-	}
-	_, err := r.db.NewInsert().Model(job).Exec(ctx)
-	return job, err
-}
-
-func (r *IndexJobRepository) SetTaskID(ctx context.Context, jobID string, taskID string) error {
-	now := time.Now()
-	_, err := r.db.NewUpdate().
-		Model((*rag_db.IndexJob)(nil)).
-		Set("asynq_task_id = ?", taskID).
-		Set("updated_at = ?", now).
-		Where("id = ?", jobID).
-		Exec(ctx)
-	return err
-}
-
 func (r *IndexJobRepository) FindOne(ctx context.Context, jobID string) (*rag_db.IndexJob, error) {
 	job := new(rag_db.IndexJob)
 	err := r.db.NewSelect().Model(job).Where("id = ?", jobID).Scan(ctx)

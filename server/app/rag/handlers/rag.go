@@ -7,7 +7,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 
 	rag_payload "verve/app/rag/models/payload"
-	rag_queue "verve/app/rag/queue"
 	rag_repo "verve/app/rag/repository"
 	rag_service "verve/app/rag/service"
 	"verve/common/response"
@@ -17,16 +16,14 @@ type RAGHandler struct {
 	indexer   *rag_service.Indexer
 	retriever *rag_service.Retriever
 	jobs      *rag_repo.IndexJobRepository
-	enqueuer  *rag_queue.Enqueuer
 }
 
 func NewRAGHandler(
 	indexer *rag_service.Indexer,
 	retriever *rag_service.Retriever,
 	jobs *rag_repo.IndexJobRepository,
-	enqueuer *rag_queue.Enqueuer,
 ) *RAGHandler {
-	return &RAGHandler{indexer: indexer, retriever: retriever, jobs: jobs, enqueuer: enqueuer}
+	return &RAGHandler{indexer: indexer, retriever: retriever, jobs: jobs}
 }
 
 func (h *RAGHandler) IndexDocument(c *fiber.Ctx) error {
@@ -61,26 +58,6 @@ func (h *RAGHandler) Search(c *fiber.Ctx) error {
 		return response.BadRequestCtx(c, err.Error())
 	}
 	return response.SuccessCtx(c, results)
-}
-
-func (h *RAGHandler) IndexFolder(c *fiber.Ctx) error {
-	folderID := strings.TrimSpace(c.Params("id"))
-	if folderID == "" {
-		return response.BadRequestCtx(c, "缺少文件夹ID")
-	}
-	if err := h.indexer.CheckReady(c.Context()); err != nil {
-		return response.BadRequestCtx(c, err.Error())
-	}
-	batch, count, err := h.enqueuer.EnqueueFolder(c.Context(), folderID)
-	if err != nil {
-		return response.InternalServerCtx(c, "启动解析队列失败: "+err.Error())
-	}
-	return response.SuccessCtx(c, rag_payload.IndexFolderResponse{
-		BatchID:       batch.ID,
-		RootFolderID:  folderID,
-		DocumentCount: count,
-		StartedAt:     batch.CreatedAt.Format(time.RFC3339),
-	})
 }
 
 func (h *RAGHandler) ListJobs(c *fiber.Ctx) error {
