@@ -217,10 +217,17 @@ func (s *Indexer) DeleteDocumentIndex(ctx context.Context, documentID string) er
 	if strings.TrimSpace(documentID) == "" {
 		return nil
 	}
-	if err := s.vectors.DeleteByDocument(ctx, vector.WikiChunkCollection, documentID); err != nil {
+	if err := s.DeleteDocumentVectors(ctx, documentID); err != nil {
 		return err
 	}
 	return s.chunks.DeleteByDocument(ctx, documentID)
+}
+
+func (s *Indexer) DeleteDocumentVectors(ctx context.Context, documentID string) error {
+	if strings.TrimSpace(documentID) == "" {
+		return nil
+	}
+	return s.vectors.DeleteByDocument(ctx, vector.WikiChunkCollection, documentID)
 }
 
 func compactPointID() string {

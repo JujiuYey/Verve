@@ -1,4 +1,4 @@
-import { IconUpload } from "@tabler/icons-react";
+import { IconFile, IconUpload, IconX } from "@tabler/icons-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -14,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface UploadDialogProps {
   open: boolean;
@@ -25,6 +26,12 @@ interface UploadDialogProps {
 
 const MAX_CONCURRENT_UPLOADS = 4;
 const ALLOWED_EXTENSIONS = [".md"];
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+}
 
 function folderTreeToTreeSelectItems(nodes: FolderTreeNode[]): TreeSelectItem<FolderTreeNode>[] {
   return nodes.map((node) => ({
@@ -98,7 +105,11 @@ export function UploadDialog({
       });
     }
 
-    setSelectedFiles(supportedFiles);
+    setSelectedFiles((prev) => [...prev, ...supportedFiles]);
+  };
+
+  const handleRemoveFile = (index: number) => {
+    setSelectedFiles((files) => files.filter((_, i) => i !== index));
   };
 
   const handleUpload = async () => {
@@ -111,32 +122,56 @@ export function UploadDialog({
       return;
     }
 
+    const total = selectedFiles.length;
     setUploading(true);
     setUploadedCount(0);
     let successCount = 0;
     let failedCount = 0;
-    let nextIndex = 0;
 
-    try {
-      const uploadNext = async () => {
-        const file = selectedFiles[nextIndex];
-        nextIndex += 1;
-        if (!file) return;
+    const results: Array<Document | null> = Array.from(
+      { length: total },
+      () => null,
+    );
+    const completed: boolean[] = Array.from({ length: total }, () => false);
+    let nextEmitIndex = 0;
 
-        try {
-          const result = await documentApi.upload(file, selectedFolderId);
+    const tryEmit = () => {
+      while (nextEmitIndex < total && completed[nextEmitIndex]) {
+        const result = results[nextEmitIndex];
+        if (result) {
           successCount += 1;
-          setUploadedCount((count) => count + 1);
           onSuccess?.(result, selectedFolderId);
-        } catch {
+        } else {
           failedCount += 1;
         }
+        nextEmitIndex += 1;
+      }
+    };
 
-        await uploadNext();
+    try {
+      const uploadOne = async (index: number) => {
+        try {
+          const result = await documentApi.upload(
+            selectedFiles[index],
+            selectedFolderId,
+          );
+          results[index] = result;
+        } catch {
+          results[index] = null;
+        }
+        completed[index] = true;
+        setUploadedCount((count) => count + 1);
+        tryEmit();
       };
 
-      const workerCount = Math.min(MAX_CONCURRENT_UPLOADS, selectedFiles.length);
-      await Promise.all(Array.from({ length: workerCount }, () => uploadNext()));
+      const workerCount = Math.min(MAX_CONCURRENT_UPLOADS, total);
+      await Promise.all(
+        Array.from({ length: workerCount }, async (_, workerIdx) => {
+          for (let i = workerIdx; i < total; i += workerCount) {
+            await uploadOne(i);
+          }
+        }),
+      );
 
       if (successCount > 0) {
         toast.success("文档上传完成", {
@@ -184,29 +219,68 @@ export function UploadDialog({
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">文件</label>
-            <div
-              className="flex items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              {selectedFiles.length > 0 ? (
-                <div className="w-full px-4 text-center">
-                  <p className="truncate text-sm font-medium">
-                    已选择 {selectedFiles.length} 个文件
-                  </p>
-                  <p className="mt-1 truncate text-xs text-muted-foreground">
-                    {selectedFiles.map((file) => file.name).join("、")}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">点击重新选择</p>
-                </div>
-              ) : (
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">文件</label>
+              {selectedFiles.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  disabled={uploading}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <IconUpload className="h-3 w-3" />
+                  添加文件
+                </Button>
+              )}
+            </div>
+            {selectedFiles.length === 0 ? (
+              <div
+                className="flex items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
+                onClick={() => fileInputRef.current?.click()}
+              >
                 <div className="text-center">
                   <IconUpload className="mx-auto h-8 w-8 text-muted-foreground" />
                   <p className="text-sm text-muted-foreground mt-2">点击选择文件</p>
                   <p className="text-xs text-muted-foreground">支持 .md 文件</p>
                 </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  已选择 {selectedFiles.length} 个文件
+                </p>
+                <ScrollArea className="h-48 rounded-md border">
+                  <div className="p-1 space-y-0.5">
+                    {selectedFiles.map((file, index) => (
+                      <div
+                        key={`${file.name}-${index}`}
+                        className="group flex items-center gap-2 rounded px-2 py-1.5 hover:bg-muted/60"
+                      >
+                        <IconFile className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <span
+                          className="flex-1 truncate text-sm"
+                          title={file.name}
+                        >
+                          {file.name}
+                        </span>
+                        <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                          {formatFileSize(file.size)}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          disabled={uploading}
+                          onClick={() => handleRemoveFile(index)}
+                          aria-label={`移除 ${file.name}`}
+                        >
+                          <IconX className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+            )}
             <input
               ref={fileInputRef}
               type="file"

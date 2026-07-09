@@ -1,5 +1,6 @@
 import { IconFile, IconFolder } from "@tabler/icons-react";
 
+import type { IndexJobProgress } from "@/api/rag/wiki";
 import type { Document } from "@/api/wiki/document";
 import type { Folder } from "@/api/wiki/folder";
 import {
@@ -16,24 +17,28 @@ import { FolderCard } from "./folder-card";
 interface ItemGridProps {
   folders: Folder[];
   documents: Document[];
+  indexJobsByDocumentId?: Record<string, IndexJobProgress | undefined>;
   loading?: boolean;
   onEditFolder: (folder: Folder) => void;
   onDeleteFolder: (folder: Folder) => void;
   onEnterFolder: (folder: Folder) => void;
   onDeleteDocument: (document: Document) => void;
   onOpenDocument?: (document: Document) => void;
+  onIndexStatusRefresh?: () => void;
   openingDocumentId?: string;
 }
 
 export function ItemGrid({
   folders,
   documents,
+  indexJobsByDocumentId,
   loading,
   onEditFolder,
   onDeleteFolder,
   onEnterFolder,
   onDeleteDocument,
   onOpenDocument,
+  onIndexStatusRefresh,
   openingDocumentId,
 }: ItemGridProps) {
   const folderGridClassName = "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4";
@@ -100,8 +105,10 @@ export function ItemGrid({
               <DocumentCard
                 key={doc.id}
                 document={doc}
+                indexJob={indexJobsByDocumentId?.[doc.id]}
                 onDelete={onDeleteDocument}
                 onOpen={onOpenDocument}
+                onIndexStatusRefresh={onIndexStatusRefresh}
                 opening={openingDocumentId === doc.id}
               />
             ))}

@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/uptrace/bun"
 
+	rag_db "verve/app/rag/models/db"
 	wiki_db "verve/app/wiki/models/db"
 )
 
@@ -144,6 +145,24 @@ func (r *DocumentRepository) Delete(ctx context.Context, id string) error {
 	}
 
 	return nil
+}
+
+func (r *DocumentRepository) DeleteWithChunks(ctx context.Context, id string) error {
+	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if _, err := tx.NewDelete().
+			Model((*rag_db.WikiChunk)(nil)).
+			Where("document_id = ?", id).
+			Exec(ctx); err != nil {
+			return fmt.Errorf("删除文档 RAG 数据失败: %w", err)
+		}
+		if _, err := tx.NewDelete().
+			Model((*wiki_db.Document)(nil)).
+			Where("id = ?", id).
+			Exec(ctx); err != nil {
+			return fmt.Errorf("删除文档失败: %w", err)
+		}
+		return nil
+	})
 }
 
 // GetDocumentsByFolderIDs 根据文件夹ID列表获取所有文档

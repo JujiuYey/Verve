@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
+	"strings"
 	"testing"
 
 	system_db "verve/app/system/models/db"
@@ -79,6 +81,64 @@ func TestOpenAICompatibleEmbedderRequestShape(t *testing.T) {
 	}
 	if result.Dimension != 2 {
 		t.Fatalf("dimension = %d", result.Dimension)
+	}
+}
+
+func TestOpenAICompatibleEmbedderBatchesLargeInputs(t *testing.T) {
+	batchSizes := make([]int, 0, 3)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Model string   `json:"model"`
+			Input []string `json:"input"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		batchSizes = append(batchSizes, len(body.Input))
+		type item struct {
+			Embedding []float32 `json:"embedding"`
+		}
+		resp := struct {
+			Model string `json:"model"`
+			Data  []item `json:"data"`
+		}{Model: body.Model, Data: make([]item, 0, len(body.Input))}
+		for _, text := range body.Input {
+			resp.Data = append(resp.Data, item{Embedding: []float32{float32(len(text))}})
+		}
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			t.Fatal(err)
+		}
+	}))
+	defer server.Close()
+
+	repo := &fakeDefaultEmbeddingModelRepo{
+		model: &system_db.SysModel{ModelName: "text-embedding-v4"},
+		platform: &system_db.SysModelPlatform{
+			BaseURL:          server.URL,
+			APIKeyCiphertext: "test-key",
+		},
+	}
+	embedder := NewOpenAICompatibleEmbedderWithClient(repo, server.Client())
+	texts := make([]string, 25)
+	for i := range texts {
+		texts[i] = strings.Repeat("x", i+1)
+	}
+
+	result, err := embedder.EmbedTexts(context.Background(), texts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantBatchSizes := []int{10, 10, 5}
+	if !reflect.DeepEqual(batchSizes, wantBatchSizes) {
+		t.Fatalf("batch sizes = %#v, want %#v", batchSizes, wantBatchSizes)
+	}
+	if len(result.Embeddings) != len(texts) {
+		t.Fatalf("embeddings = %d, want %d", len(result.Embeddings), len(texts))
+	}
+	for i, embedding := range result.Embeddings {
+		if len(embedding) != 1 || embedding[0] != float32(i+1) {
+			t.Fatalf("embedding[%d] = %#v", i, embedding)
+		}
 	}
 }
 

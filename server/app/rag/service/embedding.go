@@ -31,6 +31,8 @@ type EmbeddingResult struct {
 const (
 	AgentKeyWikiRAG      = "wiki_rag"
 	SceneKeyRAGEmbedding = "embedding"
+
+	openAICompatibleEmbeddingBatchSize = 10
 )
 
 type AgentModelRepository interface {
@@ -83,8 +85,34 @@ func (e *OpenAICompatibleEmbedder) EmbedTexts(ctx context.Context, texts []strin
 		return EmbeddingResult{}, errors.New("embedding model platform api key is not configured")
 	}
 
+	result := EmbeddingResult{
+		Model:      model.ModelName,
+		Embeddings: make([][]float32, 0, len(texts)),
+	}
+	for start := 0; start < len(texts); start += openAICompatibleEmbeddingBatchSize {
+		end := start + openAICompatibleEmbeddingBatchSize
+		if end > len(texts) {
+			end = len(texts)
+		}
+		batch, err := e.embedTextBatch(ctx, model.ModelName, platform, texts[start:end])
+		if err != nil {
+			return EmbeddingResult{}, err
+		}
+		if result.Model == model.ModelName && batch.Model != "" {
+			result.Model = batch.Model
+		}
+		if result.Dimension == 0 {
+			result.Dimension = batch.Dimension
+		}
+		result.Embeddings = append(result.Embeddings, batch.Embeddings...)
+	}
+	return result, nil
+}
+
+func (e *OpenAICompatibleEmbedder) embedTextBatch(ctx context.Context, modelName string, platform *system_db.SysModelPlatform, texts []string) (EmbeddingResult, error) {
+	apiKey := strings.TrimSpace(platform.APIKeyCiphertext)
 	body, err := json.Marshal(map[string]any{
-		"model": model.ModelName,
+		"model": modelName,
 		"input": texts,
 	})
 	if err != nil {
@@ -124,7 +152,7 @@ func (e *OpenAICompatibleEmbedder) EmbedTexts(ctx context.Context, texts []strin
 		Embeddings: make([][]float32, 0, len(parsed.Data)),
 	}
 	if result.Model == "" {
-		result.Model = model.ModelName
+		result.Model = modelName
 	}
 	for _, item := range parsed.Data {
 		if result.Dimension == 0 {

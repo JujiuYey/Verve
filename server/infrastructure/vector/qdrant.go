@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -55,7 +57,23 @@ func (s *QdrantStore) EnsureCollection(ctx context.Context, collection string, d
 			"distance": "Cosine",
 		},
 	}
-	return s.do(ctx, http.MethodPut, fmt.Sprintf("/collections/%s", collection), body, nil)
+	path := fmt.Sprintf("/collections/%s", collection)
+	err := s.do(ctx, http.MethodPut, path, body, nil)
+	if err == nil {
+		return nil
+	}
+	var httpErr *qdrantHTTPError
+	if !errors.As(err, &httpErr) || httpErr.StatusCode != http.StatusConflict {
+		return err
+	}
+	existingDimension, err := s.collectionVectorSize(ctx, collection)
+	if err != nil {
+		return err
+	}
+	if existingDimension != dimension {
+		return fmt.Errorf("qdrant collection %s vector size mismatch: got %d want %d", collection, existingDimension, dimension)
+	}
+	return nil
 }
 
 func (s *QdrantStore) Upsert(ctx context.Context, collection string, points []Point) error {
@@ -101,23 +119,60 @@ func (s *QdrantStore) DeleteByDocument(ctx context.Context, collection string, d
 	return s.do(ctx, http.MethodPost, fmt.Sprintf("/collections/%s/points/delete?wait=true", collection), body, nil)
 }
 
+func (s *QdrantStore) collectionVectorSize(ctx context.Context, collection string) (int, error) {
+	var parsed struct {
+		Result struct {
+			Config struct {
+				Params struct {
+					Vectors struct {
+						Size int `json:"size"`
+					} `json:"vectors"`
+				} `json:"params"`
+			} `json:"config"`
+		} `json:"result"`
+	}
+	if err := s.do(ctx, http.MethodGet, fmt.Sprintf("/collections/%s", collection), nil, &parsed); err != nil {
+		return 0, err
+	}
+	if parsed.Result.Config.Params.Vectors.Size == 0 {
+		return 0, fmt.Errorf("qdrant collection %s vector size is missing", collection)
+	}
+	return parsed.Result.Config.Params.Vectors.Size, nil
+}
+
+type qdrantHTTPError struct {
+	Method     string
+	Path       string
+	StatusCode int
+}
+
+func (e *qdrantHTTPError) Error() string {
+	return fmt.Sprintf("qdrant request failed: %s %s status %d", e.Method, e.Path, e.StatusCode)
+}
+
 func (s *QdrantStore) do(ctx context.Context, method, path string, body any, out any) error {
-	payload, err := json.Marshal(body)
+	var payload io.Reader
+	if body != nil {
+		encoded, err := json.Marshal(body)
+		if err != nil {
+			return err
+		}
+		payload = bytes.NewReader(encoded)
+	}
+	req, err := http.NewRequestWithContext(ctx, method, s.baseURL+path, payload)
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, method, s.baseURL+path, bytes.NewReader(payload))
-	if err != nil {
-		return err
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
 	}
-	req.Header.Set("Content-Type", "application/json")
 	resp, err := s.client.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("qdrant request failed: %s %s status %d", method, path, resp.StatusCode)
+		return &qdrantHTTPError{Method: method, Path: path, StatusCode: resp.StatusCode}
 	}
 	if out != nil {
 		return json.NewDecoder(resp.Body).Decode(out)

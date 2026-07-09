@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { objectiveApi } from "@/api/learning";
+import { type IndexJobProgress, ragWikiApi } from "@/api/rag/wiki";
 import type { Document } from "@/api/wiki/document";
 import { documentApi } from "@/api/wiki/document";
 import {
@@ -37,6 +38,9 @@ export function WikiIndexPage() {
 
   // 文档相关状态
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [indexJobsByDocumentId, setIndexJobsByDocumentId] = useState<
+    Record<string, IndexJobProgress | undefined>
+  >({});
   const [documentsLoading, setDocumentsLoading] = useState(false);
   const [deleteDocumentTarget, setDeleteDocumentTarget] = useState<Document | null>(null);
   // const [deletingDocument, setDeletingDocument] = useState(false);
@@ -93,6 +97,21 @@ export function WikiIndexPage() {
     }
   }, []);
 
+  const loadIndexJobs = useCallback(async () => {
+    try {
+      const jobs = await ragWikiApi.listJobs();
+      const nextJobsByDocumentId: Record<string, IndexJobProgress> = {};
+      for (const job of jobs) {
+        if (!nextJobsByDocumentId[job.document_id]) {
+          nextJobsByDocumentId[job.document_id] = job;
+        }
+      }
+      setIndexJobsByDocumentId(nextJobsByDocumentId);
+    } catch {
+      toast.error("加载文档解析状态失败");
+    }
+  }, []);
+
   // 加载文件夹列表，使用当前面包屑路径的最后一个文件夹ID
   useEffect(() => {
     void loadFolders(currentFolderId);
@@ -102,10 +121,27 @@ export function WikiIndexPage() {
   useEffect(() => {
     if (currentFolderId) {
       void loadDocuments(currentFolderId);
+      void loadIndexJobs();
     } else {
       setDocuments([]);
     }
-  }, [currentFolderId, loadDocuments]);
+  }, [currentFolderId, loadDocuments, loadIndexJobs]);
+
+  useEffect(() => {
+    if (!currentFolderId || documents.length === 0) return;
+
+    const hasActiveJob = documents.some((document) => {
+      const status = indexJobsByDocumentId[document.id]?.status;
+      return status === "pending" || status === "running";
+    });
+    if (!hasActiveJob) return;
+
+    const intervalId = window.setInterval(() => {
+      void loadIndexJobs();
+    }, 4000);
+
+    return () => window.clearInterval(intervalId);
+  }, [currentFolderId, documents, indexJobsByDocumentId, loadIndexJobs]);
 
   // 删除文档
   const handleDeleteDocument = useCallback((doc: Document) => {
@@ -308,12 +344,14 @@ export function WikiIndexPage() {
             <ItemGrid
               folders={contentView.folders}
               documents={contentView.documents}
+              indexJobsByDocumentId={indexJobsByDocumentId}
               loading={loading || documentsLoading}
               onEditFolder={handleEdit}
               onDeleteFolder={handleDelete}
               onEnterFolder={handleEnterFolder}
               onDeleteDocument={handleDeleteDocument}
               onOpenDocument={(document) => void handleOpenDocument(document)}
+              onIndexStatusRefresh={() => void loadIndexJobs()}
               openingDocumentId={openingDocumentId}
             />
           </div>
@@ -337,6 +375,17 @@ export function WikiIndexPage() {
         onSuccess={(document, folderId) => {
           if (folderId === currentFolderId) {
             setDocuments((prev) => [...prev, { ...document, folder_id: folderId }]);
+            setIndexJobsByDocumentId((prev) => ({
+              ...prev,
+              [document.id]: {
+                id: `local-${document.id}`,
+                document_id: document.id,
+                status: "pending",
+                chunk_count: 0,
+                created_at: new Date().toISOString(),
+              },
+            }));
+            window.setTimeout(() => void loadIndexJobs(), 1000);
           }
         }}
       />

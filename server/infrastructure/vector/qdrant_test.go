@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 )
 
@@ -40,6 +41,32 @@ func TestQdrantSearchRequestShape(t *testing.T) {
 	}
 	if len(results) != 1 || results[0].PointID != "point-1" {
 		t.Fatalf("results = %#v", results)
+	}
+}
+
+func TestQdrantEnsureCollectionAllowsExistingMatchingCollection(t *testing.T) {
+	requests := make([]string, 0, 2)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests = append(requests, r.Method+" "+r.URL.Path)
+		switch r.Method + " " + r.URL.Path {
+		case "PUT /collections/verve_wiki_chunks":
+			w.WriteHeader(http.StatusConflict)
+			_, _ = w.Write([]byte(`{"status":{"error":"collection already exists"}}`))
+		case "GET /collections/verve_wiki_chunks":
+			_, _ = w.Write([]byte(`{"result":{"config":{"params":{"vectors":{"size":1024}}}}}`))
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	store := NewQdrantStoreWithClient(server.URL, server.Client())
+	if err := store.EnsureCollection(context.Background(), WikiChunkCollection, 1024); err != nil {
+		t.Fatal(err)
+	}
+	wantRequests := []string{"PUT /collections/verve_wiki_chunks", "GET /collections/verve_wiki_chunks"}
+	if !reflect.DeepEqual(requests, wantRequests) {
+		t.Fatalf("requests = %#v, want %#v", requests, wantRequests)
 	}
 }
 

@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 
 	"github.com/gofiber/fiber/v2"
@@ -25,19 +26,41 @@ type documentRepository interface {
 	Create(ctx context.Context, folderID string, filename string, fileSize int64, filePath string) (*wiki_db.Document, error)
 	UpdateFileSize(ctx context.Context, docID string, fileSize int64) error
 	Delete(ctx context.Context, id string) error
+	DeleteWithChunks(ctx context.Context, id string) error
+}
+
+type documentFileStore interface {
+	UploadFile(ctx context.Context, objectName string, reader io.Reader, size int64, contentType string) error
+	GetPresignedURL(ctx context.Context, objectName string) (string, error)
+	GetFileContent(ctx context.Context, objectName string) (string, error)
+	PutFileContent(ctx context.Context, objectName string, content string) error
+	DeleteFile(ctx context.Context, objectName string) error
+}
+
+type documentIndexer interface {
+	IndexDocument(ctx context.Context, documentID string) error
+	DeleteDocumentVectors(ctx context.Context, documentID string) error
 }
 
 // 文档处理器
 type DocumentHandler struct {
 	documentRepository documentRepository
-	minioService       *storage.MinIOService
-	indexer            *rag_service.Indexer
+	minioService       documentFileStore
+	indexer            documentIndexer
 }
 
 // 创建文档处理器
 func NewDocumentHandler(dbService *database.DatabaseService, minioService *storage.MinIOService, indexer *rag_service.Indexer) *DocumentHandler {
+	return NewDocumentHandlerWithDependencies(
+		wiki_repo.NewDocumentRepository(dbService.GetDB()),
+		minioService,
+		indexer,
+	)
+}
+
+func NewDocumentHandlerWithDependencies(repo documentRepository, minioService documentFileStore, indexer documentIndexer) *DocumentHandler {
 	return &DocumentHandler{
-		documentRepository: wiki_repo.NewDocumentRepository(dbService.GetDB()),
+		documentRepository: repo,
 		minioService:       minioService,
 		indexer:            indexer,
 	}
@@ -241,19 +264,18 @@ func (h *DocumentHandler) Delete(c *fiber.Ctx) error {
 		return response.NotFoundCtx(c, "文档不存在")
 	}
 
-	// 删除 MinIO 中的文件
-	if err := h.minioService.DeleteFile(c.Context(), doc.FilePath); err != nil {
-		log.Printf("⚠️  删除 MinIO 文件失败: %v", err)
+	if h.indexer != nil {
+		if err := h.indexer.DeleteDocumentVectors(c.Context(), docID); err != nil {
+			return response.InternalServerCtx(c, "删除文档索引失败: "+err.Error())
+		}
 	}
 
-	// 软删除数据库记录
-	if err := h.documentRepository.Delete(c.Context(), docID); err != nil {
-		return response.InternalServerCtx(c, "删除文档失败")
+	if err := h.minioService.DeleteFile(c.Context(), doc.FilePath); err != nil {
+		return response.InternalServerCtx(c, "删除文档文件失败: "+err.Error())
 	}
-	if h.indexer != nil {
-		if err := h.indexer.DeleteDocumentIndex(c.Context(), docID); err != nil {
-			log.Printf("⚠️  删除文档索引失败: %v", err)
-		}
+
+	if err := h.documentRepository.DeleteWithChunks(c.Context(), docID); err != nil {
+		return response.InternalServerCtx(c, "删除文档失败: "+err.Error())
 	}
 
 	return response.SuccessMsgCtx(c, "文档删除成功")
