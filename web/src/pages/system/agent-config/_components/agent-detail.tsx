@@ -3,7 +3,6 @@ import { IconBrain } from "@tabler/icons-react";
 import type { AIModel, AIPlatform } from "@/api";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 
 import {
   getAgentStatus,
@@ -71,24 +70,22 @@ export function AgentDetail({
           </Alert>
         ) : null}
 
-        <div className="flex flex-col rounded-md border">
-          {agent.scenes.map((scene, index) => {
+        <div className="flex flex-col gap-3">
+          {agent.scenes.map((scene) => {
             const config = configsByScene.get(getSceneKey(agent.key, scene.key));
             return (
-              <div key={scene.key}>
-                {index > 0 ? <Separator /> : null}
-                <SceneRow
-                  agentKey={agent.key}
-                  scene={scene}
-                  configModelId={config?.model_id}
-                  enabled={config?.enabled ?? true}
-                  models={activeModels}
-                  platforms={platforms}
-                  saving={saving}
-                  onModelChange={onModelChange}
-                  onEnabledChange={onEnabledChange}
-                />
-              </div>
+              <SceneRow
+                key={scene.key}
+                agentKey={agent.key}
+                scene={scene}
+                configModelId={config?.model_id}
+                enabled={config?.enabled ?? true}
+                models={activeModels}
+                platforms={platforms}
+                saving={saving}
+                onModelChange={onModelChange}
+                onEnabledChange={onEnabledChange}
+              />
             );
           })}
         </div>

@@ -1,6 +1,7 @@
 import type { AIModel, AIPlatform } from "@/api";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { getModelLogo } from "@/lib/model-logos";
 import { cn } from "@/lib/utils";
 
 import type { SceneDefinition } from "../agent-definitions";
@@ -34,25 +35,58 @@ export function SceneRow({
   const selectedPlatform = selectedModel
     ? platforms.find((platform) => platform.id === selectedModel.platform_id)
     : undefined;
+  const modelLogo = selectedModel
+    ? getModelLogo(`${selectedModel.display_name} ${selectedModel.model_name}`)
+    : undefined;
+  const active = hasConfig && enabled;
 
   return (
-    <div className="grid min-h-20 grid-cols-[minmax(220px,1fr)_minmax(280px,440px)_96px] items-center gap-4 px-4 py-3">
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <div className="truncate text-sm font-medium text-foreground">{scene.name}</div>
-          <Badge variant={scene.required ? "default" : "secondary"}>
-            {scene.required ? "必需" : "可选"}
-          </Badge>
+    <section
+      className={cn(
+        "grid min-h-24 grid-cols-[minmax(220px,1fr)_minmax(260px,420px)_104px] items-center gap-5 rounded-md border bg-background px-4 py-4 transition-colors",
+        active ? "hover:bg-muted/20" : "bg-muted/20",
+      )}
+    >
+      <div className="flex min-w-0 items-start gap-3">
+        <div
+          className={cn(
+            "mt-1 size-2.5 shrink-0 rounded-full ring-4 ring-background",
+            active ? "bg-primary" : hasConfig ? "bg-muted-foreground/50" : "bg-border",
+          )}
+        />
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="truncate text-sm font-medium text-foreground">{scene.name}</h3>
+            <Badge variant={scene.required ? "default" : "secondary"}>
+              {scene.required ? "必需" : "可选"}
+            </Badge>
+          </div>
+          <div className="mt-1 truncate font-mono text-xs text-muted-foreground">
+            {agentKey}.{scene.key}
+          </div>
+          <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+            {scene.description}
+          </p>
         </div>
-        <div className="mt-1 truncate font-mono text-xs text-muted-foreground">
-          {agentKey}.{scene.key}
-        </div>
-        <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{scene.description}</p>
       </div>
 
-      <div className="flex min-w-0 items-center justify-between gap-3 rounded-md border bg-background px-3 py-2">
-        <div className="min-w-0">
-          <div className="truncate text-sm font-medium">
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-md border bg-muted/30">
+          {modelLogo ? (
+            <img src={modelLogo} alt="" className="size-6 rounded-sm object-contain" />
+          ) : (
+            <span className="text-[10px] font-bold text-muted-foreground">
+              {(selectedModel?.model_name || scene.name).slice(0, 2).toUpperCase()}
+            </span>
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div
+            className={cn(
+              "truncate text-sm font-medium",
+              !selectedModel && "text-muted-foreground",
+            )}
+          >
             {selectedModel?.display_name || selectedModel?.model_name || "未选择模型"}
           </div>
           <div className="truncate text-xs text-muted-foreground">
@@ -88,6 +122,6 @@ export function SceneRow({
           onCheckedChange={(checked) => onEnabledChange(agentKey, scene, checked)}
         />
       </div>
-    </div>
+    </section>
   );
 }
