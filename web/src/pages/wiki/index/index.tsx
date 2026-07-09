@@ -23,6 +23,12 @@ import { ItemGrid } from "./_components/item-grid";
 import { UploadDialog } from "./_components/upload-dialog";
 import { getFolderContentView } from "./_shared/content-view";
 
+const sortFolders = (folders: Folder[]) =>
+  [...folders].sort((a, b) => {
+    if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
+    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+  });
+
 export function WikiIndexPage() {
   const navigate = useNavigate();
   const [data, setData] = useState<Folder[]>([]);
@@ -229,12 +235,14 @@ export function WikiIndexPage() {
           ...(formData as CreateFolderRequest),
           parent_id: currentFolderId,
         });
-        setData((prev) => [...prev, createdFolder]);
+        setData((prev) => sortFolders([...prev, createdFolder]));
         toast.success("创建成功");
       } else {
         const updatedFolder = await folderApi.update(formData as UpdateFolderRequest);
         setData((prev) =>
-          prev.map((folder) => (folder.id === updatedFolder.id ? updatedFolder : folder)),
+          sortFolders(
+            prev.map((folder) => (folder.id === updatedFolder.id ? updatedFolder : folder)),
+          ),
         );
         setCurrentFolder((prev) => (prev?.id === updatedFolder.id ? updatedFolder : prev));
         toast.success("更新成功");

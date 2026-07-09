@@ -95,7 +95,7 @@ func (r *DocumentRepository) Page(ctx context.Context, pageSize int, offset int,
 
 	// 获取分页数据
 	err = query.
-		Order("created_at ASC").
+		Order("sort_order ASC", "created_at ASC").
 		Limit(pageSize).
 		Offset(offset).
 		Scan(ctx)
@@ -123,7 +123,7 @@ func (r *DocumentRepository) List(ctx context.Context, name, folderID string) ([
 	}
 
 	err := query.
-		Order("created_at ASC").
+		Order("sort_order ASC", "created_at ASC").
 		Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("列出文档失败: %w", err)
@@ -156,6 +156,7 @@ func (r *DocumentRepository) GetDocumentsByFolderIDs(ctx context.Context, folder
 	err := r.db.NewSelect().
 		Model(&docs).
 		Where("folder_id IN (?)", bun.In(folderIDs)).
+		Order("sort_order ASC", "created_at ASC").
 		Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("获取文档列表失败: %w", err)

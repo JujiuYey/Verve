@@ -8,6 +8,7 @@ export interface Document {
   content_type: string;
   folder_id: string;
   file_path: string;
+  sort_order: number;
   created_at: string;
   updated_at: string;
 }

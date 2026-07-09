@@ -9,6 +9,7 @@ export interface Folder {
   description?: string;
   parent_id?: string;
   user_id?: string;
+  sort_order: number;
   created_by?: string;
   updated_by?: string;
   created_at: string;
@@ -24,6 +25,7 @@ export interface FolderTreeNode {
   description?: string;
   parent_id?: string;
   user_id?: string;
+  sort_order: number;
   created_at: string;
   updated_at: string;
   hasChildren: boolean;
@@ -34,6 +36,7 @@ export interface CreateFolderRequest {
   name: string;
   description?: string;
   parent_id?: string;
+  sort_order?: number;
 }
 
 export interface UpdateFolderRequest {
@@ -41,6 +44,7 @@ export interface UpdateFolderRequest {
   name: string;
   description?: string;
   parent_id?: string;
+  sort_order?: number;
 }
 
 export interface FolderPageResponse {

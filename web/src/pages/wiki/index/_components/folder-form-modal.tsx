@@ -41,6 +41,7 @@ export function FolderFormModal({
       name: "",
       description: "",
       parent_id: undefined as string | undefined,
+      sort_order: 0,
     } as FolderFormValues,
     validators: {
       onSubmit: folderFormSchema,
@@ -52,6 +53,7 @@ export function FolderFormModal({
           name: value.name,
           description: value.description || undefined,
           parent_id: value.parent_id || undefined,
+          sort_order: value.sort_order,
         });
       } else {
         onSubmit({
@@ -59,6 +61,7 @@ export function FolderFormModal({
           name: value.name,
           description: value.description || undefined,
           parent_id: value.parent_id || undefined,
+          sort_order: value.sort_order,
         });
       }
     },
@@ -71,6 +74,7 @@ export function FolderFormModal({
         form.setFieldValue("name", folder.name);
         form.setFieldValue("description", folder.description || "");
         form.setFieldValue("parent_id", folder.parent_id || undefined);
+        form.setFieldValue("sort_order", folder.sort_order ?? 0);
       }
     }
   }, [open, mode, folder, form]);
@@ -92,7 +96,7 @@ export function FolderFormModal({
           }}
           className="flex flex-col gap-4"
         >
-          <div className="flex flex-col gap-4 overflow-y-auto px-4 text-sm">
+          <div className="flex flex-col gap-4 overflow-y-auto p-2 text-sm">
             <form.Field name="name" validators={{ onChange: folderFormSchema.shape.name }}>
               {(field) => (
                 <div className="flex flex-col gap-3">
@@ -128,6 +132,36 @@ export function FolderFormModal({
                     value={field.state.value ?? ""}
                     onBlur={field.handleBlur}
                     onChange={(e) => field.handleChange(e.target.value)}
+                  />
+                  {field.state.meta.isTouched && field.state.meta.errors.length > 0 && (
+                    <p className="text-destructive text-xs">
+                      {field.state.meta.errors[0]?.message}
+                    </p>
+                  )}
+                </div>
+              )}
+            </form.Field>
+
+            <form.Field
+              name="sort_order"
+              validators={{ onChange: folderFormSchema.shape.sort_order }}
+            >
+              {(field) => (
+                <div className="flex flex-col gap-3">
+                  <Label htmlFor="sort_order">排序</Label>
+                  <Input
+                    id="sort_order"
+                    type="number"
+                    min={0}
+                    step={1}
+                    placeholder="数字越小越靠前"
+                    value={field.state.value ?? 0}
+                    onBlur={field.handleBlur}
+                    onChange={(e) =>
+                      field.handleChange(
+                        Number.isNaN(e.target.valueAsNumber) ? 0 : e.target.valueAsNumber,
+                      )
+                    }
                   />
                   {field.state.meta.isTouched && field.state.meta.errors.length > 0 && (
                     <p className="text-destructive text-xs">

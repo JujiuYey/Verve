@@ -72,7 +72,7 @@ func (r *folderRepository) List(ctx context.Context, filters map[string]interfac
 		query = query.Where("user_id = ?", userID)
 	}
 
-	query = query.Order("created_at ASC")
+	query = query.Order("sort_order ASC", "created_at ASC")
 
 	err := query.Scan(ctx)
 	if err != nil {
@@ -90,7 +90,7 @@ func (r *folderRepository) GetAll(ctx context.Context) ([]*wiki_db.Folder, error
 		Model(&folders).
 		Relation("CreatedByUser").
 		Relation("UpdatedByUser").
-		Order("created_at ASC")
+		Order("sort_order ASC", "created_at ASC")
 
 	err := query.Scan(ctx)
 	if err != nil {
@@ -119,7 +119,7 @@ func (r *folderRepository) Page(ctx context.Context, offset, limit int, filters 
 		query = query.Where("user_id = ?", userID)
 	}
 
-	query = query.Order("created_at ASC")
+	query = query.Order("sort_order ASC", "created_at ASC")
 
 	total, err := query.Count(ctx)
 	if err != nil {

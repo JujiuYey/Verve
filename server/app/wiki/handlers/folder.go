@@ -20,6 +20,7 @@ type FolderTreeNode struct {
 	Description *string           `json:"description,omitempty"`
 	ParentID    *string           `json:"parent_id,omitempty"`
 	UserID      *string           `json:"user_id,omitempty"`
+	SortOrder   int               `json:"sort_order"`
 	CreatedAt   string            `json:"created_at"`
 	UpdatedAt   string            `json:"updated_at"`
 	HasChildren bool              `json:"hasChildren"`
@@ -115,6 +116,7 @@ func (h *FolderHandler) buildTree(folders []*wiki_db.Folder) []*FolderTreeNode {
 			Description: f.Description,
 			ParentID:    f.ParentID,
 			UserID:      f.UserID,
+			SortOrder:   f.SortOrder,
 			CreatedAt:   f.CreatedAt.Format("2006-01-02 15:04:05"),
 			UpdatedAt:   f.UpdatedAt.Format("2006-01-02 15:04:05"),
 			HasChildren: false,
@@ -162,6 +164,7 @@ func (h *FolderHandler) Create(c *fiber.Ctx) error {
 		Name        string  `json:"name"`
 		Description *string `json:"description"`
 		ParentID    *string `json:"parent_id"`
+		SortOrder   int     `json:"sort_order"`
 	}
 
 	if err := c.BodyParser(&req); err != nil {
@@ -179,6 +182,7 @@ func (h *FolderHandler) Create(c *fiber.Ctx) error {
 		Description: req.Description,
 		ParentID:    req.ParentID,
 		UserID:      &userIDStr,
+		SortOrder:   req.SortOrder,
 		CreatedBy:   &userIDStr,
 		UpdatedBy:   &userIDStr,
 	}
@@ -197,6 +201,7 @@ func (h *FolderHandler) Update(c *fiber.Ctx) error {
 		Name        string  `json:"name"`
 		Description *string `json:"description"`
 		ParentID    *string `json:"parent_id"`
+		SortOrder   *int    `json:"sort_order"`
 	}
 
 	if err := c.BodyParser(&req); err != nil {
@@ -217,6 +222,9 @@ func (h *FolderHandler) Update(c *fiber.Ctx) error {
 	folder.Name = req.Name
 	folder.Description = req.Description
 	folder.ParentID = req.ParentID
+	if req.SortOrder != nil {
+		folder.SortOrder = *req.SortOrder
+	}
 	folder.UpdatedBy = &userIDStr
 
 	if err := h.repo.Update(c.Context(), folder); err != nil {
