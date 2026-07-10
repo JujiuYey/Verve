@@ -22,6 +22,7 @@ type CoachQueryInput struct {
 	Folders      []CoachFolder
 	Documents    []CoachDocument
 	Objectives   []CoachObjective
+	MemoryItems  []CoachMemoryItem
 	Profiles     []CoachProfile
 	Journals     []CoachJournal
 }
@@ -55,6 +56,13 @@ type CoachObjective struct {
 	MasteryLevel     string
 }
 
+type CoachMemoryItem struct {
+	FolderID   string
+	Kind       string
+	Statement  string
+	Confidence string
+}
+
 type CoachProfile struct {
 	FolderID        string
 	CurrentLevel    string
@@ -82,6 +90,7 @@ func CoachQueryPrompt(input CoachQueryInput) string {
 	renderCoachFolders(&sb, input.Folders)
 	renderCoachDocuments(&sb, input.Documents)
 	renderCoachObjectives(&sb, input.Objectives, len(input.Documents) > 0)
+	renderCoachMemoryItems(&sb, input.MemoryItems)
 	renderCoachProfiles(&sb, input.Profiles)
 	renderCoachJournals(&sb, input.Journals)
 	renderCoachReplyContract(&sb)
@@ -169,6 +178,47 @@ func renderCoachObjectives(sb *strings.Builder, objectives []CoachObjective, has
 	}
 }
 
+func renderCoachMemoryItems(sb *strings.Builder, items []CoachMemoryItem) {
+	sb.WriteString("\n## 学习记忆\n")
+	rendered := 0
+	for _, item := range items {
+		statement := strings.TrimSpace(item.Statement)
+		if statement == "" {
+			continue
+		}
+		rendered++
+		sb.WriteString("- ")
+		sb.WriteString(coachMemoryKindLabel(item.Kind))
+		sb.WriteString(": ")
+		sb.WriteString(statement)
+		if strings.TrimSpace(item.FolderID) != "" {
+			sb.WriteString(", folder=")
+			sb.WriteString(strings.TrimSpace(item.FolderID))
+		}
+		if strings.TrimSpace(item.Confidence) != "" {
+			sb.WriteString(", confidence=")
+			sb.WriteString(strings.TrimSpace(item.Confidence))
+		}
+		sb.WriteString("\n")
+	}
+	if rendered == 0 {
+		sb.WriteString("- 暂无学习记忆\n")
+	}
+}
+
+func coachMemoryKindLabel(kind string) string {
+	switch strings.TrimSpace(kind) {
+	case "mastered_concept":
+		return "已掌握"
+	case "verification_evidence":
+		return "验证证据"
+	case "":
+		return "记忆"
+	default:
+		return strings.TrimSpace(kind)
+	}
+}
+
 func renderCoachProfiles(sb *strings.Builder, profiles []CoachProfile) {
 	sb.WriteString("\n## 学习画像\n")
 	if len(profiles) == 0 {
@@ -231,10 +281,11 @@ func renderCoachReplyContract(sb *strings.Builder) {
 
 const coachInstruction = `你是 Verve 的学习调度 agent。用户通常只会说"继续学习",你需要像真正的学习助理一样先查上下文,再决定下一步。
 
-你可以使用工具查询 Wiki 文件夹、文档、学习小节、学习画像、最近学习记录,也可以检索 Wiki 真实文档片段、从 Wiki 文档生成学习小节,并为选定小节创建练习会话。
+你可以使用工具查询 Wiki 文件夹、文档、学习小节、学习记忆、学习画像、最近学习记录,也可以检索 Wiki 真实文档片段、从 Wiki 文档生成学习小节,并为选定小节创建练习会话。
 
 决策规则:
-- 参考最近学习记录里的改进建议和 active/review 小节,但不要把一次练习建议直接当成后续学习路径;
+- 优先参考学习记忆和最近练习记录里的改进建议,结合 active/review 小节决定下一步;
+- 不要把一次练习缺口直接当成长期画像;
 - 如果有多个可能的文件夹,优先最近学习记录对应的文件夹;
 - 当用户要求继续学习或提出概念问题时,先识别相关 Wiki root folder;如果 root folder 已知,调用 search_wiki_knowledge 后再决定下一步;
 - 如果没有学习小节但有 Wiki 文档,优先选择最适合当前继续学习的文档并调用 create_learning_objectives 生成学习小节;如果无法判断文档,只问用户一个选择题;

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"database/sql"
+	"errors"
 	"log"
 	"strings"
 
@@ -85,6 +86,10 @@ func (h *CoachHandler) Chat(c *fiber.Ctx) error {
 // buildRuntimeContext 聚合陪练 agent 所需的运行时上下文:用户文件夹(已过滤)、
 // 文档、最近 objective、每个文件夹的 LearningProfile、最近 journal。
 func (h *CoachHandler) buildRuntimeContext(ctx context.Context, userID string, agentInstanceID string, rootFolderID string) (learning_service.CoachRuntimeContext, error) {
+	if h == nil || h.db == nil {
+		return learning_service.CoachRuntimeContext{}, errors.New("learning coach database is not configured")
+	}
+
 	folders, err := h.db.Folders.List(ctx, map[string]interface{}{})
 	if err != nil {
 		return learning_service.CoachRuntimeContext{}, err
@@ -130,6 +135,14 @@ func (h *CoachHandler) buildRuntimeContext(ctx context.Context, userID string, a
 		return learning_service.CoachRuntimeContext{}, err
 	}
 
+	memoryItems := make([]*learning_db.LearningMemoryItem, 0)
+	if h.db.Memories != nil {
+		memoryItems, err = h.db.Memories.FindItemsByUser(ctx, userID, rootFolderID, 20)
+		if err != nil {
+			return learning_service.CoachRuntimeContext{}, err
+		}
+	}
+
 	profiles := make([]*learning_db.LearningProfile, 0)
 	seenFolders := make(map[string]bool)
 	for _, folder := range folders {
@@ -154,6 +167,7 @@ func (h *CoachHandler) buildRuntimeContext(ctx context.Context, userID string, a
 		Folders:         folders,
 		Documents:       docs,
 		Objectives:      objectives,
+		MemoryItems:     memoryItems,
 		Profiles:        profiles,
 		Journals:        journals,
 	}, nil

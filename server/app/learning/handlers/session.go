@@ -188,7 +188,7 @@ func (h *SessionHandler) Exercise(c *fiber.Ctx) error {
 
 	// 落练习记录
 	ua, verdict, ma, fb := req.UserAnswer, result.Verdict, result.MasteryAfter, result.Feedback
-	_ = h.db.Exercises.Create(c.Context(), &learning_db.LearningExercise{
+	if err := h.db.Exercises.Create(c.Context(), &learning_db.LearningExercise{
 		SessionID:    id,
 		ObjectiveID:  obj.ID,
 		UserID:       userID,
@@ -198,11 +198,27 @@ func (h *SessionHandler) Exercise(c *fiber.Ctx) error {
 		Verdict:      &verdict,
 		MasteryAfter: &ma,
 		Feedback:     &fb,
-	})
+	}); err != nil {
+		return response.InternalServerCtx(c, "记录练习失败")
+	}
+
+	if err := learning_service.NewMemoryService(h.db).RecordExerciseJudgement(c.Context(), userID, obj, id, result); err != nil {
+		log.Printf("⚠️ 记录学习记忆失败,继续保留本次练习提交: session_id=%s user_id=%s folder_id=%s document_id=%s objective_id=%s objective_title=%q err=%v",
+			id,
+			userID,
+			stringValue(obj.SourceFolderID),
+			stringValue(obj.SourceDocumentID),
+			obj.ID,
+			obj.Title,
+			err,
+		)
+	}
 
 	// 更新掌握层级
 	obj.MasteryLevel = result.MasteryAfter
 	_ = h.db.Objectives.Update(c.Context(), obj)
+	// learning_profiles / learning_journals are kept as a legacy compatibility
+	// projection while learning memory becomes the primary learner context source.
 	h.syncLearningExaminerState(c.Context(), userID, obj, result)
 
 	return response.SuccessCtx(c, fiber.Map{

@@ -18,6 +18,7 @@ type CoachRuntimeContext struct {
 	Folders         []*wiki_db.Folder
 	Documents       []*wiki_db.Document
 	Objectives      []*learning_db.LearningObjective
+	MemoryItems     []*learning_db.LearningMemoryItem
 	Profiles        []*learning_db.LearningProfile
 	Journals        []*learning_db.LearningJournal
 }
@@ -41,11 +42,12 @@ func BuildCoachQuery(ctx CoachRuntimeContext, message string) string {
 			RootFolderID:    ctx.RootFolderID,
 			RootFolderName:  ctx.RootFolderName,
 		},
-		Folders:    mapCoachFolders(ctx.Folders),
-		Documents:  mapCoachDocuments(ctx.Documents),
-		Objectives: mapCoachObjectives(ctx.Objectives),
-		Profiles:   mapCoachProfiles(ctx.Profiles),
-		Journals:   mapCoachJournals(ctx.Journals),
+		Folders:     mapCoachFolders(ctx.Folders),
+		Documents:   mapCoachDocuments(ctx.Documents),
+		Objectives:  mapCoachObjectives(ctx.Objectives),
+		MemoryItems: mapCoachMemoryItems(ctx.MemoryItems),
+		Profiles:    mapCoachProfiles(ctx.Profiles),
+		Journals:    mapCoachJournals(ctx.Journals),
 	})
 }
 
@@ -93,6 +95,22 @@ func mapCoachObjectives(objectives []*learning_db.LearningObjective) []prompts.C
 			SourceDocumentID: trimStringPtr(obj.SourceDocumentID),
 			Status:           obj.Status,
 			MasteryLevel:     obj.MasteryLevel,
+		})
+	}
+	return result
+}
+
+func mapCoachMemoryItems(items []*learning_db.LearningMemoryItem) []prompts.CoachMemoryItem {
+	result := make([]prompts.CoachMemoryItem, 0, len(items))
+	for _, item := range items {
+		if item == nil {
+			continue
+		}
+		result = append(result, prompts.CoachMemoryItem{
+			FolderID:   trimStringPtr(item.FolderID),
+			Kind:       item.Kind,
+			Statement:  item.Statement,
+			Confidence: item.Confidence,
 		})
 	}
 	return result

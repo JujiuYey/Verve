@@ -36,6 +36,7 @@ type DatabaseService struct {
 	Profiles   *learning_repo.ProfileRepository
 	Journals   *learning_repo.JournalRepository
 	Guides     *learning_repo.GuideRepository
+	Memories   *learning_repo.MemoryRepository
 
 	// Wiki Repositories
 	Folders    wiki_repo.FolderRepository
@@ -73,6 +74,9 @@ func NewDatabaseService(dsn string) (*DatabaseService, error) {
 	db.RegisterModel((*learning_db.LearningProfile)(nil))
 	db.RegisterModel((*learning_db.LearningJournal)(nil))
 	db.RegisterModel((*learning_db.LearningGuide)(nil))
+	db.RegisterModel((*learning_db.LearningMemoryEvent)(nil))
+	db.RegisterModel((*learning_db.LearningMemoryItem)(nil))
+	db.RegisterModel((*learning_db.LearningMemorySummary)(nil))
 	db.RegisterModel((*rag_db.WikiChunk)(nil))
 	db.RegisterModel((*rag_db.IndexJob)(nil))
 	db.RegisterModel((*wiki_db.Folder)(nil))
@@ -109,6 +113,7 @@ func NewDatabaseService(dsn string) (*DatabaseService, error) {
 		Profiles:   learning_repo.NewProfileRepository(db),
 		Journals:   learning_repo.NewJournalRepository(db),
 		Guides:     learning_repo.NewGuideRepository(db),
+		Memories:   learning_repo.NewMemoryRepository(db),
 
 		// Wiki Repositories
 		Folders:    wiki_repo.NewFolderRepository(db),

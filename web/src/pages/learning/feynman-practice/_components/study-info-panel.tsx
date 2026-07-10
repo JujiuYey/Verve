@@ -120,7 +120,7 @@ export function StudyInfoPanel({
               </div>
             ) : (
               <div className="rounded-xl bg-muted/40 p-3 text-sm leading-6 text-muted-foreground">
-                提交解释后，Learning Examiner 会同步写入练习记录、学习画像和本次日志。
+                提交解释后，Learning Examiner 会同步写入练习记录、学习记忆和本次日志。
               </div>
             )}
           </div>

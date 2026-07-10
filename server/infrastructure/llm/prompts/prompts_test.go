@@ -122,6 +122,14 @@ func TestCoachQueryPromptRendersRuntimeContext(t *testing.T) {
 				MasteryLevel:     "heard",
 			},
 		},
+		MemoryItems: []CoachMemoryItem{
+			{
+				FolderID:   "folder-go",
+				Kind:       "mastered_concept",
+				Statement:  "用户已经能用自己的话解释 Go 接口的隐式实现",
+				Confidence: "confirmed",
+			},
+		},
 		Profiles: []CoachProfile{
 			{
 				FolderID:        "folder-go",
@@ -147,6 +155,9 @@ func TestCoachQueryPromptRendersRuntimeContext(t *testing.T) {
 		"interface.md (doc-interface), folder=folder-go",
 		"接口基础 (obj-interface), status=active, mastery=heard, folder=folder-go, document=doc-interface",
 		"要点:理解接口定义和实现关系",
+		"## 学习记忆",
+		"已掌握",
+		"用户已经能用自己的话解释 Go 接口的隐式实现",
 		"当前水平:explained",
 		"已掌握内容:值类型",
 		"上次建议:复述 interface 的隐式实现",
@@ -155,6 +166,9 @@ func TestCoachQueryPromptRendersRuntimeContext(t *testing.T) {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("prompt does not contain %q:\n%s", want, prompt)
 		}
+	}
+	if strings.Index(prompt, "## 学习记忆") > strings.Index(prompt, "## 学习画像") {
+		t.Fatalf("learning memory should appear before profiles:\n%s", prompt)
 	}
 }
 
@@ -165,9 +179,42 @@ func TestCoachQueryPromptRendersExplicitEmptyStates(t *testing.T) {
 		"- 暂无文件夹",
 		"- 暂无文档",
 		"- 暂无学习小节。可以建议用户先去 Wiki 补充资料。",
+		"- 暂无学习记忆",
 		"- 暂无画像",
 		"- 暂无记录",
 		"如果不能确定,只问用户一个选择题。",
+	} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("prompt does not contain %q:\n%s", want, prompt)
+		}
+	}
+}
+
+func TestCoachQueryPromptSkipsBlankMemoryStatements(t *testing.T) {
+	prompt := CoachQueryPrompt(CoachQueryInput{
+		Message: "继续学习",
+		MemoryItems: []CoachMemoryItem{
+			{Kind: "mastered_concept", Statement: "  "},
+		},
+	})
+
+	if !strings.Contains(prompt, "- 暂无学习记忆") {
+		t.Fatalf("prompt should render empty memory state:\n%s", prompt)
+	}
+}
+
+func TestCoachQueryPromptUsesFallbackMemoryKindLabel(t *testing.T) {
+	prompt := CoachQueryPrompt(CoachQueryInput{
+		Message: "继续学习",
+		MemoryItems: []CoachMemoryItem{
+			{Statement: "用户能解释值与类型"},
+			{Kind: "custom_fact", Statement: "用户偏好先看例子"},
+		},
+	})
+
+	for _, want := range []string{
+		"记忆: 用户能解释值与类型",
+		"custom_fact: 用户偏好先看例子",
 	} {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("prompt does not contain %q:\n%s", want, prompt)
