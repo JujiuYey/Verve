@@ -107,7 +107,7 @@ workflow 输出分两类：前端事件和持久化事实。
 | `learning_exercises` | 用户作答与 Examiner verdict |
 | `learning_objectives.mastery_level` | Examiner 判定后的掌握层级 |
 | `learning_profiles` | 已掌握内容、薄弱点、下一目标 |
-| `learning_journals` | 当日学习事实和下一步 |
+| `learning_journals` | 当日学习事实和本次改进建议 |
 | Wiki Markdown | 用户确认后的学习旁注 |
 
 ## 6. 状态机

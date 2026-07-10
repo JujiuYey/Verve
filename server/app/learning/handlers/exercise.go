@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	learning_db "verve/app/learning/models/db"
 	"verve/common/pagination"
 	"verve/common/response"
 	"verve/infrastructure/database"
@@ -26,8 +27,16 @@ func (h *ExerciseHandler) FindPage(c *fiber.Ctx) error {
 		return response.BadRequestCtx(c)
 	}
 	req.Validate()
+	objectiveID := c.Query("objective_id")
 
-	exercises, total, err := h.db.Exercises.FindByUser(c.Context(), userID, req.GetOffset(), req.PageSize)
+	var exercises []*learning_db.LearningExercise
+	var total int
+	var err error
+	if objectiveID != "" {
+		exercises, total, err = h.db.Exercises.FindByUserAndObjective(c.Context(), userID, objectiveID, req.GetOffset(), req.PageSize)
+	} else {
+		exercises, total, err = h.db.Exercises.FindByUser(c.Context(), userID, req.GetOffset(), req.PageSize)
+	}
 	if err != nil {
 		return response.InternalServerCtx(c, "获取练习记录失败")
 	}

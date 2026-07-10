@@ -5,7 +5,9 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import {
+  exerciseKeys,
   sessionChatStream,
+  objectiveKeys,
   useCreateSession,
   useObjectives,
   useSubmitExercise,
@@ -82,6 +84,10 @@ export function FeynmanWorkbenchPage() {
     setResult(res);
     setTutorAdvice("");
     setIsTutorTeaching(false);
+    void queryClient.invalidateQueries({
+      queryKey: objectiveKeys.list({ document_id: documentId }),
+    });
+    void queryClient.invalidateQueries({ queryKey: exerciseKeys.lists() });
     void queryClient.invalidateQueries({ queryKey: ["learning-journals"] });
     void queryClient.invalidateQueries({ queryKey: ["learning-profiles"] });
   };

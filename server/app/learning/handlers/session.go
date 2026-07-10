@@ -206,14 +206,15 @@ func (h *SessionHandler) Exercise(c *fiber.Ctx) error {
 	h.syncLearningExaminerState(c.Context(), userID, obj, result)
 
 	return response.SuccessCtx(c, fiber.Map{
-		"verdict":             result.Verdict,
-		"mastery_after":       result.MasteryAfter,
-		"feedback":            result.Feedback,
-		"objective_id":        obj.ID,
-		"evidence":            result.Evidence,
-		"weak_points":         result.WeakPoints,
-		"next_recommendation": result.NextRecommendation,
-		"review_required":     result.ReviewRequired,
+		"verdict":                result.Verdict,
+		"mastery_after":          result.MasteryAfter,
+		"feedback":               result.Feedback,
+		"objective_id":           obj.ID,
+		"evidence":               result.Evidence,
+		"weak_points":            result.WeakPoints,
+		"improvement_suggestion": result.ImprovementSuggestion,
+		"next_recommendation":    result.ImprovementSuggestion,
+		"review_required":        result.ReviewRequired,
 	})
 }
 
@@ -241,7 +242,7 @@ func (h *SessionHandler) syncLearningExaminerState(ctx context.Context, userID s
 	learned := obj.Title
 	evidence := result.Evidence
 	weakPoints := strings.Join(result.WeakPoints, "、")
-	nextStep := result.NextRecommendation
+	improvementSuggestion := result.ImprovementSuggestion
 	_ = h.db.Journals.Create(ctx, &learning_db.LearningJournal{
 		UserID:     userID,
 		FolderID:   folderID,
@@ -249,7 +250,7 @@ func (h *SessionHandler) syncLearningExaminerState(ctx context.Context, userID s
 		Learned:    &learned,
 		Evidence:   &evidence,
 		WeakPoints: &weakPoints,
-		NextStep:   &nextStep,
+		NextStep:   &improvementSuggestion,
 	})
 }
 

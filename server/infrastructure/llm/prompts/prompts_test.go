@@ -149,7 +149,7 @@ func TestCoachQueryPromptRendersRuntimeContext(t *testing.T) {
 		"要点:理解接口定义和实现关系",
 		"当前水平:explained",
 		"已掌握内容:值类型",
-		"下一步:复述 interface 的隐式实现",
+		"上次建议:复述 interface 的隐式实现",
 		"<ACTION>",
 	} {
 		if !strings.Contains(prompt, want) {

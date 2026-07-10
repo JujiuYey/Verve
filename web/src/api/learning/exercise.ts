@@ -28,9 +28,9 @@ export interface ExercisePageResponse {
 }
 
 const api = {
-  page: (page = 1, pageSize = 20) =>
+  page: (page = 1, pageSize = 20, objectiveId?: string) =>
     request.get<ExercisePageResponse>(`${BASE}/exercise/page`, {
-      params: { page, page_size: pageSize },
+      params: { page, page_size: pageSize, objective_id: objectiveId },
     }),
 };
 
@@ -38,12 +38,22 @@ export const exerciseKeys = {
   all: ["learning-exercises"] as const,
   lists: () => [...exerciseKeys.all, "list"] as const,
   list: (page: number, pageSize: number) => [...exerciseKeys.lists(), page, pageSize] as const,
+  objectiveList: (objectiveId: string, page: number, pageSize: number) =>
+    [...exerciseKeys.lists(), "objective", objectiveId, page, pageSize] as const,
 };
 
 export function useExerciseList(page = 1, pageSize = 20) {
   return useQuery({
     queryKey: exerciseKeys.list(page, pageSize),
     queryFn: () => api.page(page, pageSize),
+  });
+}
+
+export function useObjectiveExerciseList(objectiveId: string, page = 1, pageSize = 5) {
+  return useQuery({
+    queryKey: exerciseKeys.objectiveList(objectiveId, page, pageSize),
+    queryFn: () => api.page(page, pageSize, objectiveId),
+    enabled: !!objectiveId,
   });
 }
 

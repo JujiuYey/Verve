@@ -25,13 +25,14 @@ func NewExaminerService(db *database.DatabaseService) *ExaminerService {
 }
 
 type JudgeResult struct {
-	Verdict            string   `json:"verdict"`
-	MasteryAfter       string   `json:"mastery_after"`
-	Feedback           string   `json:"feedback"`
-	Evidence           string   `json:"evidence"`
-	WeakPoints         []string `json:"weak_points"`
-	NextRecommendation string   `json:"next_recommendation"`
-	ReviewRequired     bool     `json:"review_required"`
+	Verdict                  string   `json:"verdict"`
+	MasteryAfter             string   `json:"mastery_after"`
+	Feedback                 string   `json:"feedback"`
+	Evidence                 string   `json:"evidence"`
+	WeakPoints               []string `json:"weak_points"`
+	ImprovementSuggestion    string   `json:"improvement_suggestion"`
+	LegacyNextRecommendation string   `json:"next_recommendation,omitempty"`
+	ReviewRequired           bool     `json:"review_required"`
 }
 
 // Judge 调 Examiner agent 判定一次作答
@@ -126,14 +127,17 @@ func normalizeJudgeResult(result *JudgeResult) {
 	if strings.TrimSpace(result.Evidence) == "" {
 		result.Evidence = strings.TrimSpace(result.Feedback)
 	}
-	if strings.TrimSpace(result.NextRecommendation) == "" {
+	if strings.TrimSpace(result.ImprovementSuggestion) == "" {
+		result.ImprovementSuggestion = strings.TrimSpace(result.LegacyNextRecommendation)
+	}
+	if strings.TrimSpace(result.ImprovementSuggestion) == "" {
 		switch result.Verdict {
 		case "pass":
-			result.NextRecommendation = "进入下一个小目标前,补一个自己的例子巩固本次解释。"
+			result.ImprovementSuggestion = "补一个自己的例子巩固本次解释。"
 		case "partial":
-			result.NextRecommendation = "先补齐反馈里指出的缺口,再用自己的话重新解释一遍。"
+			result.ImprovementSuggestion = "先补齐反馈里指出的缺口,再用自己的话重新解释一遍。"
 		default:
-			result.NextRecommendation = "回到资料中的关键定义,先完成一次小范围复述。"
+			result.ImprovementSuggestion = "回到资料中的关键定义,先完成一次小范围复述。"
 		}
 	}
 	if result.Verdict != "pass" {
@@ -150,10 +154,6 @@ func MergeLearningProfileState(profile *learning_db.LearningProfile, obj *learni
 		profile.CompletedTopics = appendUnique(profile.CompletedTopics, obj.Title)
 	}
 	profile.WeakPoints = appendUnique(profile.WeakPoints, result.WeakPoints...)
-	if strings.TrimSpace(result.NextRecommendation) != "" {
-		next := strings.TrimSpace(result.NextRecommendation)
-		profile.NextGoal = &next
-	}
 	if strings.TrimSpace(result.Evidence) != "" {
 		habit := strings.TrimSpace(result.Evidence)
 		profile.VerificationHabits = &habit

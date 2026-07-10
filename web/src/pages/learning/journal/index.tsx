@@ -24,7 +24,7 @@ export function JournalPage() {
                 <div className="text-sm text-muted-foreground">待补齐:{j.weak_points}</div>
               ) : null}
               {j.next_step ? (
-                <div className="text-sm text-muted-foreground">下一步:{j.next_step}</div>
+                <div className="text-sm text-muted-foreground">改进建议:{j.next_step}</div>
               ) : null}
             </Card>
           ))}

@@ -38,6 +38,24 @@ func (r *ExerciseRepository) FindByUser(ctx context.Context, userID string, offs
 	return exercises, total, nil
 }
 
+// 按用户和小目标分页列出练习记录
+func (r *ExerciseRepository) FindByUserAndObjective(ctx context.Context, userID, objectiveID string, offset, limit int) ([]*learning_db.LearningExercise, int, error) {
+	var exercises []*learning_db.LearningExercise
+	query := r.db.NewSelect().Model(&exercises).
+		Where("user_id = ?", userID).
+		Where("objective_id = ?", objectiveID).
+		Order("created_at DESC")
+
+	total, err := query.Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	if err := query.Offset(offset).Limit(limit).Scan(ctx); err != nil {
+		return nil, 0, err
+	}
+	return exercises, total, nil
+}
+
 // 最近验证记录，用于学习调度器判断薄弱点和复习动作。
 func (r *ExerciseRepository) FindRecentByUser(ctx context.Context, userID string, limit int) ([]*learning_db.LearningExercise, error) {
 	var exercises []*learning_db.LearningExercise

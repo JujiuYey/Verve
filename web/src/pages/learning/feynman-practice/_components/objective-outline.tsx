@@ -8,6 +8,9 @@ import { cn } from "@/lib/utils";
 
 import { masteryLabels } from "../_shared";
 
+const watchedMasteryLevels = new Set(["seen", "heard", "explained", "written", "verified"]);
+const practicedMasteryLevels = new Set(["heard", "explained", "written", "verified"]);
+
 export function ObjectiveOutline({
   objective,
   objectives,
@@ -71,8 +74,13 @@ export function ObjectiveOutline({
                     >
                       {index + 1}
                     </span>
-                    <span className="min-w-0">
-                      <span className="block text-sm font-medium leading-5">{item.title}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+                        <span className="min-w-0 truncate text-sm font-medium leading-5">
+                          {item.title}
+                        </span>
+                        <ObjectiveProgressBadges objective={item} />
+                      </span>
                       {item.detail ? (
                         <span className="mt-1 line-clamp-3 block text-xs leading-5 text-muted-foreground">
                           {item.detail}
@@ -105,6 +113,33 @@ export function ObjectiveOutline({
         </p>
       </div>
     </div>
+  );
+}
+
+function ObjectiveProgressBadges({ objective }: { objective: LearningObjective }) {
+  const badges: string[] = [];
+
+  if (watchedMasteryLevels.has(objective.mastery_level)) {
+    badges.push("看过");
+  }
+  if (practicedMasteryLevels.has(objective.mastery_level) || objective.status === "completed") {
+    badges.push("练过");
+  }
+
+  if (badges.length === 0) return null;
+
+  return (
+    <span className="inline-flex shrink-0 flex-wrap items-center gap-1">
+      {badges.map((label) => (
+        <Badge
+          key={label}
+          variant="secondary"
+          className="h-5 rounded-full px-1.5 text-[11px] font-normal leading-none"
+        >
+          {label}
+        </Badge>
+      ))}
+    </span>
   );
 }
 

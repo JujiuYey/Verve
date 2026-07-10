@@ -47,6 +47,7 @@ export interface ExerciseResult {
   objective_id: string;
   evidence?: string;
   weak_points?: string[];
+  improvement_suggestion?: string;
   next_recommendation?: string;
   review_required?: boolean;
 }

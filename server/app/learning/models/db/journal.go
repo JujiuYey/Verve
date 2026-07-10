@@ -17,7 +17,7 @@ type LearningJournal struct {
 	Learned    *string   `bun:"learned" json:"learned,omitempty"`                                        // 今日所学
 	Evidence   *string   `bun:"evidence" json:"evidence,omitempty"`                                      // 证据 / 产物
 	WeakPoints *string   `bun:"weak_points" json:"weak_points,omitempty"`                                // 薄弱点
-	NextStep   *string   `bun:"next_step" json:"next_step,omitempty"`                                    // 下一步计划
+	NextStep   *string   `bun:"next_step" json:"next_step,omitempty"`                                    // 本次改进建议(legacy column)
 	CreatedAt  time.Time `bun:"created_at,nullzero,notnull,default:current_timestamp" json:"created_at"` // 创建时间
 	UpdatedAt  time.Time `bun:"updated_at,nullzero,notnull,default:current_timestamp" json:"updated_at"` // 更新时间
 }

@@ -45,6 +45,9 @@ type PaginationResponse[T any] struct {
 // 创建分页响应
 func NewPaginationResponse[T any](data []T, total int64, page, pageSize int) PaginationResponse[T] {
 	totalPage := int((total + int64(pageSize) - 1) / int64(pageSize))
+	if data == nil {
+		data = []T{}
+	}
 	return PaginationResponse[T]{
 		Data:      data,
 		Total:     total,

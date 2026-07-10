@@ -10,7 +10,7 @@ import (
 
 func TestParseLearningExaminerOutputIncludesStateFacts(t *testing.T) {
 	raw := `一些前置说明
-{"verdict":"pass","mastery_after":"explained","feedback":"讲清楚了值必须有类型","evidence":"能说明类型由编译期检查","weak_points":["缺少反例","编译期检查解释偏泛"],"next_recommendation":"补一个 int x = \"hello\" 的反例","review_required":false}`
+{"verdict":"pass","mastery_after":"explained","feedback":"讲清楚了值必须有类型","evidence":"能说明类型由编译期检查","weak_points":["缺少反例","编译期检查解释偏泛"],"improvement_suggestion":"补一个 int x = \"hello\" 的反例","review_required":false}`
 
 	result, err := parseLearningExaminerOutput(raw)
 	if err != nil {
@@ -26,8 +26,8 @@ func TestParseLearningExaminerOutputIncludesStateFacts(t *testing.T) {
 	if !reflect.DeepEqual(result.WeakPoints, []string{"缺少反例", "编译期检查解释偏泛"}) {
 		t.Fatalf("weak points = %#v", result.WeakPoints)
 	}
-	if result.NextRecommendation != "补一个 int x = \"hello\" 的反例" {
-		t.Fatalf("next recommendation = %q", result.NextRecommendation)
+	if result.ImprovementSuggestion != "补一个 int x = \"hello\" 的反例" {
+		t.Fatalf("improvement suggestion = %q", result.ImprovementSuggestion)
 	}
 	if result.ReviewRequired {
 		t.Fatalf("review required = true")
@@ -43,11 +43,22 @@ func TestParseLearningExaminerOutputBackfillsMissingStateFacts(t *testing.T) {
 	if result.Evidence == "" {
 		t.Fatalf("expected evidence to fall back to feedback")
 	}
-	if result.NextRecommendation == "" {
-		t.Fatalf("expected next recommendation to be generated")
+	if result.ImprovementSuggestion == "" {
+		t.Fatalf("expected improvement suggestion to be generated")
 	}
 	if result.WeakPoints == nil {
 		t.Fatalf("expected weak points to be normalized to an empty slice")
+	}
+}
+
+func TestParseLearningExaminerOutputAcceptsLegacyNextRecommendation(t *testing.T) {
+	result, err := parseLearningExaminerOutput(`{"verdict":"pass","mastery_after":"explained","feedback":"可以","next_recommendation":"补一个自己的例子"}`)
+	if err != nil {
+		t.Fatalf("parseLearningExaminerOutput returned error: %v", err)
+	}
+
+	if result.ImprovementSuggestion != "补一个自己的例子" {
+		t.Fatalf("improvement suggestion = %q", result.ImprovementSuggestion)
 	}
 }
 
@@ -59,11 +70,11 @@ func TestMergeLearningProfileStateDeduplicatesWeakPointsAndTopics(t *testing.T) 
 		WeakPoints:      []string{"缺少反例"},
 	}
 	result := &JudgeResult{
-		Verdict:            "pass",
-		MasteryAfter:       "explained",
-		Evidence:           "能说明值必须有类型",
-		WeakPoints:         []string{"缺少反例", "编译期检查解释偏泛"},
-		NextRecommendation: "补一个反例",
+		Verdict:               "pass",
+		MasteryAfter:          "explained",
+		Evidence:              "能说明值必须有类型",
+		WeakPoints:            []string{"缺少反例", "编译期检查解释偏泛"},
+		ImprovementSuggestion: "补一个反例",
 	}
 	obj := &learning_db.LearningObjective{Title: "值类型与字面量"}
 
@@ -78,8 +89,8 @@ func TestMergeLearningProfileStateDeduplicatesWeakPointsAndTopics(t *testing.T) 
 	if !reflect.DeepEqual(profile.WeakPoints, []string{"缺少反例", "编译期检查解释偏泛"}) {
 		t.Fatalf("weak points = %#v", profile.WeakPoints)
 	}
-	if profile.NextGoal == nil || *profile.NextGoal != "补一个反例" {
-		t.Fatalf("next goal = %v", profile.NextGoal)
+	if profile.NextGoal != nil {
+		t.Fatalf("next goal should not be overwritten by an improvement suggestion: %v", profile.NextGoal)
 	}
 	if profile.VerificationHabits == nil || !strings.Contains(*profile.VerificationHabits, "能说明值必须有类型") {
 		t.Fatalf("verification habits = %v", profile.VerificationHabits)
