@@ -13,15 +13,6 @@ func TestDefaultAgentPromptsContainCriticalContracts(t *testing.T) {
 		want   []string
 	}{
 		{
-			name:   "guide",
-			render: GuidePrompt,
-			want: []string{
-				"只输出 JSON",
-				`"practice_points"`,
-				"顶层第一个字符必须是 {",
-			},
-		},
-		{
 			name:   "objective generator",
 			render: ObjectiveGeneratorPrompt,
 			want: []string{
@@ -79,7 +70,6 @@ func TestAgentPromptsFallBackToDefaultPreset(t *testing.T) {
 		name   string
 		render func(Input) string
 	}{
-		{name: "guide", render: GuidePrompt},
 		{name: "objective generator", render: ObjectiveGeneratorPrompt},
 		{name: "coach", render: CoachPrompt},
 		{name: "tutor", render: TutorPrompt},

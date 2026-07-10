@@ -10,24 +10,6 @@ import (
 	"github.com/cloudwego/eino/compose"
 )
 
-// NewGuideAgent 导学 agent(阅读资料并产出掌握目标)
-func NewGuideAgent(ctx context.Context) (adk.Agent, error) {
-	chatModel, err := NewStructuredChatModel(ctx)
-	if err != nil {
-		return nil, err
-	}
-	a, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
-		Name:        "Guide",
-		Description: "阅读学习资料并生成本节导学目标",
-		Instruction: prompts.GuidePrompt(prompts.Input{}),
-		Model:       chatModel,
-	})
-	if err != nil {
-		return nil, err
-	}
-	return a, nil
-}
-
 // NewObjectiveGeneratorAgent 读取 Markdown 并生成学习小节。
 func NewObjectiveGeneratorAgent(ctx context.Context) (adk.Agent, error) {
 	chatModel, err := NewStructuredChatModel(ctx)

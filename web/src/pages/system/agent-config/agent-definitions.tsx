@@ -1,5 +1,4 @@
 import {
-  IconBook2,
   IconChecklist,
   IconRoute,
   IconStack2,
@@ -33,22 +32,6 @@ export type SceneConfigState = {
 };
 
 export const AGENTS: AgentDefinition[] = [
-  {
-    key: "guide",
-    name: "导学 Agent",
-    shortName: "导学",
-    description: "阅读资料并生成掌握目标、阅读步骤和自检问题。",
-    runtime: "GuideAgent",
-    icon: IconBook2,
-    scenes: [
-      {
-        key: "default",
-        name: "默认模型",
-        required: true,
-        description: "用于生成导学摘要、掌握目标和练习重点。",
-      },
-    ],
-  },
   {
     key: "objective_generator",
     name: "学习小节生成 Agent",

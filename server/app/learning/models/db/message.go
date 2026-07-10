@@ -13,7 +13,7 @@ type LearningMessage struct {
 	ID               string                 `bun:"id,pk,type:varchar(32)" json:"id"`                                        // 主键ID
 	SessionID        string                 `bun:"session_id,notnull" json:"session_id"`                                    // 会话ID
 	Role             string                 `bun:"role,notnull" json:"role"`                                                // user / assistant / system
-	AgentType        *string                `bun:"agent_type" json:"agent_type,omitempty"`                                  // tutor / examiner / guide
+	AgentType        *string                `bun:"agent_type" json:"agent_type,omitempty"`                                  // tutor / examiner
 	Content          string                 `bun:"content,notnull" json:"content"`                                          // 消息内容
 	ToolUsed         *string                `bun:"tool_used" json:"tool_used,omitempty"`                                    // 使用的工具
 	ToolResult       map[string]interface{} `bun:"tool_result,type:jsonb" json:"tool_result,omitempty"`                     // 工具返回结果

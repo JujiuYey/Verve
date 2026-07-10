@@ -114,8 +114,16 @@ func buildObjectiveGenerationQuery(doc *wiki_db.Document, folder *wiki_db.Folder
 	sb.WriteString("\n文档:")
 	sb.WriteString(doc.Filename)
 	sb.WriteString("\n\nMarkdown 学习资料:\n")
-	sb.WriteString(truncateGuideMarkdown(markdown, 24000))
+	sb.WriteString(truncateMarkdown(markdown, 24000))
 	return sb.String()
+}
+
+func truncateMarkdown(markdown string, limit int) string {
+	markdown = strings.TrimSpace(markdown)
+	if len(markdown) <= limit {
+		return markdown
+	}
+	return markdown[:limit] + "\n\n...(资料过长,已截断)"
 }
 
 func parseObjectiveGenerationOutput(text string) (*ObjectiveGenerationResult, error) {

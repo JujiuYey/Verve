@@ -119,7 +119,7 @@ workflow 输出分两类：前端事件和持久化事实。
 
 | 状态 | 含义 | 前端展示 |
 |---|---|---|
-| `reading` | 用户阅读源资料和 Guide | 阅读页 |
+| `reading` | 用户阅读源资料 | 阅读页 |
 | `answering` | 等待用户首次复述 | 复述页 |
 | `evaluating` | Examiner 正在判定 | 复述页 loading |
 | `passed` | 本轮通过，学习事实已写回 | 结果面板 |
