@@ -126,7 +126,7 @@ P0 验收标准：
 
 ### P1：把 Coach 的上下文拼接改成结构化输入层
 
-当前 `BuildCoachQuery` 把 Wiki 文件夹、文档、学习小节、画像、日志拼成一段 Markdown。这能跑，但后续越加越难控制 token、字段和行为边界。
+当前 `BuildCoachQuery` 把 Wiki 文件夹、文档、学习小节、学习记忆、legacy 画像、日志拼成一段 Markdown。这能跑，但后续越加越难控制 token、字段和行为边界。
 
 P1 不要求马上改成 Eino `ChatTemplate`。更稳的做法是先把 Coach 的业务上下文变成 prompt input：
 
@@ -136,6 +136,7 @@ type CoachPromptInput struct {
     Folders     []FolderPromptItem
     Documents   []DocumentPromptItem
     Objectives  []ObjectivePromptItem
+    MemoryItems []MemoryPromptItem
     Profiles    []ProfilePromptItem
     Journals    []JournalPromptItem
 }
@@ -194,7 +195,7 @@ P2 验收标准：
 |---|---|
 | workflow 名称 | 是 `RecoveryWorkflow`、`FeynmanSessionWorkflow`，还是 `LearningSessionWorkflow` |
 | 入口 | 从 `/learn/feynman-practice/$objectiveId` 进入，还是 Coach tool 触发 |
-| 输入 | objective、source markdown、user answer、session id、profile、journal |
+| 输入 | objective、source markdown、user answer、session id、learning memory、legacy profile、journal |
 | 输出 | verdict、teaching advice、next action、journal update、markdown note |
 | 状态 | reading / answering / evaluating / teaching / retrying / passed |
 | SSE | 每个状态变化对应什么 event |

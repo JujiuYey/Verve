@@ -23,7 +23,7 @@
 1. 页面刷新后能恢复到真实学习进度；
 2. Examiner / Tutor 失败后能安全重试；
 3. Tutor 与 Examiner 的交接有明确状态；
-4. pass 后学习状态、学习画像、学习日志写回保持一致；
+4. pass 后学习状态、学习记忆、学习日志写回保持一致；
 5. Markdown 旁注写回有用户确认边界，不由 agent 静默改教材。
 
 ## 2. 推荐名称
@@ -70,7 +70,7 @@ workflow 启动输入：
 | `objective_id` | route / Coach action | 本次只练一个学习小节 |
 | `session_id` | `learning_sessions` | 已存在则恢复；不存在则创建 |
 | `source_document_id` | `learning_objectives` | 可选，用于读取源 Markdown |
-| `source_folder_id` | `learning_objectives` | 可选，用于学习画像和日志 |
+| `source_folder_id` | `learning_objectives` | 可选，用于学习记忆和日志 |
 
 用户动作输入：
 
@@ -106,7 +106,10 @@ workflow 输出分两类：前端事件和持久化事实。
 | `learning_messages` | Tutor 对话和 assistant 输出 |
 | `learning_exercises` | 用户作答与 Examiner verdict |
 | `learning_objectives.mastery_level` | Examiner 判定后的掌握层级 |
-| `learning_profiles` | 已掌握内容、薄弱点、下一目标 |
+| `learning_memory_events` | 本次作答、判定、证据和改进建议等原始学习事实 |
+| `learning_memory_items` | 从学习事实中抽取的稳定记忆，如已掌握概念和验证证据 |
+| `learning_memory_summaries` | 给学习记忆页使用的摘要投影；Coach 当前优先读取 memory items |
+| `learning_profiles` | legacy 兼容投影，不再作为用户画像 source of truth |
 | `learning_journals` | 当日学习事实和本次改进建议 |
 | Wiki Markdown | 用户确认后的学习旁注 |
 

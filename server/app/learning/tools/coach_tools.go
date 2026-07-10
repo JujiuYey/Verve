@@ -34,6 +34,16 @@ type GetLearningProfileInput struct {
 	FolderID string `json:"folder_id" jsonschema_description:"文件夹 ID"`
 }
 
+type SearchLearningMemoryInput struct {
+	FolderID string `json:"folder_id" jsonschema_description:"文件夹 ID,可留空表示搜索最近的全局学习记忆"`
+	Query    string `json:"query" jsonschema_description:"要搜索的学习记忆关键词,可留空"`
+	Limit    int    `json:"limit" jsonschema_description:"最多返回多少条学习记忆,默认 10"`
+}
+
+type SearchLearningMemoryOutput struct {
+	Results []map[string]interface{} `json:"results"`
+}
+
 type ListJournalsInput struct {
 	Limit int `json:"limit" jsonschema_description:"最多返回多少条最近学习记录,默认 10"`
 }
@@ -84,6 +94,7 @@ func NewCoachTools(db *database.DatabaseService, minio *storage.MinIOService, re
 		newListFoldersTool(db, userID),
 		newListDocumentsTool(db),
 		newListObjectivesTool(db, userID),
+		newSearchLearningMemoryTool(db, userID),
 		newGetLearningProfileTool(db),
 		newListJournalsTool(db, userID),
 		newCreateLearningObjectivesTool(db, minio, userID),
@@ -111,6 +122,61 @@ func newSearchWikiKnowledgeTool(retriever *rag_service.Retriever) tool.Invokable
 					"heading_path":   result.HeadingPath,
 					"content":        result.Content,
 					"score":          result.Score,
+				})
+			}
+			return out, nil
+		})
+	if err != nil {
+		log.Fatal(err)
+	}
+	return t
+}
+
+func newSearchLearningMemoryTool(db *database.DatabaseService, userID string) tool.InvokableTool {
+	t, err := utils.InferTool("search_learning_memory", "搜索首选学习记忆; get_learning_profile 是旧版 fallback",
+		func(ctx context.Context, input *SearchLearningMemoryInput) (*SearchLearningMemoryOutput, error) {
+			out := &SearchLearningMemoryOutput{Results: []map[string]interface{}{}}
+			if db == nil || db.Memories == nil {
+				return out, nil
+			}
+			if input == nil {
+				input = &SearchLearningMemoryInput{}
+			}
+
+			limit := normalizeLimit(input.Limit, 10)
+			query := strings.ToLower(strings.TrimSpace(input.Query))
+			candidateLimit := limit
+			if query != "" {
+				candidateLimit = max(limit*5, 50)
+			}
+			items, err := db.Memories.FindItemsByUser(ctx, userID, input.FolderID, candidateLimit)
+			if err != nil {
+				return nil, err
+			}
+
+			for _, item := range items {
+				if item == nil {
+					continue
+				}
+				if query != "" {
+					statement := strings.ToLower(item.Statement)
+					kind := strings.ToLower(item.Kind)
+					if !strings.Contains(statement, query) && !strings.Contains(kind, query) {
+						continue
+					}
+				}
+				if len(out.Results) >= limit {
+					break
+				}
+				out.Results = append(out.Results, map[string]interface{}{
+					"id":           item.ID,
+					"folder_id":    stringValue(item.FolderID),
+					"document_id":  stringValue(item.DocumentID),
+					"objective_id": stringValue(item.ObjectiveID),
+					"kind":         item.Kind,
+					"statement":    item.Statement,
+					"confidence":   item.Confidence,
+					"last_seen_at": item.LastSeenAt,
 				})
 			}
 			return out, nil

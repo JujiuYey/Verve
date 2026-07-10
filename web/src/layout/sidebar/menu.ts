@@ -18,7 +18,7 @@ export const learnNav: NavItem[] = [
   { title: "知识库", url: "/wiki", icon: FolderIcon },
   { title: "费曼练习", url: "/learn/feynman", icon: AgentIcon },
   { title: "日志", url: "/learn/journal", icon: DocumentIcon },
-  { title: "我的画像", url: "/learn/profile", icon: DashboardIcon },
+  { title: "学习记忆", url: "/learn/profile", icon: DashboardIcon },
 ];
 
 export const systemNav: NavItem[] = [

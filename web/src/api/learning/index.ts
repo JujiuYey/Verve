@@ -4,3 +4,4 @@ export * from "./exercise";
 export * from "./profile";
 export * from "./guide";
 export * from "./objective";
+export * from "./memory";
