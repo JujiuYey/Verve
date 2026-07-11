@@ -1,6 +1,7 @@
 package service
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 )
@@ -17,7 +18,7 @@ func TestParseFeynmanReviewOutputAcceptsFencedJSON(t *testing.T) {
   "context_sufficient": true
 }` + "\n```"
 
-	got, err := parseFeynmanReviewOutput(raw)
+	got, err := parseFeynmanReviewOutput(raw, true)
 	if err != nil {
 		t.Fatalf("parseFeynmanReviewOutput returned error: %v", err)
 	}
@@ -33,9 +34,9 @@ func TestParseFeynmanReviewOutputAcceptsFencedJSON(t *testing.T) {
 }
 
 func TestParseFeynmanReviewOutputNormalizesNilArrays(t *testing.T) {
-	raw := `{"heard_summary":"我听到你解释了接口的隐式实现","explanation_summary":"学习者提到了方法集匹配。","follow_up_question":"","ready_to_wrap_up":true,"context_sufficient":true}`
+	raw := `{"heard_summary":"我听到你解释了接口的隐式实现","clear_points":null,"confusing_points":null,"misconceptions":null,"follow_up_question":"","explanation_summary":"学习者提到了方法集匹配。","ready_to_wrap_up":true,"context_sufficient":true}`
 
-	got, err := parseFeynmanReviewOutput(raw)
+	got, err := parseFeynmanReviewOutput(raw, true)
 	if err != nil {
 		t.Fatalf("parseFeynmanReviewOutput returned error: %v", err)
 	}
@@ -46,20 +47,56 @@ func TestParseFeynmanReviewOutputNormalizesNilArrays(t *testing.T) {
 
 func TestParseFeynmanReviewOutputRejectsEmptyAndInvalidOutputs(t *testing.T) {
 	for _, raw := range []string{"", "not json", `{}`, `{"heard_summary":""}`} {
-		if got, err := parseFeynmanReviewOutput(raw); err == nil {
+		if got, err := parseFeynmanReviewOutput(raw, false); err == nil {
 			t.Fatalf("parseFeynmanReviewOutput(%q) = %#v, nil error", raw, got)
 		}
 	}
 }
 
-func TestParseFeynmanReviewOutputRetainsFalseContextSufficient(t *testing.T) {
-	raw := `{"heard_summary":"我听到你说调度器会公平执行所有 goroutine","clear_points":[],"confusing_points":["公平的含义没有说明"],"misconceptions":[],"follow_up_question":"你说的公平具体指什么？","explanation_summary":"当前解释包含无法由检索片段核对的全局断言。","ready_to_wrap_up":false,"context_sufficient":false}`
-
-	got, err := parseFeynmanReviewOutput(raw)
-	if err != nil {
-		t.Fatalf("parseFeynmanReviewOutput returned error: %v", err)
+func TestParseFeynmanReviewOutputUsesAuthoritativeContextSufficiency(t *testing.T) {
+	base := `{"heard_summary":"我听到你解释了调度公平性","clear_points":[],"confusing_points":[],"misconceptions":[],"follow_up_question":"","explanation_summary":"学习者对调度公平性作出断言。","ready_to_wrap_up":true,"context_sufficient":%t}`
+	tests := []struct {
+		name         string
+		modelValue   bool
+		runtimeValue bool
+	}{
+		{name: "runtime false overrides model true", modelValue: true, runtimeValue: false},
+		{name: "runtime true overrides model false", modelValue: false, runtimeValue: true},
 	}
-	if got.ContextSufficient {
-		t.Fatalf("context sufficient was changed to true")
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseFeynmanReviewOutput(fmt.Sprintf(base, tt.modelValue), tt.runtimeValue)
+			if err != nil {
+				t.Fatalf("parseFeynmanReviewOutput returned error: %v", err)
+			}
+			if got.ContextSufficient != tt.runtimeValue {
+				t.Fatalf("context sufficient = %t, want authoritative %t", got.ContextSufficient, tt.runtimeValue)
+			}
+		})
+	}
+}
+
+func TestParseFeynmanReviewOutputRejectsMissingKeys(t *testing.T) {
+	raw := `{"heard_summary":"我听到你的解释","clear_points":[],"confusing_points":[],"misconceptions":[],"follow_up_question":"","explanation_summary":"解释摘要","ready_to_wrap_up":true}`
+
+	if got, err := parseFeynmanReviewOutput(raw, true); err == nil {
+		t.Fatalf("missing context_sufficient accepted: %#v", got)
+	}
+}
+
+func TestParseFeynmanReviewOutputRejectsNullScalar(t *testing.T) {
+	raw := `{"heard_summary":"我听到你的解释","clear_points":[],"confusing_points":[],"misconceptions":[],"follow_up_question":"问题是什么？","explanation_summary":"解释摘要","ready_to_wrap_up":false,"context_sufficient":null}`
+
+	if got, err := parseFeynmanReviewOutput(raw, true); err == nil {
+		t.Fatalf("null scalar accepted: %#v", got)
+	}
+}
+
+func TestParseFeynmanReviewOutputRequiresQuestionWhileNotReady(t *testing.T) {
+	raw := `{"heard_summary":"我听到你的解释","clear_points":[],"confusing_points":["还有缺口"],"misconceptions":[],"follow_up_question":"  ","explanation_summary":"解释仍需澄清","ready_to_wrap_up":false,"context_sufficient":true}`
+
+	if got, err := parseFeynmanReviewOutput(raw, true); err == nil {
+		t.Fatalf("non-wrap review without a question accepted: %#v", got)
 	}
 }

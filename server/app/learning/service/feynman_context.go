@@ -19,7 +19,7 @@ const (
 
 	feynmanSearchLimit        = 6
 	feynmanNeighborRadius     = 1
-	minimumFeynmanRAGEvidence = 2
+	minimumFeynmanPrimaryHits = 2
 )
 
 type FeynmanEvidence struct {
@@ -97,8 +97,13 @@ func (b *FeynmanContextBuilder) Build(ctx context.Context, documentID, learnerEx
 		return nil, fmt.Errorf("search Feynman document %q: %w", documentID, err)
 	}
 	indexes := make([]int, 0, len(hits))
+	primaryIndexes := make(map[int]struct{}, len(hits))
 	for _, hit := range hits {
-		if hit.DocumentID == documentID {
+		if hit.DocumentID == documentID && strings.TrimSpace(hit.Content) != "" {
+			if _, exists := primaryIndexes[hit.ChunkIndex]; exists {
+				continue
+			}
+			primaryIndexes[hit.ChunkIndex] = struct{}{}
 			indexes = append(indexes, hit.ChunkIndex)
 		}
 	}
@@ -107,9 +112,9 @@ func (b *FeynmanContextBuilder) Build(ctx context.Context, documentID, learnerEx
 		return nil, fmt.Errorf("find Feynman evidence neighbors for %q: %w", documentID, err)
 	}
 	result.Evidence = mergeFeynmanEvidence(documentID, hits, neighbors)
-	result.ContextSufficient = len(result.Evidence) >= minimumFeynmanRAGEvidence
+	result.ContextSufficient = len(primaryIndexes) >= minimumFeynmanPrimaryHits
 	if !result.ContextSufficient {
-		result.ContextInsufficiencyReason = fmt.Sprintf("retrieval returned %d unique evidence chunk(s); at least %d are required", len(result.Evidence), minimumFeynmanRAGEvidence)
+		result.ContextInsufficiencyReason = fmt.Sprintf("retrieval returned %d unique primary hit(s); at least %d are required", len(primaryIndexes), minimumFeynmanPrimaryHits)
 	}
 	return result, nil
 }
@@ -135,23 +140,27 @@ func markdownHeadingPaths(markdown string) []string {
 	var fence byte
 	var fenceLength int
 	for i, rawLine := range lines {
-		line := strings.TrimSpace(rawLine)
-		marker, markerLength := markdownFenceMarker(line)
+		line, indentedCode := markdownLineContent(rawLine)
 		if fence != 0 {
-			if marker == fence && markerLength >= fenceLength {
+			if markdownFenceCloses(line, indentedCode, fence, fenceLength) {
 				fence = 0
 				fenceLength = 0
 			}
 			continue
 		}
+		marker, markerLength := markdownFenceOpens(line, indentedCode)
 		if marker != 0 {
 			fence = marker
 			fenceLength = markerLength
 			continue
 		}
+		if indentedCode {
+			continue
+		}
 		if level := markdownSetextLevel(line); level != 0 && i > 0 {
-			title := strings.TrimSpace(lines[i-1])
-			if title != "" {
+			title, previousIndentedCode := markdownLineContent(lines[i-1])
+			title = strings.TrimSpace(title)
+			if title != "" && !previousIndentedCode {
 				appendHeading(level, title)
 			}
 			continue
@@ -164,8 +173,7 @@ func markdownHeadingPaths(markdown string) []string {
 		if level == 0 || level >= len(line) || (line[level] != ' ' && line[level] != '\t') {
 			continue
 		}
-		title := strings.TrimSpace(line[level:])
-		title = strings.TrimSpace(strings.TrimRight(title, "#"))
+		title := trimATXHeadingTitle(line[level:])
 		if title == "" {
 			continue
 		}
@@ -174,7 +182,21 @@ func markdownHeadingPaths(markdown string) []string {
 	return paths
 }
 
-func markdownFenceMarker(line string) (byte, int) {
+func markdownLineContent(line string) (string, bool) {
+	spaces := 0
+	for spaces < len(line) && line[spaces] == ' ' {
+		spaces++
+	}
+	if spaces >= 4 || (spaces < len(line) && line[spaces] == '\t') {
+		return line[spaces:], true
+	}
+	return line[spaces:], false
+}
+
+func markdownFenceOpens(line string, indentedCode bool) (byte, int) {
+	if indentedCode {
+		return 0, 0
+	}
 	if len(line) < 3 || (line[0] != '`' && line[0] != '~') {
 		return 0, 0
 	}
@@ -186,6 +208,36 @@ func markdownFenceMarker(line string) (byte, int) {
 		return 0, 0
 	}
 	return line[0], length
+}
+
+func markdownFenceCloses(line string, indentedCode bool, marker byte, minimumLength int) bool {
+	if indentedCode || len(line) < minimumLength || line[0] != marker {
+		return false
+	}
+	length := 0
+	for length < len(line) && line[length] == marker {
+		length++
+	}
+	if length < minimumLength {
+		return false
+	}
+	return strings.Trim(line[length:], " \t") == ""
+}
+
+func trimATXHeadingTitle(value string) string {
+	title := strings.TrimSpace(value)
+	if title == "" {
+		return ""
+	}
+	end := len(title)
+	start := end
+	for start > 0 && title[start-1] == '#' {
+		start--
+	}
+	if start > 0 && start < end && (title[start-1] == ' ' || title[start-1] == '\t') {
+		title = strings.TrimSpace(title[:start-1])
+	}
+	return title
 }
 
 func markdownSetextLevel(line string) int {

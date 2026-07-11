@@ -136,6 +136,10 @@ func TestFeynmanContextMarksInsufficientRAGEvidence(t *testing.T) {
 		searchResults: []rag_payload.SearchResult{
 			{ChunkID: "only", DocumentID: "doc-large", ChunkIndex: 7, Content: "唯一证据"},
 		},
+		neighbors: []*rag_db.WikiChunk{
+			{ID: "before", DocumentID: "doc-large", ChunkIndex: 6, Content: "前一个邻块"},
+			{ID: "after", DocumentID: "doc-large", ChunkIndex: 8, Content: "后一个邻块"},
+		},
 	}
 
 	got, err := NewFeynmanContextBuilder(source).Build(context.Background(), "doc-large", "解释")
@@ -143,9 +147,19 @@ func TestFeynmanContextMarksInsufficientRAGEvidence(t *testing.T) {
 		t.Fatalf("Build returned error: %v", err)
 	}
 	if got.ContextSufficient {
-		t.Fatalf("single unexpanded chunk must be marked insufficient")
+		t.Fatalf("one primary hit must remain insufficient despite neighbor expansion")
 	}
 	if strings.TrimSpace(got.ContextInsufficiencyReason) == "" {
 		t.Fatalf("missing insufficiency reason")
+	}
+}
+
+func TestMarkdownHeadingPathsUsesCommonMarkBoundaries(t *testing.T) {
+	markdown := "# Root\n\n    # indented code\n\n```go\n# fenced\n``` trailing text\n# still fenced\n```\n\n# C#\n"
+
+	got := markdownHeadingPaths(markdown)
+	want := []string{"Root", "C#"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("outline = %#v, want %#v", got, want)
 	}
 }
