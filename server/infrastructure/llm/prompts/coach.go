@@ -3,7 +3,6 @@ package prompts
 import (
 	"fmt"
 	"strings"
-	"time"
 )
 
 func CoachPrompt(input Input) string {
@@ -22,7 +21,6 @@ type CoachQueryInput struct {
 	Folders      []CoachFolder
 	Documents    []CoachDocument
 	MemoryItems  []CoachMemoryItem
-	Journals     []CoachJournal
 }
 
 type CoachAgentContext struct {
@@ -49,14 +47,6 @@ type CoachMemoryItem struct {
 	Confidence string
 }
 
-type CoachJournal struct {
-	FolderID   string
-	Date       time.Time
-	Learned    string
-	WeakPoints string
-	NextStep   string
-}
-
 func CoachQueryPrompt(input CoachQueryInput) string {
 	var sb strings.Builder
 	sb.WriteString("你正在 Verve 的费曼学习入口帮助用户继续学习。\n")
@@ -68,7 +58,6 @@ func CoachQueryPrompt(input CoachQueryInput) string {
 	renderCoachFolders(&sb, input.Folders)
 	renderCoachDocuments(&sb, input.Documents)
 	renderCoachMemoryItems(&sb, input.MemoryItems)
-	renderCoachJournals(&sb, input.Journals)
 	renderCoachReplyContract(&sb)
 	return sb.String()
 }
@@ -157,30 +146,6 @@ func coachMemoryKindLabel(kind string) string {
 	}
 }
 
-func renderCoachJournals(sb *strings.Builder, journals []CoachJournal) {
-	sb.WriteString("\n## 最近学习记录\n")
-	if len(journals) == 0 {
-		sb.WriteString("- 暂无记录\n")
-		return
-	}
-	for _, journal := range journals {
-		sb.WriteString(fmt.Sprintf("- %s folder=%s", journal.Date.Format(time.DateOnly), journal.FolderID))
-		if journal.Learned != "" {
-			sb.WriteString(", 学了:")
-			sb.WriteString(strings.TrimSpace(journal.Learned))
-		}
-		if strings.TrimSpace(journal.WeakPoints) != "" {
-			sb.WriteString(", 薄弱点:")
-			sb.WriteString(strings.TrimSpace(journal.WeakPoints))
-		}
-		if strings.TrimSpace(journal.NextStep) != "" {
-			sb.WriteString(", 上次建议:")
-			sb.WriteString(strings.TrimSpace(journal.NextStep))
-		}
-		sb.WriteString("\n")
-	}
-}
-
 func renderCoachReplyContract(sb *strings.Builder) {
 	sb.WriteString("\n请基于这些真实上下文决定下一步。")
 	sb.WriteString("当用户要求继续学习或提问某个概念时,先识别相关 Wiki 根目录/文件夹;如果已知 root folder,调用 search_wiki_knowledge 检索真实片段后再规划下一步。")
@@ -190,11 +155,10 @@ func renderCoachReplyContract(sb *strings.Builder) {
 
 const coachInstruction = `你是 Verve 的学习调度 agent。用户通常只会说"继续学习",你需要像真正的学习助理一样先查上下文,再决定下一步。
 
-你可以使用工具查询 Wiki 文件夹、文档、学习记忆和最近学习记录,也可以检索 Wiki 真实文档片段。
+你可以使用工具查询 Wiki 文件夹、文档和学习记忆,也可以检索 Wiki 真实文档片段。
 
 决策规则:
-- 优先参考学习记忆和最近练习记录里的改进建议决定下一步;
-- 如果有多个可能的文件夹,优先最近学习记录对应的文件夹;
+- 优先参考学习记忆里的证据和误解记录决定下一步;
 - 当用户要求继续学习或提出概念问题时,先识别相关 Wiki root folder;如果 root folder 已知,调用 search_wiki_knowledge 后再决定下一步;
 - 如果有 Wiki 文档,优先选择最适合当前继续学习的一篇;如果无法判断文档,只问用户一个选择题;
 - 如果没有资料,引导用户去 Wiki 添加资料;

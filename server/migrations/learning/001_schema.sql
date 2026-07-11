@@ -69,24 +69,6 @@ CREATE INDEX idx_learning_explanation_reviews_document_id
 CREATE INDEX idx_learning_explanation_reviews_user_id
     ON learning_explanation_reviews(user_id);
 
--- 4. 学习日志(按 Wiki 文件夹记录)
-CREATE TABLE learning_journals (
-    id VARCHAR(32) PRIMARY KEY,
-    user_id VARCHAR(32) NOT NULL REFERENCES sys_users(id) ON DELETE CASCADE,
-    folder_id VARCHAR(32) NOT NULL REFERENCES wiki_folders(id) ON DELETE CASCADE,
-    date DATE NOT NULL,
-    learned TEXT,
-    evidence TEXT,
-    weak_points TEXT,
-    next_step TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT uq_learning_journal_day UNIQUE (user_id, folder_id, date)
-);
-CREATE INDEX idx_learning_journals_user_date ON learning_journals(user_id, date DESC);
-CREATE INDEX idx_learning_journals_folder_id ON learning_journals(folder_id);
-
 COMMENT ON TABLE learning_sessions IS '以整篇 Wiki 文档为范围的学习会话';
 COMMENT ON TABLE learning_messages IS '陪练对话消息';
 COMMENT ON TABLE learning_explanation_reviews IS '费曼解释的多轮结构化评审';
-COMMENT ON TABLE learning_journals IS '学习日志(按 Wiki 文件夹记录)';

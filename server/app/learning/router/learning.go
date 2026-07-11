@@ -12,7 +12,6 @@ import (
 // 配置学习平台路由(/api/learning/*)
 func SetupLearningRoutes(router fiber.Router, dbService *database.DatabaseService, minioService *storage.MinIOService, retriever *rag_service.Retriever) {
 	sessionHandler := learning_handlers.NewSessionHandler(dbService, minioService, retriever)
-	journalHandler := learning_handlers.NewJournalHandler(dbService)
 	coachHandler := learning_handlers.NewCoachHandler(dbService, retriever)
 	memoryHandler := learning_handlers.NewMemoryHandler(dbService)
 
@@ -25,12 +24,6 @@ func SetupLearningRoutes(router fiber.Router, dbService *database.DatabaseServic
 			session.Get("/:id", sessionHandler.FindOne)
 			session.Post("/:id/review", sessionHandler.Review)
 			session.Post("/:id/complete", sessionHandler.Complete) // 结束本节
-		}
-
-		// 学习日志
-		journal := learning.Group("/journal")
-		{
-			journal.Get("/page", journalHandler.FindPage)
 		}
 
 		coach := learning.Group("/coach")

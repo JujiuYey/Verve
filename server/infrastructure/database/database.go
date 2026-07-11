@@ -32,7 +32,6 @@ type DatabaseService struct {
 	Sessions *learning_repo.SessionRepository
 	Messages *learning_repo.MessageRepository
 	Reviews  *learning_repo.ReviewRepository
-	Journals *learning_repo.JournalRepository
 	Memories *learning_repo.MemoryRepository
 
 	// Wiki Repositories
@@ -66,7 +65,6 @@ func NewDatabaseService(dsn string) (*DatabaseService, error) {
 	db.RegisterModel((*learning_db.LearningSession)(nil))
 	db.RegisterModel((*learning_db.LearningMessage)(nil))
 	db.RegisterModel((*learning_db.LearningExplanationReview)(nil))
-	db.RegisterModel((*learning_db.LearningJournal)(nil))
 	db.RegisterModel((*learning_db.LearningMemoryEvent)(nil))
 	db.RegisterModel((*learning_db.LearningMemoryItem)(nil))
 	db.RegisterModel((*learning_db.LearningMemorySummary)(nil))
@@ -101,7 +99,6 @@ func NewDatabaseService(dsn string) (*DatabaseService, error) {
 		Sessions: learning_repo.NewSessionRepository(db),
 		Messages: learning_repo.NewMessageRepository(db),
 		Reviews:  learning_repo.NewReviewRepository(db),
-		Journals: learning_repo.NewJournalRepository(db),
 		Memories: learning_repo.NewMemoryRepository(db),
 
 		// Wiki Repositories

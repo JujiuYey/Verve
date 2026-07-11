@@ -3,7 +3,6 @@ package prompts
 import (
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestDefaultAgentPromptsContainCriticalContracts(t *testing.T) {
@@ -216,14 +215,6 @@ func TestCoachQueryPromptRendersRuntimeContext(t *testing.T) {
 				Confidence: "confirmed",
 			},
 		},
-		Journals: []CoachJournal{
-			{
-				FolderID: "folder-go",
-				Date:     time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC),
-				Learned:  "接口基础",
-				NextStep: "复述 interface 的隐式实现",
-			},
-		},
 	})
 
 	for _, want := range []string{
@@ -233,7 +224,6 @@ func TestCoachQueryPromptRendersRuntimeContext(t *testing.T) {
 		"## 学习记忆",
 		"解释证据",
 		"用户已经能用自己的话解释 Go 接口的隐式实现",
-		"上次建议:复述 interface 的隐式实现",
 		"<ACTION>",
 	} {
 		if !strings.Contains(prompt, want) {
@@ -254,7 +244,6 @@ func TestCoachQueryPromptRendersExplicitEmptyStates(t *testing.T) {
 		"- 暂无文件夹",
 		"- 暂无文档",
 		"- 暂无学习记忆",
-		"- 暂无记录",
 		"如果不能确定,只问用户一个选择题。",
 	} {
 		if !strings.Contains(prompt, want) {

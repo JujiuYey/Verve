@@ -86,7 +86,7 @@ func writeScopedCoachAction(w *bufio.Writer, content string, documents []*wiki_d
 }
 
 // buildRuntimeContext 聚合陪练 agent 所需的运行时上下文:用户文件夹(已过滤)、
-// 文档、学习记忆和最近 journal。
+// 文档和学习记忆。
 func (h *CoachHandler) buildRuntimeContext(ctx context.Context, userID string, rootFolderID string) (learning_service.CoachRuntimeContext, error) {
 	if h == nil || h.db == nil {
 		return learning_service.CoachRuntimeContext{}, errors.New("learning coach database is not configured")
@@ -123,11 +123,6 @@ func (h *CoachHandler) buildRuntimeContext(ctx context.Context, userID string, r
 		}
 	}
 
-	journals, _, err := h.db.Journals.FindByUser(ctx, userID, 0, 10)
-	if err != nil {
-		return learning_service.CoachRuntimeContext{}, err
-	}
-
 	memoryItems := make([]*learning_db.LearningMemoryItem, 0)
 	if h.db.Memories != nil {
 		memoryItems, err = learning_service.NewMemoryService(h.db).FindCoachItems(ctx, userID, rootFolderID, 20)
@@ -143,7 +138,6 @@ func (h *CoachHandler) buildRuntimeContext(ctx context.Context, userID string, r
 		Folders:        folders,
 		Documents:      docs,
 		MemoryItems:    memoryItems,
-		Journals:       journals,
 	}, nil
 }
 

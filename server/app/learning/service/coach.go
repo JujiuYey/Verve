@@ -16,7 +16,6 @@ type CoachRuntimeContext struct {
 	Folders        []*wiki_db.Folder
 	Documents      []*wiki_db.Document
 	MemoryItems    []*learning_db.LearningMemoryItem
-	Journals       []*learning_db.LearningJournal
 }
 
 type CoachAction struct {
@@ -39,7 +38,6 @@ func BuildCoachQuery(ctx CoachRuntimeContext, message string) string {
 		Folders:     mapCoachFolders(ctx.Folders),
 		Documents:   mapCoachDocuments(ctx.Documents),
 		MemoryItems: mapCoachMemoryItems(ctx.MemoryItems),
-		Journals:    mapCoachJournals(ctx.Journals),
 	})
 }
 
@@ -132,23 +130,6 @@ func mapCoachMemoryItems(items []*learning_db.LearningMemoryItem) []prompts.Coac
 			Kind:       item.Kind,
 			Statement:  item.Statement,
 			Confidence: item.Confidence,
-		})
-	}
-	return result
-}
-
-func mapCoachJournals(journals []*learning_db.LearningJournal) []prompts.CoachJournal {
-	result := make([]prompts.CoachJournal, 0, len(journals))
-	for _, journal := range journals {
-		if journal == nil {
-			continue
-		}
-		result = append(result, prompts.CoachJournal{
-			FolderID:   journal.FolderID,
-			Date:       journal.Date,
-			Learned:    trimStringPtr(journal.Learned),
-			WeakPoints: trimStringPtr(journal.WeakPoints),
-			NextStep:   trimStringPtr(journal.NextStep),
 		})
 	}
 	return result

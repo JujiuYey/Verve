@@ -3,15 +3,12 @@ package service
 import (
 	"strings"
 	"testing"
-	"time"
 
 	learning_db "verve/app/learning/models/db"
 	wiki_db "verve/app/wiki/models/db"
 )
 
 func TestBuildCoachQueryIncludesRuntimeContext(t *testing.T) {
-	learned := "接口基础"
-	nextStep := "复述 interface 的隐式实现"
 	folderID := "folder-go"
 	docID := "doc-interface"
 
@@ -26,14 +23,6 @@ func TestBuildCoachQueryIncludesRuntimeContext(t *testing.T) {
 		MemoryItems: []*learning_db.LearningMemoryItem{
 			{Kind: "explanation_evidence", Statement: "能解释接口的隐式实现"},
 		},
-		Journals: []*learning_db.LearningJournal{
-			{
-				FolderID: folderID,
-				Date:     time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC),
-				Learned:  &learned,
-				NextStep: &nextStep,
-			},
-		},
 	}
 
 	query := BuildCoachQuery(ctx, "继续学习")
@@ -43,7 +32,6 @@ func TestBuildCoachQueryIncludesRuntimeContext(t *testing.T) {
 		"Go 基础",
 		"interface.md",
 		"能解释接口的隐式实现",
-		"复述 interface 的隐式实现",
 	} {
 		if !strings.Contains(query, want) {
 			t.Fatalf("query does not contain %q:\n%s", want, query)
@@ -83,7 +71,6 @@ func TestBuildCoachQueryIncludesExplicitEmptyStates(t *testing.T) {
 		"- 暂无文件夹",
 		"- 暂无文档",
 		"- 暂无学习记忆",
-		"- 暂无记录",
 	} {
 		if !strings.Contains(query, want) {
 			t.Fatalf("query does not contain %q:\n%s", want, query)

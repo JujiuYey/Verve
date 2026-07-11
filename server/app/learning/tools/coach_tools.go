@@ -47,10 +47,6 @@ type SearchLearningMemoryOutput struct {
 	Results []map[string]interface{} `json:"results"`
 }
 
-type ListJournalsInput struct {
-	Limit int `json:"limit" jsonschema_description:"最多返回多少条最近学习记录,默认 10"`
-}
-
 type SearchWikiKnowledgeInput struct {
 	RootFolderID string `json:"root_folder_id" jsonschema_description:"限定检索的 Wiki 根目录 ID"`
 	Query        string `json:"query" jsonschema_description:"要检索的学习问题或概念"`
@@ -76,7 +72,6 @@ func NewCoachTools(db *database.DatabaseService, retriever *rag_service.Retrieve
 		newListFoldersTool(db, userID),
 		newListDocumentsTool(db, userID),
 		newSearchLearningMemoryTool(db, userID),
-		newListJournalsTool(db, userID),
 		newCompleteTaskTool(),
 	}
 	if retriever != nil {
@@ -282,34 +277,6 @@ func loadAccessibleCoachDocuments(
 		return nil, err
 	}
 	return learning_service.FilterCoachDocumentsByFolders(docs, accessibleFolders), nil
-}
-
-func newListJournalsTool(db *database.DatabaseService, userID string) tool.InvokableTool {
-	t, err := utils.InferTool("list_learning_journals", "列出最近学习记录",
-		func(ctx context.Context, input *ListJournalsInput) ([]map[string]interface{}, error) {
-			limit := normalizeLimit(input.Limit, 10)
-			journals, _, err := db.Journals.FindByUser(ctx, userID, 0, limit)
-			if err != nil {
-				return nil, err
-			}
-			result := make([]map[string]interface{}, 0, len(journals))
-			for _, journal := range journals {
-				result = append(result, map[string]interface{}{
-					"id":          journal.ID,
-					"folder_id":   journal.FolderID,
-					"date":        journal.Date,
-					"learned":     stringValue(journal.Learned),
-					"evidence":    stringValue(journal.Evidence),
-					"weak_points": stringValue(journal.WeakPoints),
-					"next_step":   stringValue(journal.NextStep),
-				})
-			}
-			return result, nil
-		})
-	if err != nil {
-		log.Fatal(err)
-	}
-	return t
 }
 
 func newCompleteTaskTool() tool.InvokableTool {
