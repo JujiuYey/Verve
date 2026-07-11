@@ -80,15 +80,15 @@ func NewCoachTools(db *database.DatabaseService, retriever *rag_service.Retrieve
 		newCompleteTaskTool(),
 	}
 	if retriever != nil {
-		tools = append(tools, newSearchWikiKnowledgeTool(db.Folders, retriever, userID))
+		tools = append(tools, newSearchWikiKnowledgeTool(db.Folders, db.Documents, retriever, userID))
 	}
 	return tools
 }
 
-func newSearchWikiKnowledgeTool(folders coachFolderLister, retriever coachKnowledgeSearcher, userID string) tool.InvokableTool {
+func newSearchWikiKnowledgeTool(folders coachFolderLister, documents coachDocumentLister, retriever coachKnowledgeSearcher, userID string) tool.InvokableTool {
 	t, err := utils.InferTool("search_wiki_knowledge", "按 Wiki 根目录检索真实文档片段,用于回答概念问题或决定下一步学习内容",
 		func(ctx context.Context, input *SearchWikiKnowledgeInput) (*SearchWikiKnowledgeOutput, error) {
-			return searchAccessibleWikiKnowledge(ctx, folders, retriever, userID, input)
+			return searchAccessibleWikiKnowledge(ctx, folders, documents, retriever, userID, input)
 		})
 	if err != nil {
 		log.Fatal(err)
@@ -99,6 +99,7 @@ func newSearchWikiKnowledgeTool(folders coachFolderLister, retriever coachKnowle
 func searchAccessibleWikiKnowledge(
 	ctx context.Context,
 	folders coachFolderLister,
+	documents coachDocumentLister,
 	retriever coachKnowledgeSearcher,
 	userID string,
 	input *SearchWikiKnowledgeInput,
@@ -115,12 +116,24 @@ func searchAccessibleWikiKnowledge(
 	if !learning_service.CoachFolderIsAccessible(accessibleFolders, rootFolderID) {
 		return nil, sql.ErrNoRows
 	}
+	allDocuments, err := documents.List(ctx, "", "")
+	if err != nil {
+		return nil, err
+	}
+	accessibleDocuments := learning_service.FilterCoachDocumentsByFolders(allDocuments, accessibleFolders)
+	accessibleDocumentIDs := make(map[string]struct{}, len(accessibleDocuments))
+	for _, document := range accessibleDocuments {
+		accessibleDocumentIDs[document.ID] = struct{}{}
+	}
 	results, err := retriever.Search(ctx, rootFolderID, input.Query, input.Limit)
 	if err != nil {
 		return nil, err
 	}
 	out := &SearchWikiKnowledgeOutput{Results: make([]map[string]interface{}, 0, len(results))}
 	for _, result := range results {
+		if _, ok := accessibleDocumentIDs[result.DocumentID]; !ok {
+			continue
+		}
 		out.Results = append(out.Results, map[string]interface{}{
 			"document_title": result.DocumentTitle,
 			"folder_path":    result.FolderPath,
