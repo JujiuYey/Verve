@@ -63,7 +63,7 @@ CREATE TABLE learning_explanation_reviews (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX idx_learning_explanation_reviews_session_id
-    ON learning_explanation_reviews(session_id, created_at ASC);
+    ON learning_explanation_reviews(session_id, created_at, id);
 CREATE INDEX idx_learning_explanation_reviews_document_id
     ON learning_explanation_reviews(document_id);
 CREATE INDEX idx_learning_explanation_reviews_user_id

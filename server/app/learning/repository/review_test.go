@@ -16,9 +16,10 @@ import (
 )
 
 type reviewQueryRecorder struct {
-	execQuery   string
-	selectQuery string
-	rows        driver.Rows
+	execQuery       string
+	selectQuery     string
+	insertCreatedAt time.Time
+	rows            driver.Rows
 }
 
 func (r *reviewQueryRecorder) Connect(context.Context) (driver.Conn, error) {
@@ -45,7 +46,7 @@ func (c reviewQueryConn) ExecContext(_ context.Context, query string, _ []driver
 func (c reviewQueryConn) QueryContext(_ context.Context, query string, _ []driver.NamedValue) (driver.Rows, error) {
 	if strings.HasPrefix(query, "INSERT ") {
 		c.recorder.execQuery = query
-		return &reviewInsertRows{createdAt: time.Now()}, nil
+		return &reviewInsertRows{createdAt: c.recorder.insertCreatedAt}, nil
 	}
 	c.recorder.selectQuery = query
 	return c.recorder.rows, nil
@@ -96,7 +97,8 @@ func newReviewRepositoryForTest(recorder *reviewQueryRecorder) (*ReviewRepositor
 }
 
 func TestReviewRepositoryCreateAssignsIDAndPersistsReview(t *testing.T) {
-	recorder := &reviewQueryRecorder{}
+	createdAt := time.Date(2026, 7, 11, 10, 15, 0, 0, time.UTC)
+	recorder := &reviewQueryRecorder{insertCreatedAt: createdAt}
 	repo, closeDB := newReviewRepositoryForTest(recorder)
 	defer closeDB()
 
@@ -120,6 +122,9 @@ func TestReviewRepositoryCreateAssignsIDAndPersistsReview(t *testing.T) {
 	}
 	if len(review.ID) != 32 || strings.Contains(review.ID, "-") {
 		t.Fatalf("review ID = %q, want 32-character UUID without hyphens", review.ID)
+	}
+	if !review.CreatedAt.Equal(createdAt) {
+		t.Fatalf("review created_at = %v, want returned value %v", review.CreatedAt, createdAt)
 	}
 
 	for _, want := range []string{
@@ -157,8 +162,8 @@ func TestReviewRepositoryFindBySessionOrdersOldestFirst(t *testing.T) {
 	if !strings.Contains(recorder.selectQuery, `WHERE (session_id = 'session-1')`) {
 		t.Fatalf("query does not filter session: %s", recorder.selectQuery)
 	}
-	if !strings.Contains(recorder.selectQuery, `ORDER BY "created_at" ASC`) {
-		t.Fatalf("query does not order oldest first: %s", recorder.selectQuery)
+	if !strings.Contains(recorder.selectQuery, `ORDER BY "created_at" ASC, "id" ASC`) {
+		t.Fatalf("query does not order deterministically oldest first: %s", recorder.selectQuery)
 	}
 	if len(reviews) != 1 || reviews[0].ID != "review-1" {
 		t.Fatalf("reviews = %#v", reviews)

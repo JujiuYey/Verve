@@ -29,7 +29,7 @@ func (r *ReviewRepository) FindBySession(ctx context.Context, sessionID string) 
 	err := r.db.NewSelect().
 		Model(&reviews).
 		Where("session_id = ?", sessionID).
-		Order("created_at ASC").
+		Order("created_at ASC", "id ASC").
 		Scan(ctx)
 	if err != nil {
 		return nil, err
