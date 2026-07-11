@@ -27,6 +27,19 @@ func TestRetrieverSearchDocumentRejectsBlankDocumentID(t *testing.T) {
 	}
 }
 
+func TestRetrieverSearchDocumentRejectsBlankQuery(t *testing.T) {
+	retriever := NewRetriever(
+		&fakeChunkFinder{},
+		fakeEmbedder{},
+		&fakeVectorStore{},
+	)
+
+	_, err := retriever.SearchDocument(context.Background(), "doc-1", "  ", 6)
+	if err == nil || !strings.Contains(err.Error(), "query is required") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestRetrieverSearchDocumentScopesVectorSearchAndReturnsChunkIndex(t *testing.T) {
 	store := &fakeVectorStore{searchResults: []vector.ScoredPoint{
 		{PointID: "p1", Score: 0.9},
@@ -116,6 +129,14 @@ func TestRetrieverPreservesVectorScoreOrder(t *testing.T) {
 	}
 	if store.limit != 12 {
 		t.Fatalf("limit = %d", store.limit)
+	}
+	wantFilter := map[string]any{
+		"must": []map[string]any{
+			{"key": "root_folder_id", "match": map[string]any{"value": "root"}},
+		},
+	}
+	if !reflect.DeepEqual(store.filter, wantFilter) {
+		t.Fatalf("filter = %#v, want %#v", store.filter, wantFilter)
 	}
 	if len(results) != 2 || results[0].ChunkID != "c2" || results[1].ChunkID != "c1" {
 		t.Fatalf("results = %#v", results)
