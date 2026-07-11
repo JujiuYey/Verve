@@ -52,6 +52,7 @@ export function PracticePanel({
   onComplete,
 }: PracticePanelProps) {
   const latestTurn = turns.at(-1);
+  const readyToWrapUp = latestTurn?.ready_to_wrap_up === true;
 
   return (
     <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border bg-background">
@@ -94,7 +95,15 @@ export function PracticePanel({
             </Alert>
           ) : (
             <div className="flex flex-col gap-3">
-              {latestTurn?.follow_up_question ? (
+              {readyToWrapUp ? (
+                <Alert>
+                  <CircleCheckIcon />
+                  <AlertTitle>这次解释已经连成完整脉络</AlertTitle>
+                  <AlertDescription>
+                    <p>如果你没有新的补充，可以在这里结束本次练习；想再换一种说法也可以继续。</p>
+                  </AlertDescription>
+                </Alert>
+              ) : latestTurn?.follow_up_question ? (
                 <Alert>
                   <CircleHelpIcon />
                   <AlertTitle>接着讲这一点</AlertTitle>
@@ -119,7 +128,7 @@ export function PracticePanel({
                   {turns.length > 0 ? `已经完成 ${turns.length} 轮解释` : "第一轮可以先讲整体脉络"}
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {turns.length > 0 ? (
+                  {turns.length > 0 && !readyToWrapUp ? (
                     <Button
                       variant="outline"
                       onClick={onComplete}
@@ -133,7 +142,11 @@ export function PracticePanel({
                       结束本次练习
                     </Button>
                   ) : null}
-                  <Button onClick={onSubmit} disabled={disabled || !answer.trim()}>
+                  <Button
+                    variant={readyToWrapUp ? "outline" : "default"}
+                    onClick={onSubmit}
+                    disabled={disabled || !answer.trim()}
+                  >
                     {isSubmitting ? (
                       <Spinner data-icon="inline-start" />
                     ) : (
@@ -141,6 +154,16 @@ export function PracticePanel({
                     )}
                     {isSubmitting ? "正在听你的解释" : turns.length > 0 ? "继续补充" : "提交解释"}
                   </Button>
+                  {readyToWrapUp ? (
+                    <Button onClick={onComplete} disabled={isCompleting || isSubmitting}>
+                      {isCompleting ? (
+                        <Spinner data-icon="inline-start" />
+                      ) : (
+                        <SquareIcon data-icon="inline-start" />
+                      )}
+                      结束本次练习
+                    </Button>
+                  ) : null}
                 </div>
               </div>
             </div>
