@@ -41,3 +41,27 @@ func TestMemoryRepositoryFindItemsByDocumentScopesUserAndDocument(t *testing.T) 
 		}
 	}
 }
+
+func TestMemoryRepositoryFindItemsByFoldersScopesUserAndFolderSet(t *testing.T) {
+	recorder := &reviewQueryRecorder{rows: emptyMemoryRows{}}
+	sqldb := sql.OpenDB(recorder)
+	db := bun.NewDB(sqldb, pgdialect.New())
+	defer db.Close()
+	repo := NewMemoryRepository(db)
+
+	items, err := repo.FindItemsByFolders(context.Background(), "user-1", []string{"root", "child"}, 15)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if items == nil || len(items) != 0 {
+		t.Fatalf("items = %#v", items)
+	}
+	for _, want := range []string{
+		`WHERE (user_id = 'user-1') AND (folder_id IN ('root', 'child'))`,
+		`ORDER BY "last_seen_at" DESC`, `LIMIT 15`,
+	} {
+		if !strings.Contains(recorder.selectQuery, want) {
+			t.Fatalf("query does not contain %q: %s", want, recorder.selectQuery)
+		}
+	}
+}

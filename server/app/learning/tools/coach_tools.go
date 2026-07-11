@@ -162,7 +162,7 @@ func newSearchLearningMemoryTool(db *database.DatabaseService, userID string) to
 			if query != "" {
 				candidateLimit = max(limit*5, 50)
 			}
-			items, err := db.Memories.FindItemsByUser(ctx, userID, input.FolderID, candidateLimit)
+			items, err := learning_service.NewMemoryService(db).FindCoachItems(ctx, userID, input.FolderID, candidateLimit)
 			if err != nil {
 				return nil, err
 			}

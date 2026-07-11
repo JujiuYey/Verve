@@ -71,6 +71,27 @@ func (r *MemoryRepository) FindItemsByDocument(ctx context.Context, userID, docu
 	return items, nil
 }
 
+func (r *MemoryRepository) FindItemsByFolders(ctx context.Context, userID string, folderIDs []string, limit int) ([]*learning_db.LearningMemoryItem, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	items := make([]*learning_db.LearningMemoryItem, 0)
+	if len(folderIDs) == 0 {
+		return items, nil
+	}
+	err := r.db.NewSelect().
+		Model(&items).
+		Where("user_id = ?", userID).
+		Where("folder_id IN (?)", bun.In(folderIDs)).
+		Order("last_seen_at DESC").
+		Limit(limit).
+		Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 func (r *MemoryRepository) FindSummaryByFolder(ctx context.Context, userID string, folderID string) (*learning_db.LearningMemorySummary, error) {
 	summary := new(learning_db.LearningMemorySummary)
 	query := r.db.NewSelect().

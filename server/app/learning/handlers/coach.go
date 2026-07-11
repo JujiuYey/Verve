@@ -142,7 +142,7 @@ func (h *CoachHandler) buildRuntimeContext(ctx context.Context, userID string, a
 
 	memoryItems := make([]*learning_db.LearningMemoryItem, 0)
 	if h.db.Memories != nil {
-		memoryItems, err = h.db.Memories.FindItemsByUser(ctx, userID, rootFolderID, 20)
+		memoryItems, err = learning_service.NewMemoryService(h.db).FindCoachItems(ctx, userID, rootFolderID, 20)
 		if err != nil {
 			return learning_service.CoachRuntimeContext{}, err
 		}
