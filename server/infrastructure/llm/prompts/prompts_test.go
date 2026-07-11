@@ -48,6 +48,19 @@ func TestDefaultAgentPromptsContainCriticalContracts(t *testing.T) {
 				"review_required",
 			},
 		},
+		{
+			name:   "feynman reviewer",
+			render: FeynmanReviewerPrompt,
+			want: []string{
+				"倾听者",
+				"先准确复述你听到了什么",
+				"恰好提出一个自然的追问",
+				"不要给等级、通过状态或掌握度结论",
+				"具体运行时断言",
+				"明确承认资料上下文不足",
+				`"context_sufficient"`,
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -74,6 +87,7 @@ func TestAgentPromptsFallBackToDefaultPreset(t *testing.T) {
 		{name: "coach", render: CoachPrompt},
 		{name: "tutor", render: TutorPrompt},
 		{name: "examiner", render: ExaminerPrompt},
+		{name: "feynman reviewer", render: FeynmanReviewerPrompt},
 	}
 
 	for _, tt := range tests {
@@ -89,6 +103,71 @@ func TestAgentPromptsFallBackToDefaultPreset(t *testing.T) {
 				t.Fatalf("unknown preset did not fall back to default")
 			}
 		})
+	}
+}
+
+func TestFeynmanReviewerQueryPromptRendersFullDocumentContextAndTurns(t *testing.T) {
+	prompt := FeynmanReviewerQueryPrompt(FeynmanReviewerQueryInput{
+		DocumentTitle:     "Go channel",
+		Outline:           []string{"并发", "并发 > channel", "并发 > channel > 关闭"},
+		Mode:              "full",
+		FullText:          "# 并发\n\n## channel\n\n发送与接收。",
+		ContextSufficient: true,
+		PriorTurns: []FeynmanReviewerTurn{
+			{Explanation: "channel 是队列", Review: "我听到你把 channel 解释成队列。"},
+		},
+		NewExplanation: "无缓冲 channel 会同步发送者和接收者。",
+	})
+
+	for _, want := range []string{
+		"文档标题: Go channel",
+		"- 并发 > channel > 关闭",
+		"上下文模式: full",
+		"上下文足够: true",
+		"## 完整原文",
+		"发送与接收。",
+		"学习者解释: channel 是队列",
+		"倾听者审阅: 我听到你把 channel 解释成队列。",
+		"## 本轮新解释",
+		"无缓冲 channel 会同步发送者和接收者。",
+	} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("prompt does not contain %q:\n%s", want, prompt)
+		}
+	}
+	if strings.Contains(prompt, "## RAG 证据") {
+		t.Fatalf("full mode should not render RAG evidence:\n%s", prompt)
+	}
+}
+
+func TestFeynmanReviewerQueryPromptRendersRAGEvidenceAndInsufficiency(t *testing.T) {
+	prompt := FeynmanReviewerQueryPrompt(FeynmanReviewerQueryInput{
+		DocumentTitle: "大型并发指南",
+		Outline:       []string{"并发", "并发 > 调度"},
+		Mode:          "rag",
+		Evidence: []FeynmanReviewerEvidence{
+			{ChunkIndex: 4, HeadingPath: "并发 > 调度", Content: "调度器会在可运行 goroutine 间选择。"},
+		},
+		ContextSufficient:          false,
+		ContextInsufficiencyReason: "只检索到一个相关片段",
+		NewExplanation:             "调度器保证绝对公平。",
+	})
+
+	for _, want := range []string{
+		"上下文模式: rag",
+		"上下文足够: false",
+		"不足原因: 只检索到一个相关片段",
+		"## RAG 证据",
+		"[chunk 4] 并发 > 调度",
+		"调度器会在可运行 goroutine 间选择。",
+		"调度器保证绝对公平。",
+	} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("prompt does not contain %q:\n%s", want, prompt)
+		}
+	}
+	if strings.Contains(prompt, "## 完整原文") {
+		t.Fatalf("RAG mode must not pretend to include full text:\n%s", prompt)
 	}
 }
 
