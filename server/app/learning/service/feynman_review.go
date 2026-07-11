@@ -26,7 +26,15 @@ type FeynmanReview struct {
 }
 
 type FeynmanReviewer interface {
-	Review(ctx context.Context, documentID, explanation string, prior []*learning_db.LearningExplanationReview) (*FeynmanReview, error)
+	Review(ctx context.Context, request FeynmanReviewRequest) (*FeynmanReview, error)
+}
+
+type FeynmanReviewRequest struct {
+	UserID      string
+	DocumentID  string
+	Explanation string
+	PriorTurns  []*learning_db.LearningExplanationReview
+	MemoryItems []*learning_db.LearningMemoryItem
 }
 
 type FeynmanReviewService struct {
@@ -37,15 +45,15 @@ func NewFeynmanReviewService(source FeynmanDocumentSource) *FeynmanReviewService
 	return &FeynmanReviewService{contextBuilder: NewFeynmanContextBuilder(source)}
 }
 
-func (s *FeynmanReviewService) Review(ctx context.Context, documentID, explanation string, prior []*learning_db.LearningExplanationReview) (*FeynmanReview, error) {
+func (s *FeynmanReviewService) Review(ctx context.Context, request FeynmanReviewRequest) (*FeynmanReview, error) {
 	if s == nil || s.contextBuilder == nil {
 		return nil, errors.New("Feynman reviewer is not configured")
 	}
-	explanation = strings.TrimSpace(explanation)
+	explanation := strings.TrimSpace(request.Explanation)
 	if explanation == "" {
 		return nil, errors.New("explanation is required")
 	}
-	documentContext, err := s.contextBuilder.Build(ctx, documentID, explanation)
+	documentContext, err := s.contextBuilder.Build(ctx, request.DocumentID, explanation)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +62,8 @@ func (s *FeynmanReviewService) Review(ctx context.Context, documentID, explanati
 	if err != nil {
 		return nil, fmt.Errorf("initialize Feynman reviewer: %w", err)
 	}
-	query := prompts.FeynmanReviewerQueryPrompt(feynmanReviewerQueryInput(documentContext, prior, explanation))
+	request.Explanation = explanation
+	query := prompts.FeynmanReviewerQueryPrompt(feynmanReviewerQueryInput(documentContext, request))
 	runner := adk.NewRunner(ctx, adk.RunnerConfig{Agent: agent})
 	text, err := collectText(runner.Query(ctx, query))
 	if err != nil {
@@ -63,15 +72,15 @@ func (s *FeynmanReviewService) Review(ctx context.Context, documentID, explanati
 	return parseFeynmanReviewOutput(text, documentContext.ContextSufficient)
 }
 
-func feynmanReviewerQueryInput(documentContext *FeynmanDocumentContext, prior []*learning_db.LearningExplanationReview, explanation string) prompts.FeynmanReviewerQueryInput {
+func feynmanReviewerQueryInput(documentContext *FeynmanDocumentContext, request FeynmanReviewRequest) prompts.FeynmanReviewerQueryInput {
 	evidence := make([]prompts.FeynmanReviewerEvidence, 0, len(documentContext.Evidence))
 	for _, item := range documentContext.Evidence {
 		evidence = append(evidence, prompts.FeynmanReviewerEvidence{
 			ChunkIndex: item.ChunkIndex, HeadingPath: item.HeadingPath, Content: item.Content,
 		})
 	}
-	turns := make([]prompts.FeynmanReviewerTurn, 0, len(prior))
-	for _, item := range prior {
+	turns := make([]prompts.FeynmanReviewerTurn, 0, len(request.PriorTurns))
+	for _, item := range request.PriorTurns {
 		if item == nil {
 			continue
 		}
@@ -83,12 +92,21 @@ func feynmanReviewerQueryInput(documentContext *FeynmanDocumentContext, prior []
 		})
 		turns = append(turns, prompts.FeynmanReviewerTurn{Explanation: item.Explanation, Review: string(reviewJSON)})
 	}
+	memoryItems := make([]prompts.FeynmanReviewerMemoryItem, 0, len(request.MemoryItems))
+	for _, item := range request.MemoryItems {
+		if item == nil || strings.TrimSpace(item.Statement) == "" {
+			continue
+		}
+		memoryItems = append(memoryItems, prompts.FeynmanReviewerMemoryItem{
+			Kind: strings.TrimSpace(item.Kind), Statement: strings.TrimSpace(item.Statement), Confidence: strings.TrimSpace(item.Confidence),
+		})
+	}
 	return prompts.FeynmanReviewerQueryInput{
 		DocumentTitle: documentContext.Title, Outline: documentContext.Outline,
 		Mode: documentContext.Mode, FullText: documentContext.FullText, Evidence: evidence,
 		ContextSufficient:          documentContext.ContextSufficient,
 		ContextInsufficiencyReason: documentContext.ContextInsufficiencyReason,
-		PriorTurns:                 turns, NewExplanation: explanation,
+		PriorTurns:                 turns, MemoryItems: memoryItems, NewExplanation: request.Explanation,
 	}
 }
 

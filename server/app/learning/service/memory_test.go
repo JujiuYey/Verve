@@ -9,8 +9,17 @@ import (
 )
 
 type fakeMemoryWriter struct {
-	event *learning_db.LearningMemoryEvent
-	items []*learning_db.LearningMemoryItem
+	event          *learning_db.LearningMemoryEvent
+	items          []*learning_db.LearningMemoryItem
+	readItems      []*learning_db.LearningMemoryItem
+	readUserID     string
+	readDocumentID string
+}
+
+func (f *fakeMemoryWriter) FindItemsByDocument(_ context.Context, userID, documentID string, _ int) ([]*learning_db.LearningMemoryItem, error) {
+	f.readUserID = userID
+	f.readDocumentID = documentID
+	return f.readItems, nil
 }
 
 func (f *fakeMemoryWriter) CreateEvent(_ context.Context, event *learning_db.LearningMemoryEvent) error {
@@ -75,5 +84,20 @@ func TestRecordExplanationReviewValidatesInputs(t *testing.T) {
 	}
 	if err := service.RecordExplanationReview(context.Background(), "user-1", &learning_db.LearningSession{}, nil); err == nil || !strings.Contains(err.Error(), "review") {
 		t.Fatalf("missing review error = %v", err)
+	}
+}
+
+func TestMemoryServiceFindDocumentItemsForwardsUserAndDocumentScope(t *testing.T) {
+	writer := &fakeMemoryWriter{readItems: []*learning_db.LearningMemoryItem{{ID: "memory-1"}}}
+	service := newMemoryService(writer)
+	items, err := service.FindDocumentItems(context.Background(), "user-1", "doc-1", 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if writer.readUserID != "user-1" || writer.readDocumentID != "doc-1" {
+		t.Fatalf("scope = user:%q document:%q", writer.readUserID, writer.readDocumentID)
+	}
+	if len(items) != 1 || items[0].ID != "memory-1" {
+		t.Fatalf("items = %#v", items)
 	}
 }

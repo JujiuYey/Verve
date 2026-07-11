@@ -14,8 +14,13 @@ type memoryWriter interface {
 	CreateItem(ctx context.Context, item *learning_db.LearningMemoryItem) error
 }
 
+type memoryReader interface {
+	FindItemsByDocument(ctx context.Context, userID, documentID string, limit int) ([]*learning_db.LearningMemoryItem, error)
+}
+
 type MemoryService struct {
 	repository memoryWriter
+	reader     memoryReader
 }
 
 func NewMemoryService(db *database.DatabaseService) *MemoryService {
@@ -26,7 +31,18 @@ func NewMemoryService(db *database.DatabaseService) *MemoryService {
 }
 
 func newMemoryService(repository memoryWriter) *MemoryService {
-	return &MemoryService{repository: repository}
+	service := &MemoryService{repository: repository}
+	if reader, ok := repository.(memoryReader); ok {
+		service.reader = reader
+	}
+	return service
+}
+
+func (s *MemoryService) FindDocumentItems(ctx context.Context, userID, documentID string, limit int) ([]*learning_db.LearningMemoryItem, error) {
+	if s == nil || s.reader == nil {
+		return nil, errors.New("memory repository is not configured")
+	}
+	return s.reader.FindItemsByDocument(ctx, userID, documentID, limit)
 }
 
 func (s *MemoryService) RecordExplanationReview(ctx context.Context, userID string, session *learning_db.LearningSession, review *learning_db.LearningExplanationReview) error {

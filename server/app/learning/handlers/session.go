@@ -43,7 +43,8 @@ type reviewStore interface {
 	FindBySession(ctx context.Context, sessionID string) ([]*learning_db.LearningExplanationReview, error)
 }
 
-type explanationMemoryRecorder interface {
+type explanationMemoryStore interface {
+	FindDocumentItems(ctx context.Context, userID, documentID string, limit int) ([]*learning_db.LearningMemoryItem, error)
 	RecordExplanationReview(ctx context.Context, userID string, session *learning_db.LearningSession, review *learning_db.LearningExplanationReview) error
 }
 
@@ -53,7 +54,7 @@ type SessionHandlerDependencies struct {
 	Messages  messageStore
 	Reviews   reviewStore
 	Reviewer  learning_service.FeynmanReviewer
-	Memory    explanationMemoryRecorder
+	Memory    explanationMemoryStore
 }
 
 type SessionHandler struct {
@@ -133,7 +134,19 @@ func (h *SessionHandler) Review(c *fiber.Ctx) error {
 	if err != nil {
 		return response.InternalServerCtx(c, "加载先前解释失败")
 	}
-	reviewResult, err := h.deps.Reviewer.Review(c.Context(), session.DocumentID, req.Explanation, prior)
+	memoryItems := make([]*learning_db.LearningMemoryItem, 0)
+	if h.deps.Memory != nil {
+		loaded, memoryErr := h.deps.Memory.FindDocumentItems(c.Context(), userID, session.DocumentID, 20)
+		if memoryErr != nil {
+			log.Printf("load explanation memory failed, continuing without memory: session_id=%s user_id=%s document_id=%s err=%v", session.ID, userID, session.DocumentID, memoryErr)
+		} else if loaded != nil {
+			memoryItems = loaded
+		}
+	}
+	reviewResult, err := h.deps.Reviewer.Review(c.Context(), learning_service.FeynmanReviewRequest{
+		UserID: userID, DocumentID: session.DocumentID, Explanation: req.Explanation,
+		PriorTurns: prior, MemoryItems: memoryItems,
+	})
 	if err != nil {
 		log.Printf("Feynman review failed: session_id=%s user_id=%s document_id=%s err=%v", session.ID, userID, session.DocumentID, err)
 		return response.InternalServerCtx(c, "审阅解释失败,请重试")

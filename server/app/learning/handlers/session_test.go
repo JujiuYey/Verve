@@ -78,15 +78,11 @@ func (f *fakeReviewStore) FindBySession(context.Context, string) ([]*learning_db
 }
 
 type fakeFeynmanReviewer struct {
-	priorCount  int
-	documentID  string
-	explanation string
+	request learning_service.FeynmanReviewRequest
 }
 
-func (f *fakeFeynmanReviewer) Review(_ context.Context, documentID, explanation string, prior []*learning_db.LearningExplanationReview) (*learning_service.FeynmanReview, error) {
-	f.priorCount = len(prior)
-	f.documentID = documentID
-	f.explanation = explanation
+func (f *fakeFeynmanReviewer) Review(_ context.Context, request learning_service.FeynmanReviewRequest) (*learning_service.FeynmanReview, error) {
+	f.request = request
 	return &learning_service.FeynmanReview{
 		HeardSummary:       "听到你解释了类型会约束操作",
 		ClearPoints:        []string{"值有具体类型"},
@@ -100,8 +96,18 @@ func (f *fakeFeynmanReviewer) Review(_ context.Context, documentID, explanation 
 }
 
 type fakeMemoryRecorder struct {
-	called bool
-	err    error
+	called         bool
+	err            error
+	readErr        error
+	items          []*learning_db.LearningMemoryItem
+	readUserID     string
+	readDocumentID string
+}
+
+func (f *fakeMemoryRecorder) FindDocumentItems(_ context.Context, userID, documentID string, _ int) ([]*learning_db.LearningMemoryItem, error) {
+	f.readUserID = userID
+	f.readDocumentID = documentID
+	return f.items, f.readErr
 }
 
 func (f *fakeMemoryRecorder) RecordExplanationReview(_ context.Context, _ string, _ *learning_db.LearningSession, _ *learning_db.LearningExplanationReview) error {
@@ -168,7 +174,10 @@ func TestSessionReviewUsesPriorTurnsAndRecordsMemoryBestEffort(t *testing.T) {
 	prior := &learning_db.LearningExplanationReview{ID: "review-1", Explanation: "值有类型", CreatedAt: time.Now()}
 	reviews := &fakeReviewStore{reviews: []*learning_db.LearningExplanationReview{prior}}
 	reviewer := &fakeFeynmanReviewer{}
-	memory := &fakeMemoryRecorder{err: errors.New("memory unavailable")}
+	memory := &fakeMemoryRecorder{
+		err:   errors.New("memory unavailable"),
+		items: []*learning_db.LearningMemoryItem{{ID: "memory-1", Kind: "misconception", Statement: "曾把值和变量混为一谈"}},
+	}
 	handler := NewSessionHandlerWithDependencies(SessionHandlerDependencies{
 		Sessions:  &fakeSessionStore{sessions: map[string]*learning_db.LearningSession{"session-1": {ID: "session-1", UserID: "user-1", DocumentID: "doc-1"}}},
 		Documents: fakeDocumentStore{doc: &wiki_db.Document{ID: "doc-1"}}, Messages: fakeMessageStore{}, Reviews: reviews, Reviewer: reviewer, Memory: memory,
@@ -183,8 +192,14 @@ func TestSessionReviewUsesPriorTurnsAndRecordsMemoryBestEffort(t *testing.T) {
 	if resp.StatusCode != fiber.StatusOK {
 		t.Fatalf("status = %d", resp.StatusCode)
 	}
-	if reviewer.priorCount != 1 || reviewer.documentID != "doc-1" {
-		t.Fatalf("reviewer inputs = prior:%d doc:%q", reviewer.priorCount, reviewer.documentID)
+	if len(reviewer.request.PriorTurns) != 1 || reviewer.request.UserID != "user-1" || reviewer.request.DocumentID != "doc-1" {
+		t.Fatalf("reviewer request = %#v", reviewer.request)
+	}
+	if memory.readUserID != "user-1" || memory.readDocumentID != "doc-1" {
+		t.Fatalf("memory scope = user:%q document:%q", memory.readUserID, memory.readDocumentID)
+	}
+	if len(reviewer.request.MemoryItems) != 1 || reviewer.request.MemoryItems[0].ID != "memory-1" {
+		t.Fatalf("reviewer memory = %#v", reviewer.request.MemoryItems)
 	}
 	if reviews.created == nil || reviews.created.Explanation != "A value has a concrete type." || reviews.created.SessionID != "session-1" {
 		t.Fatalf("stored review = %#v", reviews.created)
@@ -202,6 +217,28 @@ func TestSessionReviewUsesPriorTurnsAndRecordsMemoryBestEffort(t *testing.T) {
 	}
 	if _, exists := data["mastery_after"]; exists {
 		t.Fatal("review response contains mastery_after")
+	}
+}
+
+func TestSessionReviewContinuesWithEmptyMemoryWhenReadFails(t *testing.T) {
+	reviewer := &fakeFeynmanReviewer{}
+	memory := &fakeMemoryRecorder{readErr: errors.New("memory unavailable")}
+	handler := NewSessionHandlerWithDependencies(SessionHandlerDependencies{
+		Sessions:  &fakeSessionStore{sessions: map[string]*learning_db.LearningSession{"session-1": {ID: "session-1", UserID: "user-1", DocumentID: "doc-1"}}},
+		Documents: fakeDocumentStore{}, Messages: fakeMessageStore{}, Reviews: &fakeReviewStore{}, Reviewer: reviewer, Memory: memory,
+	})
+	app := sessionTestApp(handler)
+	req := httptest.NewRequest("POST", "/session/session-1/review", strings.NewReader(`{"explanation":"值有类型"}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != fiber.StatusOK {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	if reviewer.request.MemoryItems == nil || len(reviewer.request.MemoryItems) != 0 {
+		t.Fatalf("reviewer memory = %#v, want non-nil empty", reviewer.request.MemoryItems)
 	}
 }
 

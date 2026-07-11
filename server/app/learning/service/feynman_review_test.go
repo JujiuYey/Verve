@@ -4,7 +4,21 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+
+	learning_db "verve/app/learning/models/db"
 )
+
+func TestFeynmanReviewerQueryInputIncludesScopedMemory(t *testing.T) {
+	input := feynmanReviewerQueryInput(&FeynmanDocumentContext{Title: "Go values", Mode: "full", ContextSufficient: true}, FeynmanReviewRequest{
+		UserID: "user-1", DocumentID: "doc-1", Explanation: "值有类型",
+		MemoryItems: []*learning_db.LearningMemoryItem{
+			{Kind: "explanation_evidence", Statement: "能说明类型约束操作", Confidence: "observed"},
+		},
+	})
+	if len(input.MemoryItems) != 1 || input.MemoryItems[0].Kind != "explanation_evidence" || input.MemoryItems[0].Statement != "能说明类型约束操作" {
+		t.Fatalf("memory input = %#v", input.MemoryItems)
+	}
+}
 
 func TestParseFeynmanReviewOutputAcceptsFencedJSON(t *testing.T) {
 	raw := "```json\n" + `{
