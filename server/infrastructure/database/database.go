@@ -75,6 +75,8 @@ func NewDatabaseService(dsn string) (*DatabaseService, error) {
 	db.RegisterModel((*rag_db.IndexJob)(nil))
 	db.RegisterModel((*wiki_db.Folder)(nil))
 	db.RegisterModel((*wiki_db.Document)(nil))
+	db.RegisterModel((*wiki_db.DocumentRevision)(nil))
+	db.RegisterModel((*wiki_db.DocumentChangeRequest)(nil))
 
 	// 添加查询钩子（开发环境下打印 SQL）
 	db.AddQueryHook(bundebug.NewQueryHook(
