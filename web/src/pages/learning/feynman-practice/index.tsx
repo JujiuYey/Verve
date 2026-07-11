@@ -319,10 +319,10 @@ export function FeynmanWorkbenchPage() {
             开始讲解{turns.length > 0 ? ` (${turns.length})` : ""}
           </TabsTrigger>
         </TabsList>
-        <TabsContent value="source" className="min-h-0 overflow-hidden">
+        <TabsContent value="source" className="flex min-h-0 overflow-hidden">
           <SourcePanel documentId={documentId} />
         </TabsContent>
-        <TabsContent value="explain" className="min-h-0 overflow-hidden">
+        <TabsContent value="explain" className="flex min-h-0 overflow-hidden">
           <PracticePanel
             answer={answer}
             turns={turns}
