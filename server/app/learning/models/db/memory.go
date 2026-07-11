@@ -14,7 +14,7 @@ type LearningMemoryEvent struct {
 	UserID      string                 `bun:"user_id,notnull" json:"user_id"`                                            // 用户ID
 	FolderID    *string                `bun:"folder_id,type:varchar(32)" json:"folder_id,omitempty"`                     // Wiki 文件夹ID
 	DocumentID  *string                `bun:"document_id,type:varchar(32)" json:"document_id,omitempty"`                 // Wiki 文档ID
-	ObjectiveID *string                `bun:"objective_id,type:varchar(32)" json:"objective_id,omitempty"`               // 学习目标ID
+	ObjectiveID *string                `bun:"-" json:"objective_id,omitempty"`                                           // 旧流程临时编译字段
 	SessionID   *string                `bun:"session_id,type:varchar(32)" json:"session_id,omitempty"`                   // 学习会话ID
 	SourceType  string                 `bun:"source_type,notnull" json:"source_type"`                                    // 来源类型
 	SourceID    *string                `bun:"source_id,type:varchar(32)" json:"source_id,omitempty"`                     // 来源ID
@@ -33,7 +33,7 @@ type LearningMemoryItem struct {
 	UserID           string    `bun:"user_id,notnull" json:"user_id"`                                              // 用户ID
 	FolderID         *string   `bun:"folder_id,type:varchar(32)" json:"folder_id,omitempty"`                       // Wiki 文件夹ID
 	DocumentID       *string   `bun:"document_id,type:varchar(32)" json:"document_id,omitempty"`                   // Wiki 文档ID
-	ObjectiveID      *string   `bun:"objective_id,type:varchar(32)" json:"objective_id,omitempty"`                 // 学习目标ID
+	ObjectiveID      *string   `bun:"-" json:"objective_id,omitempty"`                                             // 旧流程临时编译字段
 	Kind             string    `bun:"kind,notnull" json:"kind"`                                                    // 记忆类型
 	Statement        string    `bun:"statement,notnull" json:"statement"`                                          // 记忆内容
 	EvidenceEventIDs []string  `bun:"evidence_event_ids,type:jsonb,notnull" json:"evidence_event_ids"`             // 证据事件ID列表

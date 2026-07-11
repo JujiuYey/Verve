@@ -5,49 +5,25 @@
 --   wiki/001_schema.sql(wiki_folders, wiki_documents)
 -- ============================================
 
--- 1. 学习小节状态(来自 Wiki 文档)
-CREATE TABLE learning_objectives (
-    id VARCHAR(32) PRIMARY KEY,
-    user_id VARCHAR(32) NOT NULL REFERENCES sys_users(id) ON DELETE CASCADE,
-    stage_title VARCHAR(255),
-    title VARCHAR(255) NOT NULL,
-    detail TEXT,
-    source_document_id VARCHAR(32) NOT NULL REFERENCES wiki_documents(id) ON DELETE CASCADE,
-    source_folder_id VARCHAR(32) NOT NULL REFERENCES wiki_folders(id) ON DELETE CASCADE,
-    source_folder_path TEXT,
-    order_index INTEGER NOT NULL DEFAULT 0,
-    status VARCHAR(20) NOT NULL DEFAULT 'pending',
-    mastery_level VARCHAR(20) NOT NULL DEFAULT 'none',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT chk_learning_objectives_status CHECK (status IN ('pending', 'active', 'completed', 'review')),
-    CONSTRAINT chk_learning_objectives_mastery CHECK (mastery_level IN ('none','seen','heard','explained','written','verified'))
-);
-CREATE INDEX idx_learning_objectives_folder_order ON learning_objectives(source_folder_id, order_index);
-CREATE INDEX idx_learning_objectives_user_id ON learning_objectives(user_id);
-CREATE INDEX idx_learning_objectives_status ON learning_objectives(status);
-CREATE INDEX idx_learning_objectives_source_document_id ON learning_objectives(source_document_id);
-CREATE INDEX idx_learning_objectives_source_folder_id ON learning_objectives(source_folder_id);
-
--- 2. 学习会话(一节课)
+-- 1. 文档学习会话
 CREATE TABLE learning_sessions (
     id VARCHAR(32) PRIMARY KEY,
     user_id VARCHAR(32) NOT NULL REFERENCES sys_users(id) ON DELETE CASCADE,
-    objective_id VARCHAR(32) NOT NULL REFERENCES learning_objectives(id) ON DELETE CASCADE,
+    document_id VARCHAR(32) NOT NULL REFERENCES wiki_documents(id) ON DELETE CASCADE,
     status VARCHAR(20) NOT NULL DEFAULT 'active',
     summary TEXT,
-    message_count INTEGER DEFAULT 0,
-    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    message_count INTEGER NOT NULL DEFAULT 0,
+    started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     ended_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT chk_learning_sessions_status CHECK (status IN ('active', 'completed', 'abandoned'))
 );
 CREATE INDEX idx_learning_sessions_user_id ON learning_sessions(user_id);
-CREATE INDEX idx_learning_sessions_objective_id ON learning_sessions(objective_id);
+CREATE INDEX idx_learning_sessions_document_id ON learning_sessions(document_id);
 CREATE INDEX idx_learning_sessions_created_at ON learning_sessions(created_at DESC);
 
--- 3. 陪练消息
+-- 2. 陪练消息
 CREATE TABLE learning_messages (
     id VARCHAR(32) PRIMARY KEY,
     session_id VARCHAR(32) NOT NULL REFERENCES learning_sessions(id) ON DELETE CASCADE,
@@ -62,53 +38,38 @@ CREATE TABLE learning_messages (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT chk_learning_messages_role CHECK (role IN ('user', 'assistant', 'system')),
-    CONSTRAINT chk_learning_messages_agent CHECK (agent_type IS NULL OR agent_type IN ('tutor','examiner','guide'))
+    CONSTRAINT chk_learning_messages_agent CHECK (agent_type IS NULL OR agent_type IN ('tutor', 'examiner', 'guide'))
 );
 CREATE INDEX idx_learning_messages_session_id ON learning_messages(session_id, created_at);
 CREATE INDEX idx_learning_messages_agent_type ON learning_messages(agent_type) WHERE agent_type IS NOT NULL;
 CREATE INDEX idx_learning_messages_total_tokens ON learning_messages(total_tokens) WHERE total_tokens IS NOT NULL;
 CREATE INDEX idx_learning_messages_tool_result ON learning_messages USING GIN (tool_result);
 
--- 4. 练习与验证
-CREATE TABLE learning_exercises (
+-- 3. 费曼解释评审
+CREATE TABLE learning_explanation_reviews (
     id VARCHAR(32) PRIMARY KEY,
     session_id VARCHAR(32) NOT NULL REFERENCES learning_sessions(id) ON DELETE CASCADE,
-    objective_id VARCHAR(32) NOT NULL REFERENCES learning_objectives(id) ON DELETE CASCADE,
+    document_id VARCHAR(32) NOT NULL REFERENCES wiki_documents(id) ON DELETE CASCADE,
     user_id VARCHAR(32) NOT NULL REFERENCES sys_users(id) ON DELETE CASCADE,
-    type VARCHAR(20) NOT NULL,
-    prompt TEXT NOT NULL,
-    user_answer TEXT,
-    verdict VARCHAR(20),
-    mastery_after VARCHAR(20),
-    feedback TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT chk_learning_exercises_type CHECK (type IN ('explain','choice','cloze','paste_output','code_snippet')),
-    CONSTRAINT chk_learning_exercises_verdict CHECK (verdict IS NULL OR verdict IN ('pass','partial','fail')),
-    CONSTRAINT chk_learning_exercises_mastery CHECK (mastery_after IS NULL OR mastery_after IN ('none','seen','heard','explained','written','verified'))
+    explanation TEXT NOT NULL,
+    heard_summary TEXT NOT NULL,
+    clear_points JSONB NOT NULL DEFAULT '[]'::jsonb,
+    confusing_points JSONB NOT NULL DEFAULT '[]'::jsonb,
+    misconceptions JSONB NOT NULL DEFAULT '[]'::jsonb,
+    follow_up_question TEXT NOT NULL DEFAULT '',
+    explanation_summary TEXT NOT NULL,
+    ready_to_wrap_up BOOLEAN NOT NULL DEFAULT FALSE,
+    context_sufficient BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_learning_exercises_session_id ON learning_exercises(session_id);
-CREATE INDEX idx_learning_exercises_objective_id ON learning_exercises(objective_id);
-CREATE INDEX idx_learning_exercises_user_id ON learning_exercises(user_id);
+CREATE INDEX idx_learning_explanation_reviews_session_id
+    ON learning_explanation_reviews(session_id, created_at ASC);
+CREATE INDEX idx_learning_explanation_reviews_document_id
+    ON learning_explanation_reviews(document_id);
+CREATE INDEX idx_learning_explanation_reviews_user_id
+    ON learning_explanation_reviews(user_id);
 
--- 5. 学习画像(一个 Wiki 文件夹一份)
-CREATE TABLE learning_profiles (
-    id VARCHAR(32) PRIMARY KEY,
-    user_id VARCHAR(32) NOT NULL REFERENCES sys_users(id) ON DELETE CASCADE,
-    folder_id VARCHAR(32) NOT NULL REFERENCES wiki_folders(id) ON DELETE CASCADE,
-    current_level VARCHAR(50),
-    completed_topics JSONB,
-    weak_points JSONB,
-    verification_habits TEXT,
-    next_goal TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT uq_learning_profiles_folder UNIQUE (user_id, folder_id)
-);
-CREATE INDEX idx_learning_profiles_user_id ON learning_profiles(user_id);
-CREATE INDEX idx_learning_profiles_folder_id ON learning_profiles(folder_id);
-
--- 6. 学习日志(按 Wiki 文件夹记录)
+-- 4. 学习日志(按 Wiki 文件夹记录)
 CREATE TABLE learning_journals (
     id VARCHAR(32) PRIMARY KEY,
     user_id VARCHAR(32) NOT NULL REFERENCES sys_users(id) ON DELETE CASCADE,
@@ -125,12 +86,7 @@ CREATE TABLE learning_journals (
 CREATE INDEX idx_learning_journals_user_date ON learning_journals(user_id, date DESC);
 CREATE INDEX idx_learning_journals_folder_id ON learning_journals(folder_id);
 
--- ============================================
--- 表注释
--- ============================================
-COMMENT ON TABLE learning_objectives IS '学习小节状态(来自 Wiki 文档)';
-COMMENT ON TABLE learning_sessions IS '学习会话(一节课)';
+COMMENT ON TABLE learning_sessions IS '以整篇 Wiki 文档为范围的学习会话';
 COMMENT ON TABLE learning_messages IS '陪练对话消息';
-COMMENT ON TABLE learning_exercises IS '练习与验证记录';
-COMMENT ON TABLE learning_profiles IS '学习画像(一个 Wiki 文件夹一份)';
+COMMENT ON TABLE learning_explanation_reviews IS '费曼解释的多轮结构化评审';
 COMMENT ON TABLE learning_journals IS '学习日志(按 Wiki 文件夹记录)';

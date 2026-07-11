@@ -12,7 +12,8 @@ type LearningSession struct {
 
 	ID           string     `bun:"id,pk,type:varchar(32)" json:"id"`                                        // 主键ID
 	UserID       string     `bun:"user_id,notnull" json:"user_id"`                                          // 用户ID
-	ObjectiveID  string     `bun:"objective_id,notnull" json:"objective_id"`                                // 小目标ID
+	DocumentID   string     `bun:"document_id,notnull" json:"document_id"`                                  // Wiki 文档ID
+	ObjectiveID  string     `bun:"-" json:"objective_id,omitempty"`                                         // 旧流程临时编译字段
 	Status       string     `bun:"status,notnull" json:"status"`                                            // active / completed / abandoned
 	Summary      *string    `bun:"summary" json:"summary,omitempty"`                                        // 会话小结
 	MessageCount int        `bun:"message_count" json:"message_count"`                                      // 消息条数
