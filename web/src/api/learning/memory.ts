@@ -11,7 +11,6 @@ export interface LearningMemoryItem {
   confidence: string;
   folder_id?: string | null;
   document_id?: string | null;
-  objective_id?: string | null;
   last_seen_at: string;
 }
 

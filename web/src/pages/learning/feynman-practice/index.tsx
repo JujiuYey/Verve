@@ -1,255 +1,241 @@
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
-import { CircleAlertIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { BookOpenIcon, CircleAlertIcon, MessageSquareTextIcon } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import {
-  exerciseKeys,
-  sessionChatStream,
-  objectiveKeys,
+  useCompleteSession,
   useCreateSession,
-  useObjectives,
-  useSubmitExercise,
-  type ExerciseResult,
+  useReviewExplanation,
+  useSessionDetail,
+  type LearningExplanationReview,
 } from "@/api/learning";
 import { documentApi } from "@/api/wiki/document";
-import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-import { PhaseBadge } from "./_components/phase-badge";
 import { PracticePanel } from "./_components/practice-panel";
 import { SourcePanel } from "./_components/source-panel";
-import { StudyInfoPanel } from "./_components/study-info-panel";
-import { TeachingPanel } from "./_components/teaching-panel";
-import { buildPrompt, masteryLabels, type WorkbenchPhase } from "./_shared";
 
 const routeApi = getRouteApi("/_layout/learn/feynman-practice/$documentId");
 
 export function FeynmanWorkbenchPage() {
   const navigate = useNavigate();
   const { documentId } = routeApi.useParams();
-  const { objectiveId } = routeApi.useSearch();
-  const { data: objectives = [], isLoading } = useObjectives({ document_id: documentId });
-  const objective = objectives.find((item) => item.id === objectiveId) || objectives[0];
-  const selectedObjectiveId = objective?.id || "";
   const createSession = useCreateSession();
-  const queryClient = useQueryClient();
-
+  const creatingDocumentRef = useRef("");
+  const currentDocumentRef = useRef(documentId);
+  const previousDocumentRef = useRef(documentId);
+  const [createAttempt, setCreateAttempt] = useState(0);
   const [sessionId, setSessionId] = useState("");
-  const [phase, setPhase] = useState<WorkbenchPhase>("reading");
+  const [activeView, setActiveView] = useState("source");
   const [answer, setAnswer] = useState("");
-  const [result, setResult] = useState<ExerciseResult | null>(null);
-  const [tutorAdvice, setTutorAdvice] = useState("");
-  const [isTutorTeaching, setIsTutorTeaching] = useState(false);
-  const [isAppendingTutorNote, setIsAppendingTutorNote] = useState(false);
-  const submitExercise = useSubmitExercise(sessionId);
+  const [turns, setTurns] = useState<LearningExplanationReview[]>([]);
+  const [completedSummary, setCompletedSummary] = useState("");
+
+  currentDocumentRef.current = documentId;
+
+  const { data: document, isLoading: isDocumentLoading } = useQuery({
+    queryKey: ["wiki-document", documentId],
+    queryFn: () => documentApi.findOne(documentId),
+    enabled: !!documentId,
+  });
+  const { data: sessionDetail, isError: isSessionDetailError } = useSessionDetail(sessionId);
+  const reviewExplanation = useReviewExplanation(sessionId);
+  const completeSession = useCompleteSession(sessionId);
 
   useEffect(() => {
-    if (!selectedObjectiveId || sessionId || createSession.isPending) return;
-    createSession
-      .mutateAsync({ objective_id: selectedObjectiveId })
-      .then((res) => setSessionId(res.session_id))
-      .catch(() => toast.error("创建练习会话失败"));
-  }, [createSession, selectedObjectiveId, sessionId]);
-
-  useEffect(() => {
+    if (previousDocumentRef.current === documentId) return;
+    previousDocumentRef.current = documentId;
     setSessionId("");
-    setPhase("reading");
+    setActiveView("source");
     setAnswer("");
-    setResult(null);
-    setTutorAdvice("");
-    setIsTutorTeaching(false);
-    setIsAppendingTutorNote(false);
-  }, [selectedObjectiveId]);
+    setTurns([]);
+    setCompletedSummary("");
+    creatingDocumentRef.current = "";
+  }, [documentId]);
 
-  const openObjective = (id: string) => {
-    if (id === selectedObjectiveId) return;
-    navigate({
-      to: "/learn/feynman-practice/$documentId",
-      params: { documentId },
-      search: { objectiveId: id },
-      replace: true,
-    });
-  };
-
-  const submit = async () => {
-    if (!sessionId || !objective || !answer.trim()) return;
-    const res = await submitExercise.mutateAsync({
-      type: "explain",
-      prompt: buildPrompt(objective),
-      user_answer: answer,
-    });
-    setResult(res);
-    setTutorAdvice("");
-    setIsTutorTeaching(false);
-    void queryClient.invalidateQueries({
-      queryKey: objectiveKeys.list({ document_id: documentId }),
-    });
-    void queryClient.invalidateQueries({ queryKey: exerciseKeys.lists() });
-    void queryClient.invalidateQueries({ queryKey: ["learning-journals"] });
-    void queryClient.invalidateQueries({ queryKey: ["learning-profiles"] });
-  };
-
-  const resetAnswer = () => {
-    setAnswer("");
-    setResult(null);
-    setTutorAdvice("");
-    setIsTutorTeaching(false);
-    setIsAppendingTutorNote(false);
-  };
-
-  const requestTutorTeaching = async () => {
-    if (!sessionId || !objective || !result || isTutorTeaching) return;
-
-    const message = [
-      `我刚才复述「${objective.title}」没有通过。`,
-      objective.detail ? `本轮目标是：${objective.detail}` : "",
-      `Examiner 的反馈是：${result.feedback}`,
-      "请你不要只评价我，直接教我：先用通俗的话讲清楚这个知识点，再指出我漏掉的关键点，最后给我一个很小的复述练习。",
-      "最后请补一段「可写回 Markdown 的学习旁注」：像用户写在教材边上的笔记一样，补充更顺手的解释、例子、易错点和复述提示，不要替换原教材。",
-    ]
-      .filter(Boolean)
-      .join("\n");
-
-    setPhase("teaching");
-    setTutorAdvice("");
-    setIsTutorTeaching(true);
-    await sessionChatStream(
-      sessionId,
-      message,
-      (event) => {
-        if ((event.type === "stream_chunk" || event.type === "message") && event.content) {
-          setTutorAdvice((prev) => prev + event.content);
-        } else if (event.type === "error") {
-          toast.error(event.content || "教学 agent 出错");
+  useEffect(() => {
+    if (!documentId || sessionId || creatingDocumentRef.current === documentId) return;
+    creatingDocumentRef.current = documentId;
+    createSession
+      .mutateAsync({ document_id: documentId })
+      .then((result) => {
+        if (currentDocumentRef.current === documentId) {
+          setSessionId(result.session_id);
         }
-      },
-      () => setIsTutorTeaching(false),
-      (err) => {
-        setIsTutorTeaching(false);
-        toast.error(err.message);
-      },
-    );
-  };
-
-  const appendTutorNoteToMarkdown = async () => {
-    if (!documentId || !objective || !tutorAdvice.trim() || isAppendingTutorNote) return;
-
-    setIsAppendingTutorNote(true);
-    try {
-      const sourceDocument = await documentApi.getContent(documentId);
-      const title = objective.title;
-      const note = ["", "---", "", `## 学习旁注：${title}`, "", tutorAdvice.trim(), ""].join("\n");
-      const nextContent = `${sourceDocument.content?.trimEnd() || ""}${note}`;
-
-      await documentApi.updateContent(documentId, { content: nextContent });
-      await queryClient.invalidateQueries({
-        queryKey: ["feynman-source-document", documentId],
+      })
+      .catch(() => {
+        // Keep the document marked until the user explicitly retries.
       });
-      toast.success("学习旁注已追加到 Markdown");
+  }, [createAttempt, createSession, documentId, sessionId]);
+
+  useEffect(() => {
+    if (!sessionDetail) return;
+    setTurns(sessionDetail.reviews || []);
+    if (sessionDetail.session.status === "completed") {
+      setCompletedSummary(sessionDetail.session.summary || "");
+    }
+  }, [sessionDetail]);
+
+  const submitExplanation = async () => {
+    const explanation = answer.trim();
+    if (!sessionId || !explanation) return;
+
+    try {
+      const review = await reviewExplanation.mutateAsync({ explanation });
+      const createdAt = new Date().toISOString();
+      setTurns((current) => [
+        ...current,
+        {
+          ...review,
+          id: `local-${createdAt}-${current.length}`,
+          session_id: sessionId,
+          document_id: documentId,
+          user_id: "",
+          explanation,
+          created_at: createdAt,
+        },
+      ]);
+      setAnswer("");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "追加学习旁注失败");
-    } finally {
-      setIsAppendingTutorNote(false);
+      toast.error(error instanceof Error ? error.message : "审阅解释失败，请重试");
     }
   };
 
-  /* 加载骨架 */
-  if (isLoading) {
+  const finishPractice = async () => {
+    if (!sessionId || turns.length === 0) return;
+    try {
+      const result = await completeSession.mutateAsync();
+      setCompletedSummary(result.summary || "你的解释记录已经保存。");
+      toast.success("本次费曼练习已结束");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "结束练习失败");
+    }
+  };
+
+  const retryCreateSession = () => {
+    createSession.reset();
+    creatingDocumentRef.current = "";
+    setCreateAttempt((attempt) => attempt + 1);
+  };
+
+  if (createSession.isError && !sessionId) {
     return (
-      <div className="flex h-full flex-col gap-4 p-6">
-        <Skeleton className="h-10 w-48" />
-        <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(380px,0.8fr)_320px]">
-          <Skeleton className="h-full rounded-2xl" />
-          <Skeleton className="h-full rounded-2xl" />
-          <Skeleton className="h-full rounded-2xl" />
-        </div>
-      </div>
+      <Empty className="h-full border-0 p-6">
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <CircleAlertIcon />
+          </EmptyMedia>
+          <EmptyTitle>无法开始这次练习</EmptyTitle>
+          <EmptyDescription>文档可能不存在，或者当前账号没有访问权限。</EmptyDescription>
+        </EmptyHeader>
+        <EmptyContent>
+          <div className="flex flex-wrap justify-center gap-2">
+            <Button variant="outline" onClick={() => navigate({ to: "/wiki" })}>
+              返回 Wiki
+            </Button>
+            <Button onClick={retryCreateSession}>重试</Button>
+          </div>
+        </EmptyContent>
+      </Empty>
     );
   }
 
-  /* 目标不存在 */
-  if (!objective) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
-        <CircleAlertIcon className="size-8 text-muted-foreground" />
-        <div className="text-lg font-semibold">没有找到这个小目标</div>
-        <Button variant="outline" onClick={() => navigate({ to: "/learn/feynman" })}>
-          返回费曼练习
-        </Button>
-      </div>
-    );
+  if (isDocumentLoading || (!sessionId && createSession.isPending)) {
+    return <WorkbenchSkeleton />;
   }
+
+  const title = document?.filename?.replace(/\.md$/i, "") || "整篇费曼练习";
+  const isCompleted = Boolean(completedSummary || sessionDetail?.session.status === "completed");
 
   return (
-    <div className="flex h-full flex-col gap-4 overflow-hidden p-6">
-      {/* 工作台头部 */}
+    <div className="flex h-full min-h-0 flex-col gap-4 overflow-hidden p-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className=" min-w-0 flex flex-wrap items-center gap-2">
-          <h1 className="mt-2 truncate text-2xl font-bold">{objective.title}</h1>
-          <Badge variant="outline">
-            {masteryLabels[objective.mastery_level] ?? objective.mastery_level}
-          </Badge>
+        <div className="min-w-0">
+          <h1 className="truncate text-xl font-semibold">{title}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">整篇文章是一轮完整的费曼练习</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <PhaseBadge phase={phase} onPhaseChange={setPhase} />
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => navigate({ to: "/wiki" })}>
             返回 Wiki
           </Button>
           <Button variant="secondary" onClick={() => navigate({ to: "/learn/feynman" })}>
-            返回费曼练习
+            学习 Agent
           </Button>
         </div>
       </div>
 
-      {/* 阅读阶段 */}
-      {phase === "reading" ? (
-        <SourcePanel
-          documentId={documentId}
-          objective={objective}
-          objectives={objectives}
-          isObjectivesLoading={isLoading}
-          onOpenObjective={openObjective}
-        />
-      ) : phase === "answering" ? (
-        /* 复述阶段 */
-        <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+      {isSessionDetailError ? (
+        <Alert>
+          <CircleAlertIcon />
+          <AlertTitle>历史记录读取失败</AlertTitle>
+          <AlertDescription>
+            <p>你仍然可以继续解释，新提交会保存在当前会话中。</p>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      <Tabs
+        value={activeView}
+        onValueChange={setActiveView}
+        className="min-h-0 flex-1 overflow-hidden"
+      >
+        <TabsList>
+          <TabsTrigger value="source">
+            <BookOpenIcon />
+            阅读文章
+          </TabsTrigger>
+          <TabsTrigger value="explain">
+            <MessageSquareTextIcon />
+            开始讲解{turns.length > 0 ? ` (${turns.length})` : ""}
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="source" className="min-h-0 overflow-hidden">
+          <SourcePanel documentId={documentId} />
+        </TabsContent>
+        <TabsContent value="explain" className="min-h-0 overflow-hidden">
           <PracticePanel
             answer={answer}
-            result={result}
-            disabled={!sessionId || submitExercise.isPending}
-            isSubmitting={submitExercise.isPending}
-            objective={objective}
+            turns={turns}
+            disabled={!sessionId || reviewExplanation.isPending || isCompleted}
+            isSubmitting={reviewExplanation.isPending}
+            isCompleting={completeSession.isPending}
+            isCompleted={isCompleted}
+            completedSummary={completedSummary}
             onAnswerChange={setAnswer}
-            onSubmit={submit}
-            onReset={resetAnswer}
-            tutorAdvice={tutorAdvice}
-            isTutorTeaching={isTutorTeaching}
-            onRequestTutorTeaching={requestTutorTeaching}
-            canAppendTutorNote={!!documentId}
-            isAppendingTutorNote={isAppendingTutorNote}
-            onAppendTutorNote={appendTutorNoteToMarkdown}
-            onPhaseChange={setPhase}
+            onSubmit={() => void submitExplanation()}
+            onComplete={() => void finishPractice()}
           />
-          <StudyInfoPanel objective={objective} result={result} sessionId={sessionId} />
-        </div>
-      ) : (
-        /* 教学阶段 */
-        <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-          <TeachingPanel
-            tutorAdvice={tutorAdvice}
-            isTutorTeaching={isTutorTeaching}
-            canRequestTeaching={!!result}
-            canAppendTutorNote={!!documentId}
-            isAppendingTutorNote={isAppendingTutorNote}
-            onRequestTutorTeaching={requestTutorTeaching}
-            onAppendTutorNote={appendTutorNoteToMarkdown}
-          />
-          <StudyInfoPanel objective={objective} result={result} sessionId={sessionId} />
-        </div>
-      )}
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+function WorkbenchSkeleton() {
+  return (
+    <div className="flex h-full flex-col gap-4 p-6">
+      <div className="flex flex-col gap-2">
+        <Skeleton className="h-7 w-64" />
+        <Skeleton className="h-4 w-48" />
+      </div>
+      <Skeleton className="h-9 w-56" />
+      <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
+        <Skeleton className="h-full" />
+        <Skeleton className="h-full" />
+      </div>
     </div>
   );
 }

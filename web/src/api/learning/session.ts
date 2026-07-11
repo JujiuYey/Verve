@@ -9,7 +9,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 export interface LearningMessage {
   id: string;
   session_id: string;
-  role: string; // user / assistant / system
+  role: string;
   agent_type?: string;
   content: string;
   created_at: string;
@@ -18,61 +18,60 @@ export interface LearningMessage {
 export interface LearningSession {
   id: string;
   user_id: string;
-  objective_id: string;
-  status: string;
+  document_id: string;
+  status: "active" | "completed" | "abandoned";
   summary?: string;
+  message_count: number;
   started_at: string;
   ended_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FeynmanReview {
+  heard_summary: string;
+  clear_points: string[];
+  confusing_points: string[];
+  misconceptions: string[];
+  follow_up_question: string;
+  explanation_summary: string;
+  ready_to_wrap_up: boolean;
+  context_sufficient: boolean;
+}
+
+export interface LearningExplanationReview extends FeynmanReview {
+  id: string;
+  session_id: string;
+  document_id: string;
+  user_id: string;
+  explanation: string;
+  created_at: string;
 }
 
 export interface SessionDetail {
   session: LearningSession;
   messages: LearningMessage[];
+  reviews: LearningExplanationReview[];
 }
 
 export interface CreateSessionRequest {
-  objective_id: string;
+  document_id: string;
 }
 
-export interface SubmitExerciseRequest {
-  type: string; // explain / choice / cloze / paste_output / code_snippet
-  prompt: string;
-  user_answer: string;
-}
-
-export interface ExerciseResult {
-  verdict: string; // pass / partial / fail
-  mastery_after: string;
-  feedback: string;
-  objective_id: string;
-  evidence?: string;
-  weak_points?: string[];
-  improvement_suggestion?: string;
-  next_recommendation?: string;
-  review_required?: boolean;
+export interface ReviewExplanationRequest {
+  explanation: string;
 }
 
 export interface CompleteResult {
   summary: string;
-  next_objective?: { id: string; title: string };
 }
 
-// 陪练 SSE 事件(对齐后端 learning SSE)
 export interface LearningStreamEvent {
-  type:
-    | "stream_chunk"
-    | "message"
-    | "reasoning"
-    | "tool_call"
-    | "tool_result"
-    | "exercise"
-    | "action"
-    | "error";
+  type: "stream_chunk" | "message" | "reasoning" | "tool_call" | "tool_result" | "action" | "error";
   content?: string;
   agent?: string;
   phase?: string;
   action?: LearningCoachAction;
-  // tool_call / tool_result 字段
   tool_call_id?: string;
   tool_name?: string;
   id?: string;
@@ -82,8 +81,7 @@ export interface LearningStreamEvent {
 
 export interface LearningCoachAction {
   type: "navigate_to_practice";
-  objective_id?: string;
-  folder_id?: string;
+  document_id?: string;
   label?: string;
 }
 
@@ -98,15 +96,20 @@ const api = {
 
   detail: (id: string) => request.get<SessionDetail>(`${BASE}/session/${id}`),
 
-  exercise: (id: string, data: SubmitExerciseRequest) =>
-    request.post<ExerciseResult>(`${BASE}/session/${id}/exercise`, data),
+  review: (id: string, data: ReviewExplanationRequest) =>
+    request.post<FeynmanReview>(`${BASE}/session/${id}/review`, data),
 
   complete: (id: string) => request.post<CompleteResult>(`${BASE}/session/${id}/complete`),
 };
 
+export const sessionKeys = {
+  all: ["learning-session"] as const,
+  detail: (id: string) => [...sessionKeys.all, id] as const,
+};
+
 export function useSessionDetail(id: string) {
   return useQuery({
-    queryKey: ["learning-session", id],
+    queryKey: sessionKeys.detail(id),
     queryFn: () => api.detail(id),
     enabled: !!id,
   });
@@ -118,9 +121,9 @@ export function useCreateSession() {
   });
 }
 
-export function useSubmitExercise(sessionId: string) {
+export function useReviewExplanation(sessionId: string) {
   return useMutation({
-    mutationFn: (data: SubmitExerciseRequest) => api.exercise(sessionId, data),
+    mutationFn: (data: ReviewExplanationRequest) => api.review(sessionId, data),
   });
 }
 
@@ -128,71 +131,6 @@ export function useCompleteSession(sessionId: string) {
   return useMutation({
     mutationFn: () => api.complete(sessionId),
   });
-}
-
-// 陪练对话 SSE(复用 chat.ts 的 fetch + ReadableStream 模式)
-export async function sessionChatStream(
-  sessionId: string,
-  message: string,
-  onMessage: (event: LearningStreamEvent) => void,
-  onComplete?: () => void,
-  onError?: (error: Error) => void,
-): Promise<void> {
-  try {
-    const { accessToken } = useAuthStore.getState();
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (accessToken) {
-      headers.Authorization = `Bearer ${accessToken}`;
-    }
-
-    const response = await fetch(`${API_BASE_URL}${BASE}/session/${sessionId}/chat`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ message }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const reader = response.body?.getReader();
-    if (!reader) {
-      throw new Error("Response body is not readable");
-    }
-
-    const decoder = new TextDecoder();
-    let buffer = "";
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) {
-        onComplete?.();
-        break;
-      }
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
-
-      for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          const data = line.slice(6).trim();
-          if (data === "[DONE]") {
-            onComplete?.();
-            return;
-          }
-          try {
-            const event = JSON.parse(data) as LearningStreamEvent;
-            onMessage(event);
-          } catch {
-            console.warn("Failed to parse SSE data:", data);
-          }
-        }
-      }
-    }
-  } catch (error) {
-    onError?.(error instanceof Error ? error : new Error(String(error)));
-  }
 }
 
 export async function coachChatStream(
@@ -243,18 +181,16 @@ export async function coachChatStream(
       buffer = lines.pop() || "";
 
       for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          const data = line.slice(6).trim();
-          if (data === "[DONE]") {
-            onComplete?.();
-            return;
-          }
-          try {
-            const event = JSON.parse(data) as LearningStreamEvent;
-            onMessage(event);
-          } catch {
-            console.warn("Failed to parse SSE data:", data);
-          }
+        if (!line.startsWith("data: ")) continue;
+        const data = line.slice(6).trim();
+        if (data === "[DONE]") {
+          onComplete?.();
+          return;
+        }
+        try {
+          onMessage(JSON.parse(data) as LearningStreamEvent);
+        } catch {
+          console.warn("Failed to parse SSE data:", data);
         }
       }
     }

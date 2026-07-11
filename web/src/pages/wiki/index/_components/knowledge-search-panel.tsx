@@ -1,9 +1,10 @@
 import type { ChatStatus } from "ai";
-import { BotIcon, SearchIcon } from "lucide-react";
+import { BotIcon, PlayIcon, SearchIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { ragWikiApi, type WikiKnowledgeSearchResult } from "@/api/rag/wiki";
+import type { WikiAgentInstance } from "@/api/wiki/agent-instance";
 import {
   Conversation,
   ConversationContent,
@@ -21,8 +22,12 @@ import {
   type PromptInputMessage,
 } from "@/components/ai-elements/prompt-input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 interface KnowledgeSearchPanelProps {
+  agentInstance: WikiAgentInstance | null;
+  agentLoading: boolean;
+  onStartLearning: () => void;
   rootFolderId?: string;
   scopeLabel?: string;
 }
@@ -31,7 +36,13 @@ function formatScore(score: number) {
   return `${Math.round(score * 100)}%`;
 }
 
-export function KnowledgeSearchPanel({ rootFolderId, scopeLabel }: KnowledgeSearchPanelProps) {
+export function KnowledgeSearchPanel({
+  agentInstance,
+  agentLoading,
+  onStartLearning,
+  rootFolderId,
+  scopeLabel,
+}: KnowledgeSearchPanelProps) {
   const [results, setResults] = useState<WikiKnowledgeSearchResult[]>([]);
   const [lastQuery, setLastQuery] = useState("");
   const [searched, setSearched] = useState(false);
@@ -73,6 +84,16 @@ export function KnowledgeSearchPanel({ rootFolderId, scopeLabel }: KnowledgeSear
           {rootFolderId ? scopeLabel || "当前知识库" : "未选择知识库"}
         </Badge>
         {loading ? <Badge variant="secondary">检索中</Badge> : null}
+        <Button
+          className="ml-auto"
+          size="sm"
+          variant="outline"
+          disabled={!agentInstance || agentLoading}
+          onClick={onStartLearning}
+        >
+          <PlayIcon data-icon="inline-start" />
+          {agentLoading ? "准备中" : "学习 Agent"}
+        </Button>
       </div>
 
       <Conversation className="min-h-0 flex-1">

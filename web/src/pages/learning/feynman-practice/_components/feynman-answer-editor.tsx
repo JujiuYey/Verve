@@ -99,7 +99,7 @@ function EditorToolbar({ editor, onClear }: { editor: Editor | null; onClear: ()
         disabled={disabled}
         onClick={() => editor?.chain().focus().toggleBold().run()}
       >
-        <BoldIcon className="size-4" />
+        <BoldIcon />
       </ToolbarIconButton>
       <ToolbarIconButton
         label="斜体"
@@ -107,7 +107,7 @@ function EditorToolbar({ editor, onClear }: { editor: Editor | null; onClear: ()
         disabled={disabled}
         onClick={() => editor?.chain().focus().toggleItalic().run()}
       >
-        <ItalicIcon className="size-4" />
+        <ItalicIcon />
       </ToolbarIconButton>
       <ToolbarIconButton
         label="行内代码"
@@ -115,7 +115,7 @@ function EditorToolbar({ editor, onClear }: { editor: Editor | null; onClear: ()
         disabled={disabled}
         onClick={() => editor?.chain().focus().toggleCode().run()}
       >
-        <CodeIcon className="size-4" />
+        <CodeIcon />
       </ToolbarIconButton>
       <ToolbarIconButton
         label="代码块"
@@ -123,7 +123,7 @@ function EditorToolbar({ editor, onClear }: { editor: Editor | null; onClear: ()
         disabled={disabled}
         onClick={() => editor?.chain().focus().toggleCodeBlock().run()}
       >
-        <Code2Icon className="size-4" />
+        <Code2Icon />
       </ToolbarIconButton>
       <Separator orientation="vertical" className="mx-1 h-6" />
       <ToolbarIconButton
@@ -132,7 +132,7 @@ function EditorToolbar({ editor, onClear }: { editor: Editor | null; onClear: ()
         disabled={disabled}
         onClick={() => editor?.chain().focus().toggleBulletList().run()}
       >
-        <ListIcon className="size-4" />
+        <ListIcon />
       </ToolbarIconButton>
       <ToolbarIconButton
         label="有序列表"
@@ -140,7 +140,7 @@ function EditorToolbar({ editor, onClear }: { editor: Editor | null; onClear: ()
         disabled={disabled}
         onClick={() => editor?.chain().focus().toggleOrderedList().run()}
       >
-        <ListOrderedIcon className="size-4" />
+        <ListOrderedIcon />
       </ToolbarIconButton>
       <div className="ml-auto flex items-center gap-2 pl-2">
         <ToolbarIconButton
@@ -151,7 +151,7 @@ function EditorToolbar({ editor, onClear }: { editor: Editor | null; onClear: ()
             onClear();
           }}
         >
-          <Trash2Icon className="size-4" />
+          <Trash2Icon />
         </ToolbarIconButton>
       </div>
     </div>
@@ -188,6 +188,9 @@ function ToolbarIconButton({
 }
 
 function getMarkdown(editor: Editor) {
-  const markdown = (editor.storage as Record<string, any>).markdown?.getMarkdown?.();
+  const storage = editor.storage as unknown as {
+    markdown?: { getMarkdown?: () => unknown };
+  };
+  const markdown = storage.markdown?.getMarkdown?.();
   return typeof markdown === "string" ? markdown : editor.getText();
 }

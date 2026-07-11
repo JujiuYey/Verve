@@ -1,41 +1,29 @@
 import { useQuery } from "@tanstack/react-query";
-import {
-  NotebookTabsIcon,
-  TableOfContentsIcon,
-} from "lucide-react";
+import { TableOfContentsIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import type { LearningObjective } from "@/api/learning";
 import { documentApi } from "@/api/wiki/document";
 import { MessageResponse } from "@/components/ai-elements/message";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 import { extractMarkdownCatalog, scrollToMarkdownHeading } from "../_shared";
-import { ObjectiveOutline } from "./objective-outline";
 
-export function SourcePanel({
-  documentId,
-  objective,
-  objectives,
-  isObjectivesLoading,
-  onOpenObjective,
-}: {
-  documentId: string;
-  objective: LearningObjective;
-  objectives: LearningObjective[];
-  isObjectivesLoading: boolean;
-  onOpenObjective: (id: string) => void;
-}) {
+export function SourcePanel({ documentId }: { documentId: string }) {
   const [catalogOpen, setCatalogOpen] = useState(true);
-  const [objectivesOpen, setObjectivesOpen] = useState(true);
   const {
     data: sourceDocument,
-    isLoading: isSourceLoading,
-    isError: isSourceError,
+    isLoading,
+    isError,
   } = useQuery({
     queryKey: ["feynman-source-document", documentId],
     queryFn: () => documentApi.getContent(documentId),
@@ -43,30 +31,21 @@ export function SourcePanel({
   });
   const sourceMarkdown = sourceDocument?.content?.trim() || "";
   const catalog = useMemo(() => extractMarkdownCatalog(sourceMarkdown), [sourceMarkdown]);
-  const currentIndex = objectives.findIndex((item) => item.id === objective.id);
-  const previousObjective = currentIndex > 0 ? objectives[currentIndex - 1] : null;
-  const nextObjective =
-    currentIndex >= 0 && currentIndex < objectives.length - 1 ? objectives[currentIndex + 1] : null;
-  const readingGridClassName = cn(
-    "grid min-h-0 flex-1 gap-4",
-    catalogOpen && objectivesOpen
-      ? "lg:grid-cols-[220px_minmax(0,1fr)] xl:grid-cols-[240px_minmax(0,1fr)_340px]"
-      : catalogOpen
-        ? "lg:grid-cols-[220px_minmax(0,1fr)] xl:grid-cols-[240px_minmax(0,1fr)]"
-        : objectivesOpen
-          ? "lg:grid-cols-[minmax(0,1fr)] xl:grid-cols-[minmax(0,1fr)_340px]"
-          : "lg:grid-cols-[minmax(0,1fr)]",
-  );
 
   return (
-    <div className={readingGridClassName}>
+    <div
+      className={cn(
+        "grid min-h-0 flex-1 gap-4",
+        catalogOpen ? "lg:grid-cols-[240px_minmax(0,1fr)]" : "grid-cols-1",
+      )}
+    >
       {catalogOpen ? (
-        <aside className="hidden min-h-0 overflow-hidden rounded-2xl border bg-muted/20 lg:block">
-          <div className="flex h-[45px] items-center gap-2 border-b px-3">
-            <TableOfContentsIcon className="size-4 text-muted-foreground" />
-            <div className="truncate text-sm font-medium">目录</div>
+        <aside className="hidden min-h-0 overflow-hidden rounded-lg border bg-muted/20 lg:block">
+          <div className="flex h-11 items-center gap-2 border-b px-3">
+            <TableOfContentsIcon />
+            <div className="truncate text-sm font-medium">文章目录</div>
           </div>
-          <ScrollArea className="h-[calc(100%-45px)]">
+          <ScrollArea className="h-[calc(100%-44px)]">
             <nav className="flex flex-col gap-1 p-3 text-sm">
               {catalog.length > 0 ? (
                 catalog.map((item) => (
@@ -81,46 +60,37 @@ export function SourcePanel({
                   </button>
                 ))
               ) : (
-                <div className="px-2 py-1.5 text-xs leading-5 text-muted-foreground">
-                  当前文档没有可识别标题。
-                </div>
+                <p className="px-2 py-1.5 text-xs leading-5 text-muted-foreground">
+                  当前文章没有可识别标题。
+                </p>
               )}
             </nav>
           </ScrollArea>
         </aside>
       ) : null}
 
-      <section className="min-h-0 overflow-hidden rounded-2xl border bg-background">
+      <section className="min-h-0 overflow-hidden rounded-lg border bg-background">
         <div className="flex h-full min-h-0 flex-col">
-          <div className="flex shrink-0 items-center justify-between gap-3 border-b px-5 py-3">
-            <div className="flex min-w-0 items-center gap-3">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="hidden size-8 shrink-0 lg:inline-flex"
-                aria-label={catalogOpen ? "收起目录" : "展开目录"}
-                onClick={() => setCatalogOpen((open) => !open)}
-              >
-                <TableOfContentsIcon className="size-4" />
-              </Button>
-              <div className="min-w-0 truncate text-base font-semibold">{objective.title}</div>
-            </div>
+          <div className="flex h-11 shrink-0 items-center gap-3 border-b px-4">
             <Button
               variant="ghost"
-              size="icon"
-              className="size-8 shrink-0"
-              aria-label={objectivesOpen ? "收起学习小节" : "展开学习小节"}
-              onClick={() => setObjectivesOpen((open) => !open)}
+              size="icon-sm"
+              aria-label={catalogOpen ? "收起目录" : "展开目录"}
+              title={catalogOpen ? "收起目录" : "展开目录"}
+              onClick={() => setCatalogOpen((open) => !open)}
             >
-              <NotebookTabsIcon className="size-4" />
+              <TableOfContentsIcon />
             </Button>
+            <div className="min-w-0 truncate text-sm font-medium">
+              {sourceDocument?.filename || "文章正文"}
+            </div>
           </div>
 
           <ScrollArea className="min-h-0 flex-1">
             <article className="mx-auto max-w-3xl px-5 py-6 lg:px-8">
-              {isSourceLoading ? (
-                <div className="space-y-3">
-                  <Skeleton className="h-5 w-64" />
+              {isLoading ? (
+                <div className="flex flex-col gap-3">
+                  <Skeleton className="h-6 w-64" />
                   <Skeleton className="h-4 w-full" />
                   <Skeleton className="h-4 w-11/12" />
                   <Skeleton className="h-4 w-4/5" />
@@ -130,38 +100,24 @@ export function SourcePanel({
                   {sourceMarkdown}
                 </MessageResponse>
               ) : (
-                <div className="text-sm leading-7 text-muted-foreground">
-                  {isSourceError
-                    ? "原始 Markdown 文档读取失败，请稍后重试。"
-                    : "这个小节还没有关联原始 Markdown 文档。"}
-                </div>
+                <Empty className="min-h-80 border-0">
+                  <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                      <TableOfContentsIcon />
+                    </EmptyMedia>
+                    <EmptyTitle>{isError ? "文章读取失败" : "文章没有正文"}</EmptyTitle>
+                    <EmptyDescription>
+                      {isError
+                        ? "暂时无法读取 Markdown 内容，请稍后重试。"
+                        : "请先回到 Wiki 为这篇文章补充内容。"}
+                    </EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
               )}
             </article>
           </ScrollArea>
         </div>
       </section>
-
-      {objectivesOpen ? (
-        <aside className="min-h-0 overflow-hidden rounded-2xl border bg-muted/10">
-          <div className="flex h-[45px] items-center gap-2 border-b px-3">
-            <NotebookTabsIcon className="size-4 text-muted-foreground" />
-            <div className="truncate text-sm font-medium">学习小节</div>
-            <Badge variant="outline" className="ml-auto">
-              {objectives.length || 1}
-            </Badge>
-          </div>
-          <ScrollArea className="h-[calc(100%-45px)]">
-            <ObjectiveOutline
-              objective={objective}
-              objectives={objectives}
-              isLoading={isObjectivesLoading}
-              previousObjective={previousObjective}
-              nextObjective={nextObjective}
-              onOpenObjective={onOpenObjective}
-            />
-          </ScrollArea>
-        </aside>
-      ) : null}
     </div>
   );
 }

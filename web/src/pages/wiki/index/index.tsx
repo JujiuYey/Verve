@@ -3,7 +3,6 @@ import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import { objectiveApi } from "@/api/learning";
 import { type IndexJobProgress, ragWikiApi } from "@/api/rag/wiki";
 import { type WikiAgentInstance, wikiAgentInstanceApi } from "@/api/wiki/agent-instance";
 import type { Document } from "@/api/wiki/document";
@@ -60,7 +59,6 @@ export function WikiIndexPage() {
 
   const [uploadOpen, setUploadOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Folder | null>(null);
-  const [openingDocumentId, setOpeningDocumentId] = useState("");
   const [agentInstance, setAgentInstance] = useState<WikiAgentInstance | null>(null);
   const [agentLoading, setAgentLoading] = useState(false);
 
@@ -174,33 +172,13 @@ export function WikiIndexPage() {
   }, []);
 
   const handleOpenDocument = useCallback(
-    async (doc: Document) => {
-      if (openingDocumentId) return;
-      setOpeningDocumentId(doc.id);
-      try {
-        const res = await objectiveApi.ensureByDocument(doc.id);
-        if (!res.first_objective_id) {
-          toast.error("这篇文档还没有可练习的小节");
-          return;
-        }
-        if (!res.reused) {
-          toast.success("已生成学习小节");
-        }
-        const firstObjective = res.objectives.find(
-          (objective) => objective.id === res.first_objective_id,
-        );
-        navigate({
-          to: "/learn/feynman-practice/$documentId",
-          params: { documentId: firstObjective?.source_document_id || doc.id },
-          search: { objectiveId: res.first_objective_id },
-        });
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "准备费曼练习失败");
-      } finally {
-        setOpeningDocumentId("");
-      }
+    (doc: Document) => {
+      navigate({
+        to: "/learn/feynman-practice/$documentId",
+        params: { documentId: doc.id },
+      });
     },
-    [navigate, openingDocumentId],
+    [navigate],
   );
 
   const handleConfirmDeleteDocument = async () => {
@@ -393,7 +371,6 @@ export function WikiIndexPage() {
                   onDeleteDocument={handleDeleteDocument}
                   onOpenDocument={(document) => void handleOpenDocument(document)}
                   onIndexStatusRefresh={() => void loadIndexJobs()}
-                  openingDocumentId={openingDocumentId}
                 />
               </div>
               {rootFolder && (

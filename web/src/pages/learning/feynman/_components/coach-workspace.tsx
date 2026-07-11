@@ -88,7 +88,8 @@ export function CoachWorkspace({
           <Badge variant="secondary">真实上下文</Badge>
         </div>
         <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-          直接说继续学习。Agent 会查询 Wiki 文件夹、文档、学习记录和用户画像，再决定下一步进入哪一个小节。
+          直接说继续学习。Agent 会查询 Wiki
+          文件夹、文档、学习记录和用户画像，再决定下一步进入哪一个小节。
         </p>
       </div>
 
@@ -181,7 +182,7 @@ export function CoachWorkspace({
               ))
             )}
 
-            {action?.type === "navigate_to_practice" && action.objective_id ? (
+            {action?.type === "navigate_to_practice" && action.document_id ? (
               <Message from="assistant">
                 <MessageContent>
                   <Button onClick={onEnterPractice}>

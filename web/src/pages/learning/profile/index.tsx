@@ -1,10 +1,10 @@
+import { useLearningMemory, type LearningMemoryItem } from "@/api/learning";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useLearningMemory, type LearningMemoryItem } from "@/api/learning";
 
 const KIND_LABELS: Record<string, string> = {
-  mastered_concept: "已掌握概念",
-  verification_evidence: "验证证据",
+  explanation_evidence: "解释证据",
+  misconception: "待澄清理解",
 };
 
 function getKindLabel(kind: string) {
@@ -48,7 +48,7 @@ export function ProfilePage() {
       <div className="flex flex-col gap-2">
         <h1 className="text-2xl font-bold">学习记忆</h1>
         <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-          这里展示从回答、练习、文档和笔记中沉淀出来的证据型记忆，用来帮助后续学习更贴近你的真实掌握情况。
+          这里展示从解释、文档和笔记中沉淀出来的证据型记忆，用来帮助后续对话延续你的理解脉络。
         </p>
       </div>
 
@@ -85,14 +85,16 @@ export function ProfilePage() {
         <h2 className="text-lg font-semibold">最近记忆条目</h2>
         {isLoading ? (
           <Card>
-            <CardContent className="p-6 text-sm text-muted-foreground">正在读取最近条目...</CardContent>
+            <CardContent className="p-6 text-sm text-muted-foreground">
+              正在读取最近条目...
+            </CardContent>
           </Card>
         ) : hasItems ? (
           memory?.items.map((item) => <MemoryItemCard key={item.id} item={item} />)
         ) : (
           <Card>
             <CardContent className="p-6 text-sm leading-6 text-muted-foreground">
-              还没有记忆条目。后续这里会列出已掌握概念、验证证据和其他学习观察。
+              还没有记忆条目。后续这里会列出讲清楚的关系、待澄清的理解和其他学习观察。
             </CardContent>
           </Card>
         )}
