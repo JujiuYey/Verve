@@ -8,13 +8,9 @@ import { coachChatStream, type LearningCoachAction } from "@/api/learning";
 import { PromptInputProvider } from "@/components/ai-elements/prompt-input";
 
 import { CoachWorkspace, type CoachMessage, type ToolEvent } from "./_components/coach-workspace";
+import { createActionStreamFilter } from "./_lib/action-stream-filter";
 
-const STRIP_ACTIONS = /<ACTION>[\s\S]*?<\/ACTION>/g;
 const routeApi = getRouteApi("/_layout/learn/feynman");
-
-function stripAction(content: string): string {
-  return content.replace(STRIP_ACTIONS, "").trimEnd();
-}
 
 export function FeynmanExercisePage() {
   const navigate = useNavigate();
@@ -39,6 +35,16 @@ export function FeynmanExercisePage() {
       { id: assistantId, role: "assistant", content: "" },
     ]);
     setStatus("submitted");
+    const actionFilter = createActionStreamFilter();
+
+    const appendAssistantContent = (content: string) => {
+      if (!content) return;
+      updateAssistant(assistantId, (m) => ({ ...m, content: m.content + content }));
+    };
+
+    const flushActionFilter = () => {
+      appendAssistantContent(actionFilter.flush());
+    };
 
     await coachChatStream(
       message,
@@ -56,10 +62,10 @@ export function FeynmanExercisePage() {
           case "stream_chunk":
           case "message": {
             if (!event.content) return;
-            const cleaned = stripAction(event.content);
+            const cleaned = actionFilter.push(event.content);
             if (!cleaned) return;
             setStatus("streaming");
-            updateAssistant(assistantId, (m) => ({ ...m, content: m.content + cleaned }));
+            appendAssistantContent(cleaned);
             return;
           }
           case "tool_call": {
@@ -97,14 +103,19 @@ export function FeynmanExercisePage() {
             return;
           }
           case "error": {
+            flushActionFilter();
             setStatus("error");
             toast.error(event.content || "学习 agent 出错");
             return;
           }
         }
       },
-      () => setStatus("ready"),
+      () => {
+        flushActionFilter();
+        setStatus("ready");
+      },
       (error) => {
+        flushActionFilter();
         setStatus("error");
         toast.error(error.message);
       },
