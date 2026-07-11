@@ -1,10 +1,17 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/cloudwego/eino/adk"
+
+	learning_db "verve/app/learning/models/db"
+	"verve/infrastructure/llm"
+	"verve/infrastructure/llm/prompts"
 )
 
 type FeynmanReview struct {
@@ -16,6 +23,73 @@ type FeynmanReview struct {
 	ExplanationSummary string   `json:"explanation_summary"`
 	ReadyToWrapUp      bool     `json:"ready_to_wrap_up"`
 	ContextSufficient  bool     `json:"context_sufficient"`
+}
+
+type FeynmanReviewer interface {
+	Review(ctx context.Context, documentID, explanation string, prior []*learning_db.LearningExplanationReview) (*FeynmanReview, error)
+}
+
+type FeynmanReviewService struct {
+	contextBuilder *FeynmanContextBuilder
+}
+
+func NewFeynmanReviewService(source FeynmanDocumentSource) *FeynmanReviewService {
+	return &FeynmanReviewService{contextBuilder: NewFeynmanContextBuilder(source)}
+}
+
+func (s *FeynmanReviewService) Review(ctx context.Context, documentID, explanation string, prior []*learning_db.LearningExplanationReview) (*FeynmanReview, error) {
+	if s == nil || s.contextBuilder == nil {
+		return nil, errors.New("Feynman reviewer is not configured")
+	}
+	explanation = strings.TrimSpace(explanation)
+	if explanation == "" {
+		return nil, errors.New("explanation is required")
+	}
+	documentContext, err := s.contextBuilder.Build(ctx, documentID, explanation)
+	if err != nil {
+		return nil, err
+	}
+
+	agent, err := llm.NewFeynmanReviewerAgent(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("initialize Feynman reviewer: %w", err)
+	}
+	query := prompts.FeynmanReviewerQueryPrompt(feynmanReviewerQueryInput(documentContext, prior, explanation))
+	runner := adk.NewRunner(ctx, adk.RunnerConfig{Agent: agent})
+	text, err := collectText(runner.Query(ctx, query))
+	if err != nil {
+		return nil, fmt.Errorf("run Feynman reviewer: %w", err)
+	}
+	return parseFeynmanReviewOutput(text, documentContext.ContextSufficient)
+}
+
+func feynmanReviewerQueryInput(documentContext *FeynmanDocumentContext, prior []*learning_db.LearningExplanationReview, explanation string) prompts.FeynmanReviewerQueryInput {
+	evidence := make([]prompts.FeynmanReviewerEvidence, 0, len(documentContext.Evidence))
+	for _, item := range documentContext.Evidence {
+		evidence = append(evidence, prompts.FeynmanReviewerEvidence{
+			ChunkIndex: item.ChunkIndex, HeadingPath: item.HeadingPath, Content: item.Content,
+		})
+	}
+	turns := make([]prompts.FeynmanReviewerTurn, 0, len(prior))
+	for _, item := range prior {
+		if item == nil {
+			continue
+		}
+		reviewJSON, _ := json.Marshal(FeynmanReview{
+			HeardSummary: item.HeardSummary, ClearPoints: item.ClearPoints,
+			ConfusingPoints: item.ConfusingPoints, Misconceptions: item.Misconceptions,
+			FollowUpQuestion: item.FollowUpQuestion, ExplanationSummary: item.ExplanationSummary,
+			ReadyToWrapUp: item.ReadyToWrapUp, ContextSufficient: item.ContextSufficient,
+		})
+		turns = append(turns, prompts.FeynmanReviewerTurn{Explanation: item.Explanation, Review: string(reviewJSON)})
+	}
+	return prompts.FeynmanReviewerQueryInput{
+		DocumentTitle: documentContext.Title, Outline: documentContext.Outline,
+		Mode: documentContext.Mode, FullText: documentContext.FullText, Evidence: evidence,
+		ContextSufficient:          documentContext.ContextSufficient,
+		ContextInsufficiencyReason: documentContext.ContextInsufficiencyReason,
+		PriorTurns:                 turns, NewExplanation: explanation,
+	}
 }
 
 var feynmanReviewRequiredKeys = []string{
@@ -93,4 +167,21 @@ func normalizeFeynmanReview(review *FeynmanReview) {
 	review.ClearPoints = uniqueNonEmptyStrings(review.ClearPoints)
 	review.ConfusingPoints = uniqueNonEmptyStrings(review.ConfusingPoints)
 	review.Misconceptions = uniqueNonEmptyStrings(review.Misconceptions)
+}
+
+func uniqueNonEmptyStrings(values []string) []string {
+	result := make([]string, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if _, exists := seen[value]; exists {
+			continue
+		}
+		seen[value] = struct{}{}
+		result = append(result, value)
+	}
+	return result
 }

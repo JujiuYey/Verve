@@ -11,7 +11,7 @@ import (
 
 // 配置学习平台路由(/api/learning/*)
 func SetupLearningRoutes(router fiber.Router, dbService *database.DatabaseService, minioService *storage.MinIOService, retriever *rag_service.Retriever) {
-	sessionHandler := learning_handlers.NewSessionHandler(dbService)
+	sessionHandler := learning_handlers.NewSessionHandler(dbService, minioService, retriever)
 	journalHandler := learning_handlers.NewJournalHandler(dbService)
 	exerciseHandler := learning_handlers.NewExerciseHandler(dbService)
 	objectiveHandler := learning_handlers.NewObjectiveHandler(dbService, minioService)
@@ -25,8 +25,7 @@ func SetupLearningRoutes(router fiber.Router, dbService *database.DatabaseServic
 		{
 			session.Post("/", sessionHandler.Create)
 			session.Get("/:id", sessionHandler.FindOne)
-			session.Post("/:id/chat", sessionHandler.Chat)         // 陪练对话(SSE)
-			session.Post("/:id/exercise", sessionHandler.Exercise) // 提交练习验证
+			session.Post("/:id/review", sessionHandler.Review)
 			session.Post("/:id/complete", sessionHandler.Complete) // 结束本节
 		}
 

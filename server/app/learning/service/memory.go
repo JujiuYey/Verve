@@ -9,91 +9,87 @@ import (
 	"verve/infrastructure/database"
 )
 
-// MemoryService records learning observations into reusable memory.
+type memoryWriter interface {
+	CreateEvent(ctx context.Context, event *learning_db.LearningMemoryEvent) error
+	CreateItem(ctx context.Context, item *learning_db.LearningMemoryItem) error
+}
+
 type MemoryService struct {
-	db *database.DatabaseService
+	repository memoryWriter
 }
 
 func NewMemoryService(db *database.DatabaseService) *MemoryService {
-	return &MemoryService{db: db}
+	if db == nil {
+		return newMemoryService(nil)
+	}
+	return newMemoryService(db.Memories)
 }
 
-func (s *MemoryService) RecordExerciseJudgement(ctx context.Context, userID string, obj *learning_db.LearningObjective, sessionID string, result *JudgeResult) error {
-	if obj == nil {
-		return errors.New("learning objective is required")
+func newMemoryService(repository memoryWriter) *MemoryService {
+	return &MemoryService{repository: repository}
+}
+
+func (s *MemoryService) RecordExplanationReview(ctx context.Context, userID string, session *learning_db.LearningSession, review *learning_db.LearningExplanationReview) error {
+	if session == nil {
+		return errors.New("learning session is required")
 	}
-	if result == nil {
-		return errors.New("judge result is required")
+	if review == nil {
+		return errors.New("explanation review is required")
 	}
-	if s == nil || s.db == nil || s.db.Memories == nil {
-		return errors.New("memory database repository is not configured")
+	if s == nil || s.repository == nil {
+		return errors.New("memory repository is not configured")
 	}
 
-	event := buildExerciseMemoryEvent(userID, obj, sessionID, result)
-	if err := s.db.Memories.CreateEvent(ctx, event); err != nil {
+	event := buildExplanationMemoryEvent(userID, session, review)
+	if err := s.repository.CreateEvent(ctx, event); err != nil {
 		return err
 	}
-
-	for _, item := range buildExerciseMemoryItems(userID, obj, event.ID, result) {
-		if err := s.db.Memories.CreateItem(ctx, item); err != nil {
+	for _, item := range buildExplanationMemoryItems(userID, session, event.ID, review) {
+		if err := s.repository.CreateItem(ctx, item); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func buildExerciseMemoryEvent(userID string, obj *learning_db.LearningObjective, sessionID string, result *JudgeResult) *learning_db.LearningMemoryEvent {
-	event := &learning_db.LearningMemoryEvent{
-		UserID:      userID,
-		FolderID:    obj.SourceFolderID,
-		DocumentID:  obj.SourceDocumentID,
-		ObjectiveID: &obj.ID,
-		SourceType:  "exercise",
-		EventType:   "examiner_judgement",
-		Content:     firstNonBlank(result.Feedback, result.Evidence, obj.Title),
+func buildExplanationMemoryEvent(userID string, session *learning_db.LearningSession, review *learning_db.LearningExplanationReview) *learning_db.LearningMemoryEvent {
+	documentID := session.DocumentID
+	sessionID := session.ID
+	sourceID := review.ID
+	return &learning_db.LearningMemoryEvent{
+		UserID: userID, DocumentID: &documentID, SessionID: &sessionID,
+		SourceType: "feynman_review", SourceID: &sourceID, EventType: "explanation_review",
+		Content: firstNonBlank(review.ExplanationSummary, review.HeardSummary, review.Explanation),
 		Evidence: map[string]interface{}{
-			"verdict":                result.Verdict,
-			"mastery_after":          result.MasteryAfter,
-			"evidence":               result.Evidence,
-			"weak_points":            result.WeakPoints,
-			"improvement_suggestion": result.ImprovementSuggestion,
-			"review_required":        result.ReviewRequired,
+			"clear_points":       review.ClearPoints,
+			"confusing_points":   review.ConfusingPoints,
+			"misconceptions":     review.Misconceptions,
+			"follow_up_question": review.FollowUpQuestion,
+			"ready_to_wrap_up":   review.ReadyToWrapUp,
+			"context_sufficient": review.ContextSufficient,
 		},
 	}
-
-	if sessionID != "" {
-		event.SessionID = &sessionID
-		event.SourceID = &sessionID
-	}
-
-	return event
 }
 
-func buildExerciseMemoryItems(userID string, obj *learning_db.LearningObjective, eventID string, result *JudgeResult) []*learning_db.LearningMemoryItem {
-	items := make([]*learning_db.LearningMemoryItem, 0, 2)
-	title := strings.TrimSpace(obj.Title)
-	if result.Verdict == "pass" && title != "" {
-		items = append(items, buildExerciseMemoryItem(userID, obj, eventID, "mastered_concept", "用户已经能解释："+title))
+func buildExplanationMemoryItems(userID string, session *learning_db.LearningSession, eventID string, review *learning_db.LearningExplanationReview) []*learning_db.LearningMemoryItem {
+	items := make([]*learning_db.LearningMemoryItem, 0, len(review.ClearPoints)+len(review.Misconceptions))
+	for _, point := range review.ClearPoints {
+		if point = strings.TrimSpace(point); point != "" {
+			items = append(items, buildExplanationMemoryItem(userID, session.DocumentID, eventID, "explanation_evidence", point))
+		}
 	}
-
-	evidence := strings.TrimSpace(result.Evidence)
-	if evidence != "" {
-		items = append(items, buildExerciseMemoryItem(userID, obj, eventID, "verification_evidence", evidence))
+	for _, misconception := range review.Misconceptions {
+		if misconception = strings.TrimSpace(misconception); misconception != "" {
+			items = append(items, buildExplanationMemoryItem(userID, session.DocumentID, eventID, "misconception", misconception))
+		}
 	}
-
 	return items
 }
 
-func buildExerciseMemoryItem(userID string, obj *learning_db.LearningObjective, eventID string, kind string, statement string) *learning_db.LearningMemoryItem {
+func buildExplanationMemoryItem(userID, documentID, eventID, kind, statement string) *learning_db.LearningMemoryItem {
 	return &learning_db.LearningMemoryItem{
-		UserID:           userID,
-		FolderID:         obj.SourceFolderID,
-		DocumentID:       obj.SourceDocumentID,
-		ObjectiveID:      &obj.ID,
-		Kind:             kind,
-		Statement:        statement,
-		EvidenceEventIDs: []string{eventID},
-		Confidence:       "observed",
+		UserID: userID, DocumentID: &documentID, Kind: kind, Statement: statement,
+		EvidenceEventIDs: []string{eventID}, Confidence: "observed",
 	}
 }
 

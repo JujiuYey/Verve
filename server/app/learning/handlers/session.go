@@ -3,7 +3,6 @@ package handlers
 import (
 	"bufio"
 	"context"
-	"database/sql"
 	"errors"
 	"io"
 	"log"
@@ -12,358 +11,252 @@ import (
 
 	"github.com/cloudwego/eino/adk"
 	"github.com/gofiber/fiber/v2"
-	"github.com/valyala/fasthttp"
 
 	learning_db "verve/app/learning/models/db"
 	learning_payload "verve/app/learning/models/payload"
 	learning_service "verve/app/learning/service"
-	learning_tools "verve/app/learning/tools"
+	rag_db "verve/app/rag/models/db"
+	rag_payload "verve/app/rag/models/payload"
+	rag_service "verve/app/rag/service"
+	wiki_db "verve/app/wiki/models/db"
 	"verve/common/response"
 	"verve/infrastructure/database"
-	"verve/infrastructure/llm"
+	"verve/infrastructure/storage"
 )
 
-// 学习会话处理器
+type sessionStore interface {
+	FindOne(ctx context.Context, id string) (*learning_db.LearningSession, error)
+	Create(ctx context.Context, session *learning_db.LearningSession) error
+	Update(ctx context.Context, session *learning_db.LearningSession) error
+}
+
+type documentStore interface {
+	FindOne(ctx context.Context, id string) (*wiki_db.Document, error)
+}
+
+type messageStore interface {
+	FindBySession(ctx context.Context, sessionID string) ([]*learning_db.LearningMessage, error)
+}
+
+type reviewStore interface {
+	Create(ctx context.Context, review *learning_db.LearningExplanationReview) error
+	FindBySession(ctx context.Context, sessionID string) ([]*learning_db.LearningExplanationReview, error)
+}
+
+type explanationMemoryRecorder interface {
+	RecordExplanationReview(ctx context.Context, userID string, session *learning_db.LearningSession, review *learning_db.LearningExplanationReview) error
+}
+
+type SessionHandlerDependencies struct {
+	Sessions  sessionStore
+	Documents documentStore
+	Messages  messageStore
+	Reviews   reviewStore
+	Reviewer  learning_service.FeynmanReviewer
+	Memory    explanationMemoryRecorder
+}
+
 type SessionHandler struct {
-	db       *database.DatabaseService
-	examiner *learning_service.ExaminerService
+	deps SessionHandlerDependencies
 }
 
-func NewSessionHandler(db *database.DatabaseService) *SessionHandler {
-	return &SessionHandler{
-		db:       db,
-		examiner: learning_service.NewExaminerService(db),
+func NewSessionHandler(db *database.DatabaseService, minio *storage.MinIOService, retriever *rag_service.Retriever) *SessionHandler {
+	source := &feynmanDocumentSource{
+		documents: db.Documents,
+		files:     minio,
+		retriever: retriever,
+		chunks:    db.RAGChunks,
 	}
+	return NewSessionHandlerWithDependencies(SessionHandlerDependencies{
+		Sessions: db.Sessions, Documents: db.Documents, Messages: db.Messages, Reviews: db.Reviews,
+		Reviewer: learning_service.NewFeynmanReviewService(source),
+		Memory:   learning_service.NewMemoryService(db),
+	})
 }
 
-// 开始一节(关联某个小目标)
+func NewSessionHandlerWithDependencies(deps SessionHandlerDependencies) *SessionHandler {
+	return &SessionHandler{deps: deps}
+}
+
 func (h *SessionHandler) Create(c *fiber.Ctx) error {
 	userID, _ := c.Locals("user_id").(string)
-
 	var req learning_payload.CreateSessionRequest
 	if err := c.BodyParser(&req); err != nil {
 		return response.BadRequestCtx(c, err.Error())
 	}
-
-	obj, err := h.db.Objectives.FindOne(c.Context(), req.ObjectiveID)
-	if err != nil {
-		return response.NotFoundCtx(c, "小目标不存在")
+	req.DocumentID = strings.TrimSpace(req.DocumentID)
+	if req.DocumentID == "" {
+		return response.BadRequestCtx(c, "document_id 不能为空")
 	}
-	if obj.UserID != userID {
-		return response.ForbiddenCtx(c, "无权访问")
+	if _, err := h.deps.Documents.FindOne(c.Context(), req.DocumentID); err != nil {
+		return response.NotFoundCtx(c, "文档不存在")
 	}
-
-	session := &learning_db.LearningSession{
-		UserID:      userID,
-		ObjectiveID: obj.ID,
-		Status:      "active",
-	}
-	if err := h.db.Sessions.Create(c.Context(), session); err != nil {
+	session := &learning_db.LearningSession{UserID: userID, DocumentID: req.DocumentID, Status: "active"}
+	if err := h.deps.Sessions.Create(c.Context(), session); err != nil {
 		return response.InternalServerCtx(c, "创建会话失败")
 	}
-
 	return response.SuccessCtx(c, fiber.Map{"session_id": session.ID})
 }
 
-// 会话详情(含历史消息)
 func (h *SessionHandler) FindOne(c *fiber.Ctx) error {
 	userID, _ := c.Locals("user_id").(string)
-	id := c.Params("id")
-
-	session, err := h.db.Sessions.FindOne(c.Context(), id)
+	session, err := h.ownedSession(c.Context(), userID, c.Params("id"))
 	if err != nil {
-		return response.NotFoundCtx(c, "会话不存在")
+		return writeSessionLookupError(c, err)
 	}
-	if session.UserID != userID {
-		return response.ForbiddenCtx(c, "无权访问")
+	messages, err := h.deps.Messages.FindBySession(c.Context(), session.ID)
+	if err != nil {
+		return response.InternalServerCtx(c, "加载会话消息失败")
 	}
-
-	messages, _ := h.db.Messages.FindBySession(c.Context(), id)
-	return response.SuccessCtx(c, fiber.Map{"session": session, "messages": messages})
+	reviews, err := h.deps.Reviews.FindBySession(c.Context(), session.ID)
+	if err != nil {
+		return response.InternalServerCtx(c, "加载解释记录失败")
+	}
+	return response.SuccessCtx(c, fiber.Map{"session": session, "messages": messages, "reviews": reviews})
 }
 
-// Chat 陪练对话(SSE,Tutor)
-func (h *SessionHandler) Chat(c *fiber.Ctx) error {
+func (h *SessionHandler) Review(c *fiber.Ctx) error {
 	userID, _ := c.Locals("user_id").(string)
-	id := c.Params("id")
-
-	session, err := h.db.Sessions.FindOne(c.Context(), id)
+	session, err := h.ownedSession(c.Context(), userID, c.Params("id"))
 	if err != nil {
-		return response.NotFoundCtx(c, "会话不存在")
+		return writeSessionLookupError(c, err)
 	}
-	if session.UserID != userID {
-		return response.ForbiddenCtx(c, "无权访问")
-	}
-
-	var req struct {
-		Message string `json:"message"`
-	}
-	_ = c.BodyParser(&req)
-
-	// 落用户消息
-	if req.Message != "" {
-		_ = h.db.Messages.Create(c.Context(), &learning_db.LearningMessage{
-			SessionID: id,
-			Role:      "user",
-			Content:   req.Message,
-		})
-	}
-
-	// 当前小目标作为上下文
-	obj, err := h.db.Objectives.FindOne(c.Context(), session.ObjectiveID)
-	if err != nil {
-		return response.InternalServerCtx(c, "小目标不存在")
-	}
-
-	// 构造 Tutor agent(带读工具)
-	tools := learning_tools.NewLearningTools(h.db.Objectives, h.db.Exercises)
-	agent, err := llm.NewTutorAgent(c.Context(), tools)
-	if err != nil {
-		return response.InternalServerCtx(c, "Tutor 初始化失败: "+err.Error())
-	}
-	runner := adk.NewRunner(c.Context(), adk.RunnerConfig{EnableStreaming: true, Agent: agent})
-	iter := runner.Query(c.Context(), buildTutorQuery(obj, req.Message))
-
-	c.Set("Content-Type", "text/event-stream")
-	c.Set("Cache-Control", "no-cache")
-	c.Set("Connection", "keep-alive")
-	c.Set("Transfer-Encoding", "chunked")
-
-	db := h.db
-	sessionID := id
-	c.Context().SetBodyStreamWriter(fasthttp.StreamWriter(func(w *bufio.Writer) {
-		content := writeLearningSSE(w, iter)
-		// 落 assistant 消息(用独立 context,避免请求结束被取消)
-		if strings.TrimSpace(content) != "" {
-			agentType := "tutor"
-			_ = db.Messages.Create(context.Background(), &learning_db.LearningMessage{
-				SessionID: sessionID,
-				Role:      "assistant",
-				AgentType: &agentType,
-				Content:   content,
-			})
-		}
-	}))
-	return nil
-}
-
-// Exercise 提交练习验证(Examiner)
-func (h *SessionHandler) Exercise(c *fiber.Ctx) error {
-	userID, _ := c.Locals("user_id").(string)
-	id := c.Params("id")
-
-	session, err := h.db.Sessions.FindOne(c.Context(), id)
-	if err != nil {
-		return response.NotFoundCtx(c, "会话不存在")
-	}
-	if session.UserID != userID {
-		return response.ForbiddenCtx(c, "无权访问")
-	}
-
-	var req learning_payload.SubmitExerciseRequest
+	var req learning_payload.ReviewExplanationRequest
 	if err := c.BodyParser(&req); err != nil {
 		return response.BadRequestCtx(c, err.Error())
 	}
-
-	obj, err := h.db.Objectives.FindOne(c.Context(), session.ObjectiveID)
+	req.Explanation = strings.TrimSpace(req.Explanation)
+	if req.Explanation == "" {
+		return response.BadRequestCtx(c, "explanation 不能为空")
+	}
+	prior, err := h.deps.Reviews.FindBySession(c.Context(), session.ID)
 	if err != nil {
-		return response.InternalServerCtx(c, "小目标不存在")
+		return response.InternalServerCtx(c, "加载先前解释失败")
 	}
-
-	result, err := h.examiner.Judge(c.Context(), obj, req.Type, req.Prompt, req.UserAnswer)
+	reviewResult, err := h.deps.Reviewer.Review(c.Context(), session.DocumentID, req.Explanation, prior)
 	if err != nil {
-		log.Printf("❌ Examiner 判定失败: session_id=%s user_id=%s folder_id=%s objective_id=%s objective_title=%q type=%s prompt_chars=%d answer_chars=%d err=%v",
-			id,
-			userID,
-			stringValue(obj.SourceFolderID),
-			obj.ID,
-			obj.Title,
-			req.Type,
-			len(req.Prompt),
-			len(req.UserAnswer),
-			err,
-		)
-		return response.InternalServerCtx(c, "判定失败,请重试")
+		log.Printf("Feynman review failed: session_id=%s user_id=%s document_id=%s err=%v", session.ID, userID, session.DocumentID, err)
+		return response.InternalServerCtx(c, "审阅解释失败,请重试")
 	}
-
-	// 落练习记录
-	ua, verdict, ma, fb := req.UserAnswer, result.Verdict, result.MasteryAfter, result.Feedback
-	if err := h.db.Exercises.Create(c.Context(), &learning_db.LearningExercise{
-		SessionID:    id,
-		ObjectiveID:  obj.ID,
-		UserID:       userID,
-		Type:         req.Type,
-		Prompt:       req.Prompt,
-		UserAnswer:   &ua,
-		Verdict:      &verdict,
-		MasteryAfter: &ma,
-		Feedback:     &fb,
-	}); err != nil {
-		return response.InternalServerCtx(c, "记录练习失败")
+	if reviewResult == nil {
+		log.Printf("Feynman review returned no result: session_id=%s user_id=%s document_id=%s", session.ID, userID, session.DocumentID)
+		return response.InternalServerCtx(c, "审阅解释失败,请重试")
 	}
-
-	if err := learning_service.NewMemoryService(h.db).RecordExerciseJudgement(c.Context(), userID, obj, id, result); err != nil {
-		log.Printf("⚠️ 记录学习记忆失败,继续保留本次练习提交: session_id=%s user_id=%s folder_id=%s document_id=%s objective_id=%s objective_title=%q err=%v",
-			id,
-			userID,
-			stringValue(obj.SourceFolderID),
-			stringValue(obj.SourceDocumentID),
-			obj.ID,
-			obj.Title,
-			err,
-		)
+	review := reviewModelFromResult(session, userID, req.Explanation, reviewResult)
+	if err := h.deps.Reviews.Create(c.Context(), review); err != nil {
+		return response.InternalServerCtx(c, "记录解释审阅失败")
 	}
-
-	// 更新掌握层级
-	obj.MasteryLevel = result.MasteryAfter
-	_ = h.db.Objectives.Update(c.Context(), obj)
-	// learning_profiles / learning_journals are kept as a legacy compatibility
-	// projection while learning memory becomes the primary learner context source.
-	h.syncLearningExaminerState(c.Context(), userID, obj, result)
-
-	return response.SuccessCtx(c, fiber.Map{
-		"verdict":                result.Verdict,
-		"mastery_after":          result.MasteryAfter,
-		"feedback":               result.Feedback,
-		"objective_id":           obj.ID,
-		"evidence":               result.Evidence,
-		"weak_points":            result.WeakPoints,
-		"improvement_suggestion": result.ImprovementSuggestion,
-		"next_recommendation":    result.ImprovementSuggestion,
-		"review_required":        result.ReviewRequired,
-	})
-}
-
-func (h *SessionHandler) syncLearningExaminerState(ctx context.Context, userID string, obj *learning_db.LearningObjective, result *learning_service.JudgeResult) {
-	if result == nil {
-		return
-	}
-	folderID := stringValue(obj.SourceFolderID)
-	if folderID == "" {
-		return
-	}
-
-	if profile, err := h.db.Profiles.FindByFolder(ctx, folderID); err == nil {
-		learning_service.MergeLearningProfileState(profile, obj, result)
-		_ = h.db.Profiles.Update(ctx, profile)
-	} else if err == sql.ErrNoRows {
-		profile := &learning_db.LearningProfile{
-			UserID:   userID,
-			FolderID: folderID,
+	if h.deps.Memory != nil {
+		if err := h.deps.Memory.RecordExplanationReview(c.Context(), userID, session, review); err != nil {
+			log.Printf("record explanation memory failed: session_id=%s user_id=%s document_id=%s err=%v", session.ID, userID, session.DocumentID, err)
 		}
-		learning_service.MergeLearningProfileState(profile, obj, result)
-		_ = h.db.Profiles.Create(ctx, profile)
 	}
-
-	learned := obj.Title
-	evidence := result.Evidence
-	weakPoints := strings.Join(result.WeakPoints, "、")
-	improvementSuggestion := result.ImprovementSuggestion
-	_ = h.db.Journals.Create(ctx, &learning_db.LearningJournal{
-		UserID:     userID,
-		FolderID:   folderID,
-		Date:       time.Now(),
-		Learned:    &learned,
-		Evidence:   &evidence,
-		WeakPoints: &weakPoints,
-		NextStep:   &improvementSuggestion,
-	})
+	return response.SuccessCtx(c, reviewResult)
 }
 
-// Complete 结束本节(标记完成、推进进度、写日志)
 func (h *SessionHandler) Complete(c *fiber.Ctx) error {
 	userID, _ := c.Locals("user_id").(string)
-	id := c.Params("id")
-
-	session, err := h.db.Sessions.FindOne(c.Context(), id)
+	session, err := h.ownedSession(c.Context(), userID, c.Params("id"))
 	if err != nil {
-		return response.NotFoundCtx(c, "会话不存在")
+		return writeSessionLookupError(c, err)
 	}
-	if session.UserID != userID {
-		return response.ForbiddenCtx(c, "无权访问")
+	reviews, err := h.deps.Reviews.FindBySession(c.Context(), session.ID)
+	if err != nil {
+		return response.InternalServerCtx(c, "加载解释记录失败")
 	}
-
+	summaryParts := make([]string, 0, len(reviews))
+	for _, review := range reviews {
+		if review != nil && strings.TrimSpace(review.ExplanationSummary) != "" {
+			summaryParts = append(summaryParts, strings.TrimSpace(review.ExplanationSummary))
+		}
+	}
+	summary := strings.Join(summaryParts, "\n")
 	now := time.Now()
 	session.Status = "completed"
 	session.EndedAt = &now
-	_ = h.db.Sessions.Update(c.Context(), session)
+	session.Summary = &summary
+	if err := h.deps.Sessions.Update(c.Context(), session); err != nil {
+		return response.InternalServerCtx(c, "结束会话失败")
+	}
+	return response.SuccessCtx(c, fiber.Map{"summary": summary})
+}
 
-	obj, err := h.db.Objectives.FindOne(c.Context(), session.ObjectiveID)
+var (
+	errSessionNotFound  = errors.New("session not found")
+	errSessionForbidden = errors.New("session forbidden")
+)
+
+func (h *SessionHandler) ownedSession(ctx context.Context, userID, id string) (*learning_db.LearningSession, error) {
+	session, err := h.deps.Sessions.FindOne(ctx, id)
 	if err != nil {
-		return response.InternalServerCtx(c, "小目标不存在")
+		return nil, errSessionNotFound
 	}
-	obj.Status = "completed"
-	_ = h.db.Objectives.Update(c.Context(), obj)
-
-	// 推进到下一个小目标
-	var next *learning_db.LearningObjective
-	if obj.SourceFolderID != nil {
-		objectives, err := h.db.Objectives.FindByFolder(c.Context(), *obj.SourceFolderID)
-		if err == nil {
-			for _, o := range objectives {
-				if o.OrderIndex > obj.OrderIndex {
-					next = o
-					break
-				}
-			}
-		}
+	if session.UserID != userID {
+		return nil, errSessionForbidden
 	}
-	if next != nil {
-		next.Status = "active"
-		_ = h.db.Objectives.Update(c.Context(), next)
-	}
-
-	// 写一条简单日志(同日同目标的唯一冲突忽略)
-	learned := obj.Title
-	if obj.SourceFolderID != nil {
-		_ = h.db.Journals.Create(c.Context(), &learning_db.LearningJournal{
-			UserID:   userID,
-			FolderID: *obj.SourceFolderID,
-			Date:     now,
-			Learned:  &learned,
-		})
-	}
-
-	resp := fiber.Map{"summary": "已完成:" + obj.Title}
-	if next != nil {
-		resp["next_objective"] = fiber.Map{"id": next.ID, "title": next.Title}
-	}
-	return response.SuccessCtx(c, resp)
+	return session, nil
 }
 
-// 构造注入当前小目标 + 用户消息的查询
-func buildTutorQuery(obj *learning_db.LearningObjective, message string) string {
-	var sb strings.Builder
-	sb.WriteString("当前学习小目标:")
-	sb.WriteString(obj.Title)
-	if obj.Detail != nil && *obj.Detail != "" {
-		sb.WriteString("\n要点:")
-		sb.WriteString(*obj.Detail)
+func writeSessionLookupError(c *fiber.Ctx, err error) error {
+	if err == nil {
+		return nil
 	}
-	if strings.TrimSpace(message) != "" {
-		sb.WriteString("\n\n学习者说:")
-		sb.WriteString(message)
-	} else {
-		sb.WriteString("\n\n请开始这一节,先用一个小问题诊断学习者的基础。")
+	if errors.Is(err, errSessionForbidden) {
+		return response.ForbiddenCtx(c, "无权访问")
 	}
-	return sb.String()
+	return response.NotFoundCtx(c, "会话不存在")
 }
 
-func stringValue(value *string) string {
-	if value == nil {
-		return ""
+func reviewModelFromResult(session *learning_db.LearningSession, userID, explanation string, result *learning_service.FeynmanReview) *learning_db.LearningExplanationReview {
+	return &learning_db.LearningExplanationReview{
+		SessionID: session.ID, DocumentID: session.DocumentID, UserID: userID, Explanation: explanation,
+		HeardSummary: result.HeardSummary, ClearPoints: result.ClearPoints,
+		ConfusingPoints: result.ConfusingPoints, Misconceptions: result.Misconceptions,
+		FollowUpQuestion: result.FollowUpQuestion, ExplanationSummary: result.ExplanationSummary,
+		ReadyToWrapUp: result.ReadyToWrapUp, ContextSufficient: result.ContextSufficient,
 	}
-	return *value
 }
 
-// 把 agent 事件流写成 SSE,并返回累积的 assistant 文本(对齐现有 chat.go)
-func writeLearningSSE(w *bufio.Writer, iter *adk.AsyncIterator[*adk.AgentEvent]) string {
-	content := writeLearningSSEContent(w, iter)
-	_, _ = w.Write([]byte("data: [DONE]\n\n"))
-	_ = w.Flush()
-	return content
+type documentContentStore interface {
+	GetFileContent(ctx context.Context, objectName string) (string, error)
 }
 
+type documentRetriever interface {
+	SearchDocument(ctx context.Context, documentID, query string, limit int) ([]rag_payload.SearchResult, error)
+}
+
+type documentChunkStore interface {
+	FindNeighbors(ctx context.Context, documentID string, indexes []int, radius int) ([]*rag_db.WikiChunk, error)
+}
+
+type feynmanDocumentSource struct {
+	documents documentStore
+	files     documentContentStore
+	retriever documentRetriever
+	chunks    documentChunkStore
+}
+
+func (s *feynmanDocumentSource) LoadDocument(ctx context.Context, documentID string) (*wiki_db.Document, string, error) {
+	doc, err := s.documents.FindOne(ctx, documentID)
+	if err != nil {
+		return nil, "", err
+	}
+	content, err := s.files.GetFileContent(ctx, doc.FilePath)
+	if err != nil {
+		return nil, "", err
+	}
+	return doc, content, nil
+}
+
+func (s *feynmanDocumentSource) SearchDocument(ctx context.Context, documentID, query string, limit int) ([]rag_payload.SearchResult, error) {
+	return s.retriever.SearchDocument(ctx, documentID, query, limit)
+}
+
+func (s *feynmanDocumentSource) FindNeighbors(ctx context.Context, documentID string, indexes []int, radius int) ([]*rag_db.WikiChunk, error) {
+	return s.chunks.FindNeighbors(ctx, documentID, indexes, radius)
+}
+
+// writeLearningSSEContent is retained for the Coach stream.
 func writeLearningSSEContent(w *bufio.Writer, iter *adk.AsyncIterator[*adk.AgentEvent]) string {
 	var content strings.Builder
 	state := &thinkParseState{}
@@ -380,7 +273,6 @@ func writeLearningSSEContent(w *bufio.Writer, iter *adk.AsyncIterator[*adk.Agent
 			continue
 		}
 		mo := event.Output.MessageOutput
-
 		if mo.MessageStream != nil {
 			for {
 				chunk, err := mo.MessageStream.Recv()
@@ -391,10 +283,9 @@ func writeLearningSSEContent(w *bufio.Writer, iter *adk.AsyncIterator[*adk.Agent
 					_ = writeSSEEvent(w, SSEError, map[string]interface{}{"content": err.Error()})
 					return content.String()
 				}
-				if chunk == nil {
-					continue
+				if chunk != nil {
+					dispatchMessageChunk(w, chunk, event.AgentName, &content, state)
 				}
-				dispatchMessageChunk(w, chunk, event.AgentName, &content, state)
 			}
 		} else if mo.Message != nil {
 			dispatchMessageChunk(w, mo.Message, event.AgentName, &content, state)

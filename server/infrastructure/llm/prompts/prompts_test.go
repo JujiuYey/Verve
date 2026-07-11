@@ -31,24 +31,6 @@ func TestDefaultAgentPromptsContainCriticalContracts(t *testing.T) {
 			},
 		},
 		{
-			name:   "tutor",
-			render: TutorPrompt,
-			want: []string{
-				"费曼式编程陪练",
-				"每次只推进一个认知点",
-				"不连续追问",
-			},
-		},
-		{
-			name:   "examiner",
-			render: ExaminerPrompt,
-			want: []string{
-				"只输出 JSON",
-				`"verdict":"pass|partial|fail"`,
-				"review_required",
-			},
-		},
-		{
 			name:   "feynman reviewer",
 			render: FeynmanReviewerPrompt,
 			want: []string{
@@ -87,8 +69,6 @@ func TestAgentPromptsFallBackToDefaultPreset(t *testing.T) {
 	}{
 		{name: "objective generator", render: ObjectiveGeneratorPrompt},
 		{name: "coach", render: CoachPrompt},
-		{name: "tutor", render: TutorPrompt},
-		{name: "examiner", render: ExaminerPrompt},
 		{name: "feynman reviewer", render: FeynmanReviewerPrompt},
 	}
 

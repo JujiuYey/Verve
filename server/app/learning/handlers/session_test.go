@@ -1,0 +1,338 @@
+package handlers
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/gofiber/fiber/v2"
+
+	learning_db "verve/app/learning/models/db"
+	learning_service "verve/app/learning/service"
+	rag_db "verve/app/rag/models/db"
+	rag_payload "verve/app/rag/models/payload"
+	wiki_db "verve/app/wiki/models/db"
+)
+
+type fakeSessionStore struct {
+	sessions map[string]*learning_db.LearningSession
+	created  *learning_db.LearningSession
+	updated  *learning_db.LearningSession
+}
+
+func (f *fakeSessionStore) FindOne(_ context.Context, id string) (*learning_db.LearningSession, error) {
+	session, ok := f.sessions[id]
+	if !ok {
+		return nil, errors.New("not found")
+	}
+	copy := *session
+	return &copy, nil
+}
+
+func (f *fakeSessionStore) Create(_ context.Context, session *learning_db.LearningSession) error {
+	session.ID = "session-new"
+	f.created = session
+	return nil
+}
+
+func (f *fakeSessionStore) Update(_ context.Context, session *learning_db.LearningSession) error {
+	f.updated = session
+	return nil
+}
+
+type fakeDocumentStore struct {
+	doc *wiki_db.Document
+	err error
+}
+
+func (f fakeDocumentStore) FindOne(context.Context, string) (*wiki_db.Document, error) {
+	return f.doc, f.err
+}
+
+type fakeMessageStore struct {
+	messages []*learning_db.LearningMessage
+}
+
+func (f fakeMessageStore) FindBySession(context.Context, string) ([]*learning_db.LearningMessage, error) {
+	return f.messages, nil
+}
+
+type fakeReviewStore struct {
+	reviews []*learning_db.LearningExplanationReview
+	created *learning_db.LearningExplanationReview
+}
+
+func (f *fakeReviewStore) Create(_ context.Context, review *learning_db.LearningExplanationReview) error {
+	review.ID = "review-new"
+	f.created = review
+	f.reviews = append(f.reviews, review)
+	return nil
+}
+
+func (f *fakeReviewStore) FindBySession(context.Context, string) ([]*learning_db.LearningExplanationReview, error) {
+	return f.reviews, nil
+}
+
+type fakeFeynmanReviewer struct {
+	priorCount  int
+	documentID  string
+	explanation string
+}
+
+func (f *fakeFeynmanReviewer) Review(_ context.Context, documentID, explanation string, prior []*learning_db.LearningExplanationReview) (*learning_service.FeynmanReview, error) {
+	f.priorCount = len(prior)
+	f.documentID = documentID
+	f.explanation = explanation
+	return &learning_service.FeynmanReview{
+		HeardSummary:       "听到你解释了类型会约束操作",
+		ClearPoints:        []string{"值有具体类型"},
+		ConfusingPoints:    []string{},
+		Misconceptions:     []string{},
+		FollowUpQuestion:   "这种约束在什么时候检查？",
+		ExplanationSummary: "值的类型决定可用操作",
+		ReadyToWrapUp:      false,
+		ContextSufficient:  true,
+	}, nil
+}
+
+type fakeMemoryRecorder struct {
+	called bool
+	err    error
+}
+
+func (f *fakeMemoryRecorder) RecordExplanationReview(_ context.Context, _ string, _ *learning_db.LearningSession, _ *learning_db.LearningExplanationReview) error {
+	f.called = true
+	return f.err
+}
+
+func TestSessionCreateUsesDocument(t *testing.T) {
+	store := &fakeSessionStore{sessions: map[string]*learning_db.LearningSession{}}
+	handler := NewSessionHandlerWithDependencies(SessionHandlerDependencies{
+		Sessions:  store,
+		Documents: fakeDocumentStore{doc: &wiki_db.Document{ID: "doc-1"}},
+		Messages:  fakeMessageStore{},
+		Reviews:   &fakeReviewStore{},
+		Reviewer:  &fakeFeynmanReviewer{},
+		Memory:    &fakeMemoryRecorder{},
+	})
+	app := sessionTestApp(handler)
+
+	req := httptest.NewRequest("POST", "/session", strings.NewReader(`{"document_id":"doc-1"}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != fiber.StatusOK {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	if store.created == nil || store.created.DocumentID != "doc-1" || store.created.UserID != "user-1" {
+		t.Fatalf("created session = %#v", store.created)
+	}
+	var body struct {
+		Data struct {
+			SessionID string `json:"session_id"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Data.SessionID != "session-new" {
+		t.Fatalf("session id = %q", body.Data.SessionID)
+	}
+}
+
+func TestSessionCreateRejectsMissingDocument(t *testing.T) {
+	handler := NewSessionHandlerWithDependencies(SessionHandlerDependencies{
+		Sessions:  &fakeSessionStore{sessions: map[string]*learning_db.LearningSession{}},
+		Documents: fakeDocumentStore{err: errors.New("not found")},
+		Messages:  fakeMessageStore{}, Reviews: &fakeReviewStore{}, Reviewer: &fakeFeynmanReviewer{}, Memory: &fakeMemoryRecorder{},
+	})
+	app := sessionTestApp(handler)
+	req := httptest.NewRequest("POST", "/session", strings.NewReader(`{"document_id":"missing"}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != fiber.StatusNotFound {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+}
+
+func TestSessionReviewUsesPriorTurnsAndRecordsMemoryBestEffort(t *testing.T) {
+	prior := &learning_db.LearningExplanationReview{ID: "review-1", Explanation: "值有类型", CreatedAt: time.Now()}
+	reviews := &fakeReviewStore{reviews: []*learning_db.LearningExplanationReview{prior}}
+	reviewer := &fakeFeynmanReviewer{}
+	memory := &fakeMemoryRecorder{err: errors.New("memory unavailable")}
+	handler := NewSessionHandlerWithDependencies(SessionHandlerDependencies{
+		Sessions:  &fakeSessionStore{sessions: map[string]*learning_db.LearningSession{"session-1": {ID: "session-1", UserID: "user-1", DocumentID: "doc-1"}}},
+		Documents: fakeDocumentStore{doc: &wiki_db.Document{ID: "doc-1"}}, Messages: fakeMessageStore{}, Reviews: reviews, Reviewer: reviewer, Memory: memory,
+	})
+	app := sessionTestApp(handler)
+	req := httptest.NewRequest("POST", "/session/session-1/review", strings.NewReader(`{"explanation":"A value has a concrete type."}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != fiber.StatusOK {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	if reviewer.priorCount != 1 || reviewer.documentID != "doc-1" {
+		t.Fatalf("reviewer inputs = prior:%d doc:%q", reviewer.priorCount, reviewer.documentID)
+	}
+	if reviews.created == nil || reviews.created.Explanation != "A value has a concrete type." || reviews.created.SessionID != "session-1" {
+		t.Fatalf("stored review = %#v", reviews.created)
+	}
+	if !memory.called {
+		t.Fatal("memory recorder was not called")
+	}
+	var body map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	data := body["data"].(map[string]any)
+	if _, exists := data["verdict"]; exists {
+		t.Fatal("review response contains verdict")
+	}
+	if _, exists := data["mastery_after"]; exists {
+		t.Fatal("review response contains mastery_after")
+	}
+}
+
+func TestSessionReviewRejectsAnotherUser(t *testing.T) {
+	handler := NewSessionHandlerWithDependencies(SessionHandlerDependencies{
+		Sessions:  &fakeSessionStore{sessions: map[string]*learning_db.LearningSession{"session-1": {ID: "session-1", UserID: "other", DocumentID: "doc-1"}}},
+		Documents: fakeDocumentStore{}, Messages: fakeMessageStore{}, Reviews: &fakeReviewStore{}, Reviewer: &fakeFeynmanReviewer{}, Memory: &fakeMemoryRecorder{},
+	})
+	app := sessionTestApp(handler)
+	req := httptest.NewRequest("POST", "/session/session-1/review", strings.NewReader(`{"explanation":"hello"}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != fiber.StatusForbidden {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+}
+
+func TestSessionFindOneReturnsOrderedReviewHistory(t *testing.T) {
+	reviews := []*learning_db.LearningExplanationReview{{ID: "review-1"}, {ID: "review-2"}}
+	handler := NewSessionHandlerWithDependencies(SessionHandlerDependencies{
+		Sessions:  &fakeSessionStore{sessions: map[string]*learning_db.LearningSession{"session-1": {ID: "session-1", UserID: "user-1", DocumentID: "doc-1"}}},
+		Documents: fakeDocumentStore{}, Messages: fakeMessageStore{messages: []*learning_db.LearningMessage{}},
+		Reviews: &fakeReviewStore{reviews: reviews}, Reviewer: &fakeFeynmanReviewer{}, Memory: &fakeMemoryRecorder{},
+	})
+	app := sessionTestApp(handler)
+	resp, err := app.Test(httptest.NewRequest("GET", "/session/session-1", nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != fiber.StatusOK {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	var body struct {
+		Data struct {
+			Reviews []learning_db.LearningExplanationReview `json:"reviews"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if len(body.Data.Reviews) != 2 || body.Data.Reviews[0].ID != "review-1" || body.Data.Reviews[1].ID != "review-2" {
+		t.Fatalf("reviews = %#v", body.Data.Reviews)
+	}
+}
+
+func TestSessionCompleteSummarizesAllReviewTurnsWithoutNextObjective(t *testing.T) {
+	store := &fakeSessionStore{sessions: map[string]*learning_db.LearningSession{"session-1": {ID: "session-1", UserID: "user-1", DocumentID: "doc-1"}}}
+	handler := NewSessionHandlerWithDependencies(SessionHandlerDependencies{
+		Sessions: store, Documents: fakeDocumentStore{}, Messages: fakeMessageStore{},
+		Reviews: &fakeReviewStore{reviews: []*learning_db.LearningExplanationReview{
+			{ID: "review-1", ExplanationSummary: "值有类型"},
+			{ID: "review-2", ExplanationSummary: "类型决定可用操作"},
+		}}, Reviewer: &fakeFeynmanReviewer{}, Memory: &fakeMemoryRecorder{},
+	})
+	app := sessionTestApp(handler)
+	resp, err := app.Test(httptest.NewRequest("POST", "/session/session-1/complete", nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != fiber.StatusOK {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	if store.updated == nil || store.updated.Status != "completed" || store.updated.Summary == nil || *store.updated.Summary != "值有类型\n类型决定可用操作" {
+		t.Fatalf("updated session = %#v", store.updated)
+	}
+	var body map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	data := body["data"].(map[string]any)
+	if _, exists := data["next_objective"]; exists {
+		t.Fatal("complete response contains next_objective")
+	}
+}
+
+type fakeDocumentContent struct{ path string }
+
+func (f *fakeDocumentContent) GetFileContent(_ context.Context, path string) (string, error) {
+	f.path = path
+	return "# Go\n", nil
+}
+
+type fakeDocumentRetriever struct{ documentID string }
+
+func (f *fakeDocumentRetriever) SearchDocument(_ context.Context, documentID, _ string, _ int) ([]rag_payload.SearchResult, error) {
+	f.documentID = documentID
+	return []rag_payload.SearchResult{}, nil
+}
+
+type fakeDocumentChunks struct{ documentID string }
+
+func (f *fakeDocumentChunks) FindNeighbors(_ context.Context, documentID string, _ []int, _ int) ([]*rag_db.WikiChunk, error) {
+	f.documentID = documentID
+	return []*rag_db.WikiChunk{}, nil
+}
+
+func TestFeynmanDocumentSourceUsesDocumentFileAndScopedRAG(t *testing.T) {
+	files := &fakeDocumentContent{}
+	retriever := &fakeDocumentRetriever{}
+	chunks := &fakeDocumentChunks{}
+	source := &feynmanDocumentSource{
+		documents: fakeDocumentStore{doc: &wiki_db.Document{ID: "doc-1", FilePath: "wiki/doc-1.md"}},
+		files:     files, retriever: retriever, chunks: chunks,
+	}
+	doc, markdown, err := source.LoadDocument(context.Background(), "doc-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if doc.ID != "doc-1" || markdown != "# Go\n" || files.path != "wiki/doc-1.md" {
+		t.Fatalf("loaded = doc:%#v markdown:%q path:%q", doc, markdown, files.path)
+	}
+	if _, err := source.SearchDocument(context.Background(), "doc-1", "value", 6); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := source.FindNeighbors(context.Background(), "doc-1", []int{2}, 1); err != nil {
+		t.Fatal(err)
+	}
+	if retriever.documentID != "doc-1" || chunks.documentID != "doc-1" {
+		t.Fatalf("scope = retriever:%q chunks:%q", retriever.documentID, chunks.documentID)
+	}
+}
+
+func sessionTestApp(handler *SessionHandler) *fiber.App {
+	app := fiber.New()
+	app.Use(func(c *fiber.Ctx) error { c.Locals("user_id", "user-1"); return c.Next() })
+	app.Post("/session", handler.Create)
+	app.Get("/session/:id", handler.FindOne)
+	app.Post("/session/:id/review", handler.Review)
+	app.Post("/session/:id/complete", handler.Complete)
+	return app
+}
