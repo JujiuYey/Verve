@@ -13,17 +13,15 @@ import (
 )
 
 type RAGHandler struct {
-	indexer   *rag_service.Indexer
-	retriever *rag_service.Retriever
-	jobs      *rag_repo.IndexJobRepository
+	indexer *rag_service.Indexer
+	jobs    *rag_repo.IndexJobRepository
 }
 
 func NewRAGHandler(
 	indexer *rag_service.Indexer,
-	retriever *rag_service.Retriever,
 	jobs *rag_repo.IndexJobRepository,
 ) *RAGHandler {
-	return &RAGHandler{indexer: indexer, retriever: retriever, jobs: jobs}
+	return &RAGHandler{indexer: indexer, jobs: jobs}
 }
 
 func (h *RAGHandler) IndexDocument(c *fiber.Ctx) error {
@@ -46,18 +44,6 @@ func (h *RAGHandler) DeleteDocumentIndex(c *fiber.Ctx) error {
 		return response.InternalServerCtx(c, "删除文档索引失败: "+err.Error())
 	}
 	return response.SuccessMsgCtx(c, "文档索引已删除")
-}
-
-func (h *RAGHandler) Search(c *fiber.Ctx) error {
-	var req rag_payload.SearchRequest
-	if err := c.BodyParser(&req); err != nil {
-		return response.BadRequestCtx(c, "参数错误: "+err.Error())
-	}
-	results, err := h.retriever.Search(c.Context(), req.RootFolderID, req.Query, req.Limit)
-	if err != nil {
-		return response.BadRequestCtx(c, err.Error())
-	}
-	return response.SuccessCtx(c, results)
 }
 
 func (h *RAGHandler) ListJobs(c *fiber.Ctx) error {

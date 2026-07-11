@@ -14,24 +14,6 @@ export interface IndexJobProgress {
   finished_at?: string;
 }
 
-export interface WikiKnowledgeSearchRequest {
-  root_folder_id: string;
-  query: string;
-  limit?: number;
-}
-
-export interface WikiKnowledgeSearchResult {
-  chunk_id: string;
-  score: number;
-  root_folder_id: string;
-  folder_id: string;
-  document_id: string;
-  document_title: string;
-  folder_path: string;
-  heading_path: string;
-  content: string;
-}
-
 const RESOURCE_PATH = "/api/rag/wiki";
 
 export const ragWikiApi = {
@@ -41,6 +23,4 @@ export const ragWikiApi = {
     }),
   indexDocument: (documentId: string) =>
     request.post<void>(`${RESOURCE_PATH}/documents/${documentId}/index`),
-  search: (data: WikiKnowledgeSearchRequest) =>
-    request.post<WikiKnowledgeSearchResult[]>(`${RESOURCE_PATH}/search`, data),
 };

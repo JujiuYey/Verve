@@ -39,9 +39,8 @@ func NewCoachHandler(db *database.DatabaseService, retriever *rag_service.Retrie
 func (h *CoachHandler) Chat(c *fiber.Ctx) error {
 	userID, _ := c.Locals("user_id").(string)
 	var req struct {
-		Message         string `json:"message"`
-		AgentInstanceID string `json:"agent_instance_id"`
-		RootFolderID    string `json:"root_folder_id"`
+		Message      string `json:"message"`
+		RootFolderID string `json:"root_folder_id"`
 	}
 	_ = c.BodyParser(&req)
 	message := strings.TrimSpace(req.Message)
@@ -49,7 +48,7 @@ func (h *CoachHandler) Chat(c *fiber.Ctx) error {
 		message = "继续学习"
 	}
 
-	runtimeContext, err := h.buildRuntimeContext(c.Context(), userID, strings.TrimSpace(req.AgentInstanceID), strings.TrimSpace(req.RootFolderID))
+	runtimeContext, err := h.buildRuntimeContext(c.Context(), userID, strings.TrimSpace(req.RootFolderID))
 	if err != nil {
 		log.Printf("❌ 构建学习调度上下文失败: user_id=%s err=%v", userID, err)
 		return response.InternalServerCtx(c, "构建学习上下文失败")
@@ -88,7 +87,7 @@ func writeScopedCoachAction(w *bufio.Writer, content string, documents []*wiki_d
 
 // buildRuntimeContext 聚合陪练 agent 所需的运行时上下文:用户文件夹(已过滤)、
 // 文档、学习记忆和最近 journal。
-func (h *CoachHandler) buildRuntimeContext(ctx context.Context, userID string, agentInstanceID string, rootFolderID string) (learning_service.CoachRuntimeContext, error) {
+func (h *CoachHandler) buildRuntimeContext(ctx context.Context, userID string, rootFolderID string) (learning_service.CoachRuntimeContext, error) {
 	if h == nil || h.db == nil {
 		return learning_service.CoachRuntimeContext{}, errors.New("learning coach database is not configured")
 	}
@@ -102,21 +101,10 @@ func (h *CoachHandler) buildRuntimeContext(ctx context.Context, userID string, a
 		return learning_service.CoachRuntimeContext{}, errors.New("requested Wiki root folder is not accessible")
 	}
 
-	agentName := ""
 	rootFolderName := ""
-	if agentInstanceID != "" {
-		for _, folder := range folders {
-			instance, err := h.db.WikiAgents.FindByRoot(ctx, userID, folder.ID)
-			if err == nil && instance.ID == agentInstanceID {
-				rootFolderID = instance.RootFolderID
-				agentName = instance.Name
-				break
-			}
-		}
-	}
 	if rootFolderID != "" {
 		if !learning_service.CoachFolderIsAccessible(folders, rootFolderID) {
-			return learning_service.CoachRuntimeContext{}, errors.New("Wiki agent root folder is not accessible")
+			return learning_service.CoachRuntimeContext{}, errors.New("Wiki root folder is not accessible")
 		}
 		if rootFolder, err := h.db.Folders.FindOne(ctx, rootFolderID); err == nil {
 			rootFolderName = rootFolder.Name
@@ -149,15 +137,13 @@ func (h *CoachHandler) buildRuntimeContext(ctx context.Context, userID string, a
 	}
 
 	return learning_service.CoachRuntimeContext{
-		UserID:          userID,
-		AgentInstanceID: agentInstanceID,
-		AgentName:       agentName,
-		RootFolderID:    rootFolderID,
-		RootFolderName:  rootFolderName,
-		Folders:         folders,
-		Documents:       docs,
-		MemoryItems:     memoryItems,
-		Journals:        journals,
+		UserID:         userID,
+		RootFolderID:   rootFolderID,
+		RootFolderName: rootFolderName,
+		Folders:        folders,
+		Documents:      docs,
+		MemoryItems:    memoryItems,
+		Journals:       journals,
 	}, nil
 }
 

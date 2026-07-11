@@ -120,7 +120,6 @@ export function FeynmanExercisePage() {
         toast.error(error.message);
       },
       {
-        agent_instance_id: search.agentInstanceId,
         root_folder_id: search.rootFolderId,
       },
     );

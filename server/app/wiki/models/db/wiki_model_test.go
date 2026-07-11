@@ -13,15 +13,6 @@ func TestWikiModelsExposeSortOrder(t *testing.T) {
 	assertSortOrderField(t, Document{})
 }
 
-func TestWikiAgentInstanceUsesWikiAgentInstancesTable(t *testing.T) {
-	t.Parallel()
-
-	tag := reflect.TypeOf(AgentInstance{}).Field(0).Tag
-	if !strings.Contains(string(tag), "table:wiki_agent_instances") {
-		t.Fatalf("expected AgentInstance to use wiki_agent_instances table, got %q", tag)
-	}
-}
-
 func assertSortOrderField(t *testing.T, model any) {
 	t.Helper()
 

@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { type IndexJobProgress, ragWikiApi } from "@/api/rag/wiki";
-import { type WikiAgentInstance, wikiAgentInstanceApi } from "@/api/wiki/agent-instance";
 import type { Document } from "@/api/wiki/document";
 import { documentApi } from "@/api/wiki/document";
 import {
@@ -21,7 +20,6 @@ import { Input } from "@/components/ui/input";
 import { BreadcrumbNav } from "./_components/breadcrumb-nav";
 import { FolderFormModal } from "./_components/folder-form-modal";
 import { ItemGrid } from "./_components/item-grid";
-import { KnowledgeSearchPanel } from "./_components/knowledge-search-panel";
 import { UploadDialog } from "./_components/upload-dialog";
 import { getFolderContentView } from "./_shared/content-view";
 
@@ -59,32 +57,9 @@ export function WikiIndexPage() {
 
   const [uploadOpen, setUploadOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Folder | null>(null);
-  const [agentInstance, setAgentInstance] = useState<WikiAgentInstance | null>(null);
-  const [agentLoading, setAgentLoading] = useState(false);
 
   // 获取当前文件夹ID（面包屑最后一个）
   const currentFolderId = breadcrumb.length > 0 ? breadcrumb[breadcrumb.length - 1].id : undefined;
-  const rootFolder = breadcrumb[0];
-
-  const ensureAgentInstance = useCallback(async (folder: { id?: string; name: string }) => {
-    if (!folder.id) {
-      setAgentInstance(null);
-      return;
-    }
-    setAgentLoading(true);
-    try {
-      const instance = await wikiAgentInstanceApi.ensure({
-        root_folder_id: folder.id,
-        name: `${folder.name} 学习 Agent`,
-      });
-      setAgentInstance(instance);
-    } catch (error) {
-      setAgentInstance(null);
-      toast.error(error instanceof Error ? error.message : "创建 Wiki Agent 失败");
-    } finally {
-      setAgentLoading(false);
-    }
-  }, []);
 
   const loadFolders = useCallback(async (parentId?: string) => {
     setLoading(true);
@@ -206,14 +181,6 @@ export function WikiIndexPage() {
   useEffect(() => {
     void loadFolderTree();
   }, [loadFolderTree]);
-
-  useEffect(() => {
-    if (rootFolder?.id) {
-      void ensureAgentInstance(rootFolder);
-    } else {
-      setAgentInstance(null);
-    }
-  }, [ensureAgentInstance, rootFolder]);
 
   // 进入文件夹
   const handleEnterFolder = useCallback((folder: Folder) => {
@@ -352,13 +319,7 @@ export function WikiIndexPage() {
               <BreadcrumbNav items={breadcrumb} onNavigate={handleBreadcrumbNavigate} />
             )}
 
-            <div
-              className={
-                rootFolder
-                  ? "grid flex-1 min-h-0 gap-4 xl:grid-cols-[minmax(0,1fr)_520px]"
-                  : "flex-1 min-h-0"
-              }
-            >
+            <div className="flex-1 min-h-0">
               <div className="min-h-0 min-w-0">
                 <ItemGrid
                   folders={contentView.folders}
@@ -373,27 +334,6 @@ export function WikiIndexPage() {
                   onIndexStatusRefresh={() => void loadIndexJobs()}
                 />
               </div>
-              {rootFolder && (
-                <aside className="min-h-0 min-w-0 xl:sticky xl:top-2 xl:h-full xl:self-stretch">
-                  <KnowledgeSearchPanel
-                    agentInstance={agentInstance}
-                    agentLoading={agentLoading}
-                    onStartLearning={() => {
-                      if (!agentInstance) return;
-                      navigate({
-                        to: "/learn/feynman",
-                        search: {
-                          agentInstanceId: agentInstance.id,
-                          rootFolderId: rootFolder.id,
-                          rootFolderName: rootFolder.name,
-                        },
-                      });
-                    }}
-                    rootFolderId={rootFolder.id}
-                    scopeLabel={rootFolder.name}
-                  />
-                </aside>
-              )}
             </div>
           </div>
         </div>

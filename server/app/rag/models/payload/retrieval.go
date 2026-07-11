@@ -1,11 +1,5 @@
 package payload
 
-type SearchRequest struct {
-	RootFolderID string `json:"root_folder_id"`
-	Query        string `json:"query"`
-	Limit        int    `json:"limit"`
-}
-
 type SearchResult struct {
 	ChunkID       string  `json:"chunk_id"`
 	Score         float64 `json:"score"`

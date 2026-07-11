@@ -26,10 +26,8 @@ type CoachQueryInput struct {
 }
 
 type CoachAgentContext struct {
-	AgentInstanceID string
-	AgentName       string
-	RootFolderID    string
-	RootFolderName  string
+	RootFolderID   string
+	RootFolderName string
 }
 
 type CoachFolder struct {
@@ -79,17 +77,7 @@ func renderCoachAgentContext(sb *strings.Builder, agent *CoachAgentContext) {
 	if agent == nil || strings.TrimSpace(agent.RootFolderID) == "" {
 		return
 	}
-	sb.WriteString("## 当前 Wiki Agent\n")
-	if strings.TrimSpace(agent.AgentName) != "" {
-		sb.WriteString("- agent: ")
-		sb.WriteString(strings.TrimSpace(agent.AgentName))
-		sb.WriteString("\n")
-	}
-	if strings.TrimSpace(agent.AgentInstanceID) != "" {
-		sb.WriteString("- agent_instance_id: ")
-		sb.WriteString(strings.TrimSpace(agent.AgentInstanceID))
-		sb.WriteString("\n")
-	}
+	sb.WriteString("## 当前 Wiki 范围\n")
 	sb.WriteString("- root_folder_id: ")
 	sb.WriteString(strings.TrimSpace(agent.RootFolderID))
 	if strings.TrimSpace(agent.RootFolderName) != "" {

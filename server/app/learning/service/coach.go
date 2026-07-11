@@ -10,15 +10,13 @@ import (
 )
 
 type CoachRuntimeContext struct {
-	UserID          string
-	AgentInstanceID string
-	AgentName       string
-	RootFolderID    string
-	RootFolderName  string
-	Folders         []*wiki_db.Folder
-	Documents       []*wiki_db.Document
-	MemoryItems     []*learning_db.LearningMemoryItem
-	Journals        []*learning_db.LearningJournal
+	UserID         string
+	RootFolderID   string
+	RootFolderName string
+	Folders        []*wiki_db.Folder
+	Documents      []*wiki_db.Document
+	MemoryItems    []*learning_db.LearningMemoryItem
+	Journals       []*learning_db.LearningJournal
 }
 
 type CoachAction struct {
@@ -35,10 +33,8 @@ func BuildCoachQuery(ctx CoachRuntimeContext, message string) string {
 	return prompts.CoachQueryPrompt(prompts.CoachQueryInput{
 		Message: message,
 		AgentContext: &prompts.CoachAgentContext{
-			AgentInstanceID: ctx.AgentInstanceID,
-			AgentName:       ctx.AgentName,
-			RootFolderID:    ctx.RootFolderID,
-			RootFolderName:  ctx.RootFolderName,
+			RootFolderID:   ctx.RootFolderID,
+			RootFolderName: ctx.RootFolderName,
 		},
 		Folders:     mapCoachFolders(ctx.Folders),
 		Documents:   mapCoachDocuments(ctx.Documents),

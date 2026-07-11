@@ -86,7 +86,6 @@ export interface LearningCoachAction {
 }
 
 export interface CoachChatOptions {
-  agent_instance_id?: string;
   root_folder_id?: string;
 }
 
@@ -152,7 +151,6 @@ export async function coachChatStream(
       headers,
       body: JSON.stringify({
         message,
-        agent_instance_id: options?.agent_instance_id,
         root_folder_id: options?.root_folder_id,
       }),
     });
