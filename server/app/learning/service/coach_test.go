@@ -120,3 +120,61 @@ func TestParseCoachActionRejectsNavigateActionWithoutDocument(t *testing.T) {
 		}
 	}
 }
+
+func TestFilterCoachDocumentsForUserIncludesOwnedAndPublicFolders(t *testing.T) {
+	owner := "user-1"
+	other := "user-2"
+	emptyOwner := ""
+	folders := []*wiki_db.Folder{
+		{ID: "owned", UserID: &owner},
+		{ID: "foreign", UserID: &other},
+		{ID: "public-nil"},
+		{ID: "public-empty", UserID: &emptyOwner},
+	}
+	documents := []*wiki_db.Document{
+		{ID: "doc-owned", FolderID: "owned"},
+		{ID: "doc-foreign", FolderID: "foreign"},
+		{ID: "doc-public-nil", FolderID: "public-nil"},
+		{ID: "doc-public-empty", FolderID: "public-empty"},
+		{ID: "doc-orphan", FolderID: "missing"},
+	}
+
+	accessibleFolders := FilterCoachFoldersForUser(folders, owner)
+	got := FilterCoachDocumentsByFolders(documents, accessibleFolders)
+
+	want := []string{"doc-owned", "doc-public-nil", "doc-public-empty"}
+	if len(got) != len(want) {
+		t.Fatalf("documents = %#v, want IDs %v", got, want)
+	}
+	for i, documentID := range want {
+		if got[i].ID != documentID {
+			t.Fatalf("document[%d] = %q, want %q", i, got[i].ID, documentID)
+		}
+	}
+	if !CoachFolderIsAccessible(accessibleFolders, "owned") || !CoachFolderIsAccessible(accessibleFolders, "public-nil") {
+		t.Fatal("owned and public folders should be accessible")
+	}
+	if CoachFolderIsAccessible(accessibleFolders, "foreign") || CoachFolderIsAccessible(accessibleFolders, "") {
+		t.Fatal("foreign and blank folder scopes should not be accessible")
+	}
+}
+
+func TestParseCoachActionForDocumentsRequiresNavigateTypeAndScopedDocument(t *testing.T) {
+	documents := []*wiki_db.Document{{ID: "doc-visible"}}
+
+	valid := `<ACTION>{"type":"navigate_to_practice","document_id":"doc-visible","label":"开始费曼练习"}</ACTION>`
+	if action := ParseCoachActionForDocuments(valid, documents); action == nil || action.DocumentID != "doc-visible" {
+		t.Fatalf("valid action = %#v", action)
+	}
+
+	invalid := []string{
+		`<ACTION>{"type":"navigate_to_practice","document_id":"doc-foreign"}</ACTION>`,
+		`<ACTION>{"type":"open_wiki","document_id":"doc-visible"}</ACTION>`,
+		`<ACTION>{"type":"navigate_to_practice"}</ACTION>`,
+	}
+	for _, content := range invalid {
+		if action := ParseCoachActionForDocuments(content, documents); action != nil {
+			t.Fatalf("out-of-scope action should be rejected: %#v", action)
+		}
+	}
+}

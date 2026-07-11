@@ -77,6 +77,54 @@ func mapCoachDocuments(documents []*wiki_db.Document) []prompts.CoachDocument {
 	return result
 }
 
+// FilterCoachFoldersForUser returns folders owned by the user plus public folders.
+func FilterCoachFoldersForUser(folders []*wiki_db.Folder, userID string) []*wiki_db.Folder {
+	result := make([]*wiki_db.Folder, 0, len(folders))
+	for _, folder := range folders {
+		if folder == nil {
+			continue
+		}
+		if folder.UserID != nil && *folder.UserID != "" && *folder.UserID != userID {
+			continue
+		}
+		result = append(result, folder)
+	}
+	return result
+}
+
+func CoachFolderIsAccessible(folders []*wiki_db.Folder, folderID string) bool {
+	folderID = strings.TrimSpace(folderID)
+	if folderID == "" {
+		return false
+	}
+	for _, folder := range folders {
+		if folder != nil && folder.ID == folderID {
+			return true
+		}
+	}
+	return false
+}
+
+// FilterCoachDocumentsByFolders excludes documents whose folder is not visible.
+func FilterCoachDocumentsByFolders(documents []*wiki_db.Document, folders []*wiki_db.Folder) []*wiki_db.Document {
+	allowed := make(map[string]struct{}, len(folders))
+	for _, folder := range folders {
+		if folder != nil {
+			allowed[folder.ID] = struct{}{}
+		}
+	}
+	result := make([]*wiki_db.Document, 0, len(documents))
+	for _, document := range documents {
+		if document == nil {
+			continue
+		}
+		if _, ok := allowed[document.FolderID]; ok {
+			result = append(result, document)
+		}
+	}
+	return result
+}
+
 func mapCoachMemoryItems(items []*learning_db.LearningMemoryItem) []prompts.CoachMemoryItem {
 	result := make([]prompts.CoachMemoryItem, 0, len(items))
 	for _, item := range items {
@@ -135,4 +183,17 @@ func ParseCoachAction(content string) *CoachAction {
 		return nil
 	}
 	return &action
+}
+
+func ParseCoachActionForDocuments(content string, documents []*wiki_db.Document) *CoachAction {
+	action := ParseCoachAction(content)
+	if action == nil || action.Type != "navigate_to_practice" {
+		return nil
+	}
+	for _, document := range documents {
+		if document != nil && document.ID == action.DocumentID {
+			return action
+		}
+	}
+	return nil
 }

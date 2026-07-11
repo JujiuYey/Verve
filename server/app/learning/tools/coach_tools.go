@@ -2,13 +2,16 @@ package tools
 
 import (
 	"context"
+	"database/sql"
 	"log"
 	"strings"
 
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
 
+	learning_service "verve/app/learning/service"
 	rag_service "verve/app/rag/service"
+	wiki_db "verve/app/wiki/models/db"
 	"verve/infrastructure/database"
 )
 
@@ -19,6 +22,14 @@ type ListFoldersInput struct {
 type ListDocumentsInput struct {
 	FolderID string `json:"folder_id" jsonschema_description:"文件夹 ID,可留空"`
 	Limit    int    `json:"limit" jsonschema_description:"最多返回多少个文档,默认 50"`
+}
+
+type coachFolderLister interface {
+	List(context.Context, map[string]interface{}) ([]*wiki_db.Folder, error)
+}
+
+type coachDocumentLister interface {
+	List(context.Context, string, string) ([]*wiki_db.Document, error)
 }
 
 type SearchLearningMemoryInput struct {
@@ -58,7 +69,7 @@ type CompleteTaskOutput struct {
 func NewCoachTools(db *database.DatabaseService, retriever *rag_service.Retriever, userID string) []tool.BaseTool {
 	tools := []tool.BaseTool{
 		newListFoldersTool(db, userID),
-		newListDocumentsTool(db),
+		newListDocumentsTool(db, userID),
 		newSearchLearningMemoryTool(db, userID),
 		newListJournalsTool(db, userID),
 		newCompleteTaskTool(),
@@ -179,10 +190,13 @@ func newListFoldersTool(db *database.DatabaseService, userID string) tool.Invoka
 	return t
 }
 
-func newListDocumentsTool(db *database.DatabaseService) tool.InvokableTool {
+func newListDocumentsTool(db *database.DatabaseService, userID string) tool.InvokableTool {
 	t, err := utils.InferTool("list_documents", "列出 Wiki 文档,可按文件夹过滤",
 		func(ctx context.Context, input *ListDocumentsInput) ([]map[string]interface{}, error) {
-			docs, err := db.Documents.List(ctx, "", input.FolderID)
+			if input == nil {
+				input = &ListDocumentsInput{}
+			}
+			docs, err := loadAccessibleCoachDocuments(ctx, db.Folders, db.Documents, userID, input.FolderID)
 			if err != nil {
 				return nil, err
 			}
@@ -205,6 +219,29 @@ func newListDocumentsTool(db *database.DatabaseService) tool.InvokableTool {
 		log.Fatal(err)
 	}
 	return t
+}
+
+func loadAccessibleCoachDocuments(
+	ctx context.Context,
+	folders coachFolderLister,
+	documents coachDocumentLister,
+	userID string,
+	folderID string,
+) ([]*wiki_db.Document, error) {
+	allFolders, err := folders.List(ctx, map[string]interface{}{})
+	if err != nil {
+		return nil, err
+	}
+	accessibleFolders := learning_service.FilterCoachFoldersForUser(allFolders, userID)
+	folderID = strings.TrimSpace(folderID)
+	if folderID != "" && !learning_service.CoachFolderIsAccessible(accessibleFolders, folderID) {
+		return nil, sql.ErrNoRows
+	}
+	docs, err := documents.List(ctx, "", folderID)
+	if err != nil {
+		return nil, err
+	}
+	return learning_service.FilterCoachDocumentsByFolders(docs, accessibleFolders), nil
 }
 
 func newListJournalsTool(db *database.DatabaseService, userID string) tool.InvokableTool {

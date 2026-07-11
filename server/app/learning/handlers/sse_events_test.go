@@ -9,6 +9,8 @@ import (
 
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/schema"
+
+	wiki_db "verve/app/wiki/models/db"
 )
 
 // makeEvent wraps a single Message into an AgentEvent as a non-streaming variant.
@@ -21,6 +23,33 @@ func makeEvent(agentName string, msg *schema.Message) *adk.AgentEvent {
 				Message:     msg,
 			},
 		},
+	}
+}
+
+func TestWriteScopedCoachActionOnlyEmitsVisibleDocumentNavigation(t *testing.T) {
+	documents := []*wiki_db.Document{{ID: "doc-visible"}}
+	tests := []struct {
+		name    string
+		content string
+		wantSSE bool
+	}{
+		{name: "visible", content: `<ACTION>{"type":"navigate_to_practice","document_id":"doc-visible"}</ACTION>`, wantSSE: true},
+		{name: "foreign", content: `<ACTION>{"type":"navigate_to_practice","document_id":"doc-foreign"}</ACTION>`},
+		{name: "wrong type", content: `<ACTION>{"type":"open_wiki","document_id":"doc-visible"}</ACTION>`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			writer := bufio.NewWriter(&buf)
+			if err := writeScopedCoachAction(writer, tt.content, documents); err != nil {
+				t.Fatal(err)
+			}
+			_ = writer.Flush()
+			if got := strings.Contains(buf.String(), `"type":"action"`); got != tt.wantSSE {
+				t.Fatalf("action SSE emitted = %v, want %v: %q", got, tt.wantSSE, buf.String())
+			}
+		})
 	}
 }
 

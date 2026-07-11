@@ -71,13 +71,19 @@ func (h *CoachHandler) Chat(c *fiber.Ctx) error {
 
 	c.Context().SetBodyStreamWriter(fasthttp.StreamWriter(func(w *bufio.Writer) {
 		content := writeLearningSSEContent(w, iter)
-		if action := learning_service.ParseCoachAction(content); action != nil {
-			_ = writeSSEEvent(w, SSEAction, map[string]interface{}{"action": action})
-		}
+		_ = writeScopedCoachAction(w, content, runtimeContext.Documents)
 		_, _ = w.Write([]byte("data: [DONE]\n\n"))
 		_ = w.Flush()
 	}))
 	return nil
+}
+
+func writeScopedCoachAction(w *bufio.Writer, content string, documents []*wiki_db.Document) error {
+	action := learning_service.ParseCoachActionForDocuments(content, documents)
+	if action == nil {
+		return nil
+	}
+	return writeSSEEvent(w, SSEAction, map[string]interface{}{"action": action})
 }
 
 // buildRuntimeContext 聚合陪练 agent 所需的运行时上下文:用户文件夹(已过滤)、
@@ -91,7 +97,10 @@ func (h *CoachHandler) buildRuntimeContext(ctx context.Context, userID string, a
 	if err != nil {
 		return learning_service.CoachRuntimeContext{}, err
 	}
-	folders = filterFoldersForUser(folders, userID)
+	folders = learning_service.FilterCoachFoldersForUser(folders, userID)
+	if rootFolderID != "" && !learning_service.CoachFolderIsAccessible(folders, rootFolderID) {
+		return learning_service.CoachRuntimeContext{}, errors.New("requested Wiki root folder is not accessible")
+	}
 
 	agentName := ""
 	rootFolderName := ""
@@ -106,6 +115,9 @@ func (h *CoachHandler) buildRuntimeContext(ctx context.Context, userID string, a
 		}
 	}
 	if rootFolderID != "" {
+		if !learning_service.CoachFolderIsAccessible(folders, rootFolderID) {
+			return learning_service.CoachRuntimeContext{}, errors.New("Wiki agent root folder is not accessible")
+		}
 		if rootFolder, err := h.db.Folders.FindOne(ctx, rootFolderID); err == nil {
 			rootFolderName = rootFolder.Name
 		}
@@ -115,6 +127,7 @@ func (h *CoachHandler) buildRuntimeContext(ctx context.Context, userID string, a
 	if err != nil {
 		return learning_service.CoachRuntimeContext{}, err
 	}
+	docs = learning_service.FilterCoachDocumentsByFolders(docs, folders)
 	if rootFolderID != "" {
 		docs, err = h.filterDocumentsByRoot(ctx, docs, rootFolderID)
 		if err != nil {
@@ -164,17 +177,4 @@ func (h *CoachHandler) filterDocumentsByRoot(ctx context.Context, docs []*wiki_d
 		}
 	}
 	return result, nil
-}
-
-// filterFoldersForUser 过滤出归属当前用户的文件夹;未归属(folder.UserID 为空)
-// 视为公开资源一并保留。
-func filterFoldersForUser(folders []*wiki_db.Folder, userID string) []*wiki_db.Folder {
-	result := make([]*wiki_db.Folder, 0, len(folders))
-	for _, folder := range folders {
-		if folder.UserID != nil && *folder.UserID != "" && *folder.UserID != userID {
-			continue
-		}
-		result = append(result, folder)
-	}
-	return result
 }
