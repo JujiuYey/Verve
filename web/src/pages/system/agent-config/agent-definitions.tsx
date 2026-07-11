@@ -1,7 +1,4 @@
-import {
-  IconRoute,
-  IconStack2,
-} from "@tabler/icons-react";
+import { IconRoute, IconStack2 } from "@tabler/icons-react";
 import type { ComponentType, SVGProps } from "react";
 
 export type SceneDefinition = {

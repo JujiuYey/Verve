@@ -27,6 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { PracticePanel } from "./_components/practice-panel";
 import { SourcePanel } from "./_components/source-panel";
+import { mergeReviewTurns } from "./_lib/review-turns";
 
 const routeApi = getRouteApi("/_layout/learn/feynman-practice/$documentId");
 
@@ -339,30 +340,6 @@ export function FeynmanWorkbenchPage() {
       </Tabs>
     </div>
   );
-}
-
-function mergeReviewTurns(
-  current: LearningExplanationReview[],
-  serverTurns: LearningExplanationReview[],
-) {
-  const remaining = [...current];
-  const merged = serverTurns.map((serverTurn) => {
-    for (let index = remaining.length - 1; index >= 0; index -= 1) {
-      const turn = remaining[index];
-      const isPersistedTurn = turn.id === serverTurn.id;
-      const isMatchingLocalTurn =
-        turn.id.startsWith("local-") &&
-        turn.session_id === serverTurn.session_id &&
-        turn.document_id === serverTurn.document_id &&
-        turn.explanation === serverTurn.explanation;
-      if (isPersistedTurn || isMatchingLocalTurn) {
-        remaining.splice(index, 1);
-      }
-    }
-    return serverTurn;
-  });
-
-  return [...merged, ...remaining.filter((turn) => turn.id.startsWith("local-"))];
 }
 
 function SessionProblem({
