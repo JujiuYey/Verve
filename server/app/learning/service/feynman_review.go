@@ -6,12 +6,22 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/cloudwego/eino/adk"
 
 	learning_db "verve/app/learning/models/db"
 	"verve/infrastructure/llm"
 	"verve/infrastructure/llm/prompts"
+)
+
+const (
+	FeynmanPriorHistoryCharacterBudget = 12000
+	FeynmanRecentTurnLimit             = 4
+	feynmanPriorSummaryCharacterBudget = 4000
+	feynmanRecentTurnCharacterBudget   = (FeynmanPriorHistoryCharacterBudget - feynmanPriorSummaryCharacterBudget) / FeynmanRecentTurnLimit
+	feynmanRecentExplanationBudget     = 1250
+	feynmanRecentReviewBudget          = feynmanRecentTurnCharacterBudget - feynmanRecentExplanationBudget
 )
 
 type FeynmanReview struct {
@@ -53,7 +63,7 @@ func (s *FeynmanReviewService) Review(ctx context.Context, request FeynmanReview
 	if explanation == "" {
 		return nil, errors.New("explanation is required")
 	}
-	documentContext, err := s.contextBuilder.Build(ctx, request.DocumentID, explanation)
+	documentContext, err := s.contextBuilder.Build(ctx, request.UserID, request.DocumentID, explanation)
 	if err != nil {
 		return nil, err
 	}
@@ -79,18 +89,17 @@ func feynmanReviewerQueryInput(documentContext *FeynmanDocumentContext, request 
 			ChunkIndex: item.ChunkIndex, HeadingPath: item.HeadingPath, Content: item.Content,
 		})
 	}
-	turns := make([]prompts.FeynmanReviewerTurn, 0, len(request.PriorTurns))
-	for _, item := range request.PriorTurns {
-		if item == nil {
-			continue
-		}
-		reviewJSON, _ := json.Marshal(FeynmanReview{
-			HeardSummary: item.HeardSummary, ClearPoints: item.ClearPoints,
-			ConfusingPoints: item.ConfusingPoints, Misconceptions: item.Misconceptions,
-			FollowUpQuestion: item.FollowUpQuestion, ExplanationSummary: item.ExplanationSummary,
-			ReadyToWrapUp: item.ReadyToWrapUp, ContextSufficient: item.ContextSufficient,
+	prior := nonNilReviews(request.PriorTurns)
+	recentStart := len(prior) - FeynmanRecentTurnLimit
+	if recentStart < 0 {
+		recentStart = 0
+	}
+	turns := make([]prompts.FeynmanReviewerTurn, 0, len(prior)-recentStart)
+	for _, item := range prior[recentStart:] {
+		turns = append(turns, prompts.FeynmanReviewerTurn{
+			Explanation: truncateRunes(strings.TrimSpace(item.Explanation), feynmanRecentExplanationBudget),
+			Review:      compactPriorReview(item, feynmanRecentReviewBudget),
 		})
-		turns = append(turns, prompts.FeynmanReviewerTurn{Explanation: item.Explanation, Review: string(reviewJSON)})
 	}
 	memoryItems := make([]prompts.FeynmanReviewerMemoryItem, 0, len(request.MemoryItems))
 	for _, item := range request.MemoryItems {
@@ -106,8 +115,77 @@ func feynmanReviewerQueryInput(documentContext *FeynmanDocumentContext, request 
 		Mode: documentContext.Mode, FullText: documentContext.FullText, Evidence: evidence,
 		ContextSufficient:          documentContext.ContextSufficient,
 		ContextInsufficiencyReason: documentContext.ContextInsufficiencyReason,
+		PriorSummary:               compactOlderReviewSummaries(prior[:recentStart], feynmanPriorSummaryCharacterBudget),
 		PriorTurns:                 turns, MemoryItems: memoryItems, NewExplanation: request.Explanation,
 	}
+}
+
+func nonNilReviews(items []*learning_db.LearningExplanationReview) []*learning_db.LearningExplanationReview {
+	result := make([]*learning_db.LearningExplanationReview, 0, len(items))
+	for _, item := range items {
+		if item != nil {
+			result = append(result, item)
+		}
+	}
+	return result
+}
+
+func compactPriorReview(item *learning_db.LearningExplanationReview, budget int) string {
+	compact := struct {
+		ExplanationSummary string `json:"explanation_summary"`
+		FollowUpQuestion   string `json:"follow_up_question,omitempty"`
+		Misconceptions     string `json:"misconceptions,omitempty"`
+	}{
+		ExplanationSummary: truncateRunes(strings.TrimSpace(item.ExplanationSummary), 250),
+		FollowUpQuestion:   truncateRunes(strings.TrimSpace(item.FollowUpQuestion), 180),
+		Misconceptions:     truncateRunes(strings.Join(uniqueNonEmptyStrings(item.Misconceptions), "; "), 180),
+	}
+	data, _ := json.Marshal(compact)
+	if utf8.RuneCount(data) <= budget {
+		return string(data)
+	}
+	compact.FollowUpQuestion = ""
+	compact.Misconceptions = ""
+	compact.ExplanationSummary = truncateRunes(compact.ExplanationSummary, budget/2)
+	data, _ = json.Marshal(compact)
+	if utf8.RuneCount(data) <= budget {
+		return string(data)
+	}
+	return "{}"
+}
+
+func compactOlderReviewSummaries(items []*learning_db.LearningExplanationReview, budget int) string {
+	lines := make([]string, 0, len(items))
+	used := 0
+	for i := len(items) - 1; i >= 0 && used < budget; i-- {
+		summary := truncateRunes(strings.TrimSpace(items[i].ExplanationSummary), 500)
+		if summary == "" {
+			continue
+		}
+		line := fmt.Sprintf("turn %d: %s", i+1, summary)
+		remaining := budget - used
+		line = truncateRunes(line, remaining)
+		lines = append(lines, line)
+		used += utf8.RuneCountInString(line)
+		if used < budget {
+			used++ // newline
+		}
+	}
+	for left, right := 0, len(lines)-1; left < right; left, right = left+1, right-1 {
+		lines[left], lines[right] = lines[right], lines[left]
+	}
+	return truncateRunes(strings.Join(lines, "\n"), budget)
+}
+
+func truncateRunes(value string, limit int) string {
+	if limit <= 0 {
+		return ""
+	}
+	if utf8.RuneCountInString(value) <= limit {
+		return value
+	}
+	runes := []rune(value)
+	return string(runes[:limit])
 }
 
 var feynmanReviewRequiredKeys = []string{

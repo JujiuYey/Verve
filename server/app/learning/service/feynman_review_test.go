@@ -3,10 +3,52 @@ package service
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
+	"unicode/utf8"
 
 	learning_db "verve/app/learning/models/db"
 )
+
+func TestFeynmanReviewerQueryInputBoundsPriorHistoryAndKeepsNewestTurns(t *testing.T) {
+	turns := make([]*learning_db.LearningExplanationReview, 20)
+	for i := range turns {
+		turns[i] = &learning_db.LearningExplanationReview{
+			Explanation:        fmt.Sprintf("old-explanation-%02d:%s", i, strings.Repeat("解释", 800)),
+			HeardSummary:       strings.Repeat("复述", 400),
+			ExplanationSummary: fmt.Sprintf("summary-%02d:%s", i, strings.Repeat("摘要", 200)),
+			FollowUpQuestion:   strings.Repeat("追问", 200),
+		}
+	}
+	current := strings.Repeat("本轮解释", 5000)
+	input := feynmanReviewerQueryInput(&FeynmanDocumentContext{Title: "Go", Mode: "full", ContextSufficient: true}, FeynmanReviewRequest{
+		UserID: "user-1", DocumentID: "doc-1", Explanation: current, PriorTurns: turns,
+	})
+
+	if input.NewExplanation != current {
+		t.Fatal("current explanation was truncated")
+	}
+	if len(input.PriorTurns) == 0 || len(input.PriorTurns) > FeynmanRecentTurnLimit {
+		t.Fatalf("recent turns = %d", len(input.PriorTurns))
+	}
+	if !strings.Contains(input.PriorTurns[len(input.PriorTurns)-1].Explanation, "old-explanation-19") {
+		t.Fatalf("newest turn missing: %#v", input.PriorTurns)
+	}
+	if strings.Contains(input.PriorSummary, "old-explanation-00") {
+		t.Fatalf("older full explanation leaked into summary: %q", input.PriorSummary)
+	}
+	if !strings.Contains(input.PriorSummary, "summary-") {
+		t.Fatalf("older summaries missing: %q", input.PriorSummary)
+	}
+	historyCharacters := utf8.RuneCountInString(input.PriorSummary)
+	for _, turn := range input.PriorTurns {
+		historyCharacters += utf8.RuneCountInString(turn.Explanation)
+		historyCharacters += utf8.RuneCountInString(turn.Review)
+	}
+	if historyCharacters > FeynmanPriorHistoryCharacterBudget {
+		t.Fatalf("history characters = %d, budget = %d", historyCharacters, FeynmanPriorHistoryCharacterBudget)
+	}
+}
 
 func TestFeynmanReviewerQueryInputIncludesScopedMemory(t *testing.T) {
 	input := feynmanReviewerQueryInput(&FeynmanDocumentContext{Title: "Go values", Mode: "full", ContextSufficient: true}, FeynmanReviewRequest{

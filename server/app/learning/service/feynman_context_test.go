@@ -25,7 +25,7 @@ type fakeFeynmanDocumentSource struct {
 	neighborIndexes []int
 }
 
-func (f *fakeFeynmanDocumentSource) LoadDocument(context.Context, string) (*wiki_db.Document, string, error) {
+func (f *fakeFeynmanDocumentSource) LoadDocument(context.Context, string, string) (*wiki_db.Document, string, error) {
 	return f.document, f.markdown, nil
 }
 
@@ -51,7 +51,7 @@ func TestFeynmanContextUsesFullMarkdownAtCharacterLimit(t *testing.T) {
 		markdown: markdown,
 	}
 
-	got, err := NewFeynmanContextBuilder(source).Build(context.Background(), "doc-1", "我的解释")
+	got, err := NewFeynmanContextBuilder(source).Build(context.Background(), "user-1", "doc-1", "我的解释")
 	if err != nil {
 		t.Fatalf("Build returned error: %v", err)
 	}
@@ -88,7 +88,7 @@ func TestFeynmanContextUsesDocumentScopedRAGWithoutTruncatingFullText(t *testing
 		},
 	}
 
-	got, err := NewFeynmanContextBuilder(source).Build(context.Background(), "doc-2", "  channel 会阻塞发送者  ")
+	got, err := NewFeynmanContextBuilder(source).Build(context.Background(), "user-1", "doc-2", "  channel 会阻塞发送者  ")
 	if err != nil {
 		t.Fatalf("Build returned error: %v", err)
 	}
@@ -123,7 +123,7 @@ func TestFeynmanContextRejectsEmptyMarkdown(t *testing.T) {
 		markdown: " \n\t ",
 	}
 
-	_, err := NewFeynmanContextBuilder(source).Build(context.Background(), "doc-empty", "解释")
+	_, err := NewFeynmanContextBuilder(source).Build(context.Background(), "user-1", "doc-empty", "解释")
 	if err == nil || !strings.Contains(err.Error(), "markdown") || !strings.Contains(err.Error(), "empty") {
 		t.Fatalf("error = %v", err)
 	}
@@ -142,7 +142,7 @@ func TestFeynmanContextMarksInsufficientRAGEvidence(t *testing.T) {
 		},
 	}
 
-	got, err := NewFeynmanContextBuilder(source).Build(context.Background(), "doc-large", "解释")
+	got, err := NewFeynmanContextBuilder(source).Build(context.Background(), "user-1", "doc-large", "解释")
 	if err != nil {
 		t.Fatalf("Build returned error: %v", err)
 	}
@@ -176,7 +176,7 @@ func TestFeynmanContextRequiresTwoRelevantPrimaryHits(t *testing.T) {
 				},
 			}
 
-			got, err := NewFeynmanContextBuilder(source).Build(context.Background(), "doc-scores", "解释")
+			got, err := NewFeynmanContextBuilder(source).Build(context.Background(), "user-1", "doc-scores", "解释")
 			if err != nil {
 				t.Fatalf("Build returned error: %v", err)
 			}

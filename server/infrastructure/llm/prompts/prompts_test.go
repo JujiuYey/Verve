@@ -96,6 +96,7 @@ func TestFeynmanReviewerQueryPromptRendersFullDocumentContextAndTurns(t *testing
 		Mode:              "full",
 		FullText:          "# 并发\n\n## channel\n\n发送与接收。",
 		ContextSufficient: true,
+		PriorSummary:      "前几轮已经讲清了阻塞与唤醒。",
 		PriorTurns: []FeynmanReviewerTurn{
 			{Explanation: "channel 是队列", Review: "我听到你把 channel 解释成队列。"},
 		},
@@ -113,6 +114,9 @@ func TestFeynmanReviewerQueryPromptRendersFullDocumentContextAndTurns(t *testing
 		"<UNTRUSTED_SOURCE_TEXT>",
 		"</UNTRUSTED_SOURCE_TEXT>",
 		"发送与接收。",
+		"<UNTRUSTED_PRIOR_SUMMARY>",
+		"前几轮已经讲清了阻塞与唤醒。",
+		"</UNTRUSTED_PRIOR_SUMMARY>",
 		`"explanation": "channel 是队列"`,
 		`"review": "我听到你把 channel 解释成队列。"`,
 		"<UNTRUSTED_PRIOR_TURNS>",

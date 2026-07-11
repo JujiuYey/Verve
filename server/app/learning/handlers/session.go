@@ -3,7 +3,9 @@ package handlers
 import (
 	"bufio"
 	"context"
+	"database/sql"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"strings"
@@ -34,6 +36,14 @@ type documentStore interface {
 	FindOne(ctx context.Context, id string) (*wiki_db.Document, error)
 }
 
+type accessibleDocumentStore interface {
+	FindAccessible(ctx context.Context, userID, id string) (*wiki_db.Document, error)
+}
+
+type folderStore interface {
+	FindOne(ctx context.Context, id string) (*wiki_db.Folder, error)
+}
+
 type messageStore interface {
 	FindBySession(ctx context.Context, sessionID string) ([]*learning_db.LearningMessage, error)
 }
@@ -50,7 +60,7 @@ type explanationMemoryStore interface {
 
 type SessionHandlerDependencies struct {
 	Sessions  sessionStore
-	Documents documentStore
+	Documents accessibleDocumentStore
 	Messages  messageStore
 	Reviews   reviewStore
 	Reviewer  learning_service.FeynmanReviewer
@@ -64,12 +74,13 @@ type SessionHandler struct {
 func NewSessionHandler(db *database.DatabaseService, minio *storage.MinIOService, retriever *rag_service.Retriever) *SessionHandler {
 	source := &feynmanDocumentSource{
 		documents: db.Documents,
+		folders:   db.Folders,
 		files:     minio,
 		retriever: retriever,
 		chunks:    db.RAGChunks,
 	}
 	return NewSessionHandlerWithDependencies(SessionHandlerDependencies{
-		Sessions: db.Sessions, Documents: db.Documents, Messages: db.Messages, Reviews: db.Reviews,
+		Sessions: db.Sessions, Documents: source, Messages: db.Messages, Reviews: db.Reviews,
 		Reviewer: learning_service.NewFeynmanReviewService(source),
 		Memory:   learning_service.NewMemoryService(db),
 	})
@@ -89,8 +100,15 @@ func (h *SessionHandler) Create(c *fiber.Ctx) error {
 	if req.DocumentID == "" {
 		return response.BadRequestCtx(c, "document_id 不能为空")
 	}
-	if _, err := h.deps.Documents.FindOne(c.Context(), req.DocumentID); err != nil {
-		return response.NotFoundCtx(c, "文档不存在")
+	if _, err := h.deps.Documents.FindAccessible(c.Context(), userID, req.DocumentID); err != nil {
+		switch {
+		case errors.Is(err, errDocumentForbidden):
+			return response.ForbiddenCtx(c, "无权访问")
+		case errors.Is(err, sql.ErrNoRows):
+			return response.NotFoundCtx(c, "文档不存在")
+		default:
+			return response.InternalServerCtx(c, "读取文档失败")
+		}
 	}
 	session := &learning_db.LearningSession{UserID: userID, DocumentID: req.DocumentID, Status: "active"}
 	if err := h.deps.Sessions.Create(c.Context(), session); err != nil {
@@ -121,6 +139,9 @@ func (h *SessionHandler) Review(c *fiber.Ctx) error {
 	session, err := h.ownedSession(c.Context(), userID, c.Params("id"))
 	if err != nil {
 		return writeSessionLookupError(c, err)
+	}
+	if session.Status != "active" {
+		return c.Status(fiber.StatusConflict).JSON(response.FailWithCode(fiber.StatusConflict, "会话已结束"))
 	}
 	var req learning_payload.ReviewExplanationRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -195,14 +216,18 @@ func (h *SessionHandler) Complete(c *fiber.Ctx) error {
 }
 
 var (
-	errSessionNotFound  = errors.New("session not found")
-	errSessionForbidden = errors.New("session forbidden")
+	errSessionNotFound   = errors.New("session not found")
+	errSessionForbidden  = errors.New("session forbidden")
+	errDocumentForbidden = errors.New("document forbidden")
 )
 
 func (h *SessionHandler) ownedSession(ctx context.Context, userID, id string) (*learning_db.LearningSession, error) {
 	session, err := h.deps.Sessions.FindOne(ctx, id)
 	if err != nil {
-		return nil, errSessionNotFound
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errSessionNotFound
+		}
+		return nil, fmt.Errorf("find session: %w", err)
 	}
 	if session.UserID != userID {
 		return nil, errSessionForbidden
@@ -217,7 +242,10 @@ func writeSessionLookupError(c *fiber.Ctx, err error) error {
 	if errors.Is(err, errSessionForbidden) {
 		return response.ForbiddenCtx(c, "无权访问")
 	}
-	return response.NotFoundCtx(c, "会话不存在")
+	if errors.Is(err, errSessionNotFound) {
+		return response.NotFoundCtx(c, "会话不存在")
+	}
+	return response.InternalServerCtx(c, "读取会话失败")
 }
 
 func reviewModelFromResult(session *learning_db.LearningSession, userID, explanation string, result *learning_service.FeynmanReview) *learning_db.LearningExplanationReview {
@@ -244,13 +272,29 @@ type documentChunkStore interface {
 
 type feynmanDocumentSource struct {
 	documents documentStore
+	folders   folderStore
 	files     documentContentStore
 	retriever documentRetriever
 	chunks    documentChunkStore
 }
 
-func (s *feynmanDocumentSource) LoadDocument(ctx context.Context, documentID string) (*wiki_db.Document, string, error) {
+func (s *feynmanDocumentSource) FindAccessible(ctx context.Context, userID, documentID string) (*wiki_db.Document, error) {
 	doc, err := s.documents.FindOne(ctx, documentID)
+	if err != nil {
+		return nil, err
+	}
+	folder, err := s.folders.FindOne(ctx, doc.FolderID)
+	if err != nil {
+		return nil, err
+	}
+	if folder.UserID != nil && strings.TrimSpace(*folder.UserID) != "" && *folder.UserID != userID {
+		return nil, errDocumentForbidden
+	}
+	return doc, nil
+}
+
+func (s *feynmanDocumentSource) LoadDocument(ctx context.Context, userID, documentID string) (*wiki_db.Document, string, error) {
+	doc, err := s.FindAccessible(ctx, userID, documentID)
 	if err != nil {
 		return nil, "", err
 	}
