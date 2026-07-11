@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"sort"
 
 	rag_db "verve/app/rag/models/db"
 
@@ -37,6 +38,39 @@ func (r *ChunkRepository) FindByPointIDs(ctx context.Context, pointIDs []string)
 	err := r.db.NewSelect().
 		Model(&chunks).
 		Where("vector_point_id IN (?)", bun.In(pointIDs)).
+		Scan(ctx)
+	return chunks, err
+}
+
+func (r *ChunkRepository) FindNeighbors(ctx context.Context, documentID string, indexes []int, radius int) ([]*rag_db.WikiChunk, error) {
+	if len(indexes) == 0 {
+		return []*rag_db.WikiChunk{}, nil
+	}
+	if radius < 0 {
+		radius = 0
+	}
+
+	indexSet := make(map[int]struct{}, len(indexes)*(radius*2+1))
+	for _, index := range indexes {
+		for offset := -radius; offset <= radius; offset++ {
+			candidate := index + offset
+			if candidate >= 0 {
+				indexSet[candidate] = struct{}{}
+			}
+		}
+	}
+	expandedIndexes := make([]int, 0, len(indexSet))
+	for index := range indexSet {
+		expandedIndexes = append(expandedIndexes, index)
+	}
+	sort.Ints(expandedIndexes)
+
+	var chunks []*rag_db.WikiChunk
+	err := r.db.NewSelect().
+		Model(&chunks).
+		Where("rwc.document_id = ?", documentID).
+		Where("rwc.chunk_index IN (?)", bun.In(expandedIndexes)).
+		OrderExpr("rwc.chunk_index ASC").
 		Scan(ctx)
 	return chunks, err
 }

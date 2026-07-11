@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"reflect"
+	"strings"
 	"testing"
 
 	rag_db "verve/app/rag/models/db"
@@ -10,6 +12,48 @@ import (
 
 type fakeEmbedder struct {
 	result EmbeddingResult
+}
+
+func TestRetrieverSearchDocumentRejectsBlankDocumentID(t *testing.T) {
+	retriever := NewRetriever(
+		&fakeChunkFinder{},
+		fakeEmbedder{},
+		&fakeVectorStore{},
+	)
+
+	_, err := retriever.SearchDocument(context.Background(), "  ", "channel", 6)
+	if err == nil || !strings.Contains(err.Error(), "document_id is required") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestRetrieverSearchDocumentScopesVectorSearchAndReturnsChunkIndex(t *testing.T) {
+	store := &fakeVectorStore{searchResults: []vector.ScoredPoint{
+		{PointID: "p1", Score: 0.9},
+	}}
+	retriever := NewRetriever(
+		&fakeChunkFinder{chunks: []*rag_db.WikiChunk{
+			{ID: "c1", VectorPointID: "p1", DocumentID: "doc-1", ChunkIndex: 7},
+		}},
+		fakeEmbedder{result: EmbeddingResult{Model: "embed", Dimension: 2, Embeddings: [][]float32{{0.1, 0.2}}}},
+		store,
+	)
+
+	results, err := retriever.SearchDocument(context.Background(), " doc-1 ", "channel", 6)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantFilter := map[string]any{
+		"must": []map[string]any{
+			{"key": "document_id", "match": map[string]any{"value": "doc-1"}},
+		},
+	}
+	if !reflect.DeepEqual(store.filter, wantFilter) {
+		t.Fatalf("filter = %#v, want %#v", store.filter, wantFilter)
+	}
+	if len(results) != 1 || results[0].ChunkIndex != 7 {
+		t.Fatalf("results = %#v", results)
+	}
 }
 
 func (f fakeEmbedder) EmbedTexts(ctx context.Context, texts []string) (EmbeddingResult, error) {

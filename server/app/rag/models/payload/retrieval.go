@@ -15,6 +15,7 @@ type SearchResult struct {
 	DocumentTitle string  `json:"document_title"`
 	FolderPath    string  `json:"folder_path"`
 	HeadingPath   string  `json:"heading_path"`
+	ChunkIndex    int     `json:"chunk_index"`
 	Content       string  `json:"content"`
 }
 

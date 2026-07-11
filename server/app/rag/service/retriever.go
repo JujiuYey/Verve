@@ -33,6 +33,32 @@ func (r *Retriever) Search(ctx context.Context, rootFolderID, query string, limi
 	if query == "" {
 		return nil, fmt.Errorf("query is required")
 	}
+	filter := map[string]any{
+		"must": []map[string]any{
+			{"key": "root_folder_id", "match": map[string]any{"value": rootFolderID}},
+		},
+	}
+	return r.search(ctx, query, limit, filter)
+}
+
+func (r *Retriever) SearchDocument(ctx context.Context, documentID, query string, limit int) ([]rag_payload.SearchResult, error) {
+	documentID = strings.TrimSpace(documentID)
+	query = strings.TrimSpace(query)
+	if documentID == "" {
+		return nil, fmt.Errorf("document_id is required")
+	}
+	if query == "" {
+		return nil, fmt.Errorf("query is required")
+	}
+	filter := map[string]any{
+		"must": []map[string]any{
+			{"key": "document_id", "match": map[string]any{"value": documentID}},
+		},
+	}
+	return r.search(ctx, query, limit, filter)
+}
+
+func (r *Retriever) search(ctx context.Context, query string, limit int, filter map[string]any) ([]rag_payload.SearchResult, error) {
 	limit = normalizeSearchLimit(limit)
 	embedding, err := r.embed.EmbedTexts(ctx, []string{query})
 	if err != nil {
@@ -40,11 +66,6 @@ func (r *Retriever) Search(ctx context.Context, rootFolderID, query string, limi
 	}
 	if len(embedding.Embeddings) == 0 {
 		return []rag_payload.SearchResult{}, nil
-	}
-	filter := map[string]any{
-		"must": []map[string]any{
-			{"key": "root_folder_id", "match": map[string]any{"value": rootFolderID}},
-		},
 	}
 	points, err := r.vectors.Search(ctx, vector.WikiChunkCollection, embedding.Embeddings[0], filter, limit)
 	if err != nil {
@@ -81,6 +102,7 @@ func (r *Retriever) Search(ctx context.Context, rootFolderID, query string, limi
 			DocumentTitle: chunk.DocumentTitle,
 			FolderPath:    chunk.FolderPath,
 			HeadingPath:   chunk.HeadingPath,
+			ChunkIndex:    chunk.ChunkIndex,
 			Content:       chunk.Content,
 		})
 	}
