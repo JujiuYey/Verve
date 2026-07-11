@@ -31,3 +31,12 @@ Prefer components in this order:
 - Project-specific reusable components in `web/src/components/sag-ui`.
 
 Before building a custom component, check whether shadcn/ui or `sag-ui` already provides the needed behavior. If a required component is missing, do not silently invent a one-off replacement. Tell the user what is missing, where you checked, and whether you recommend adding a shadcn component, reusing/extending `sag-ui`, or implementing a small local component.
+
+## Go Model Field Documentation
+
+For Go structs under any `models/db` or `models/payload` directory, every business field must have a clear field-level comment.
+
+- Write concise Chinese trailing comments in the same style as the existing model files.
+- Describe the field's business meaning; include enum values or units only when necessary.
+- Keep comments synchronized whenever fields are added, renamed, repurposed, or removed.
+- Prefer short comments such as “用户ID”“会话状态”“输入 token 数”; do not write paragraph-style field documentation.

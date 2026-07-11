@@ -6,17 +6,17 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// 陪练对话消息(多 agent)
+// 学习会话消息
 type LearningMessage struct {
 	bun.BaseModel `bun:"table:learning_messages,alias:lm"`
 
-	ID               string                 `bun:"id,pk,type:varchar(32)" json:"id"`                                        // 主键ID
+	ID               string                 `bun:"id,pk,type:varchar(32)" json:"id"`                                        // 消息ID
 	SessionID        string                 `bun:"session_id,notnull" json:"session_id"`                                    // 会话ID
-	Role             string                 `bun:"role,notnull" json:"role"`                                                // user / assistant / system
-	AgentType        *string                `bun:"agent_type" json:"agent_type,omitempty"`                                  // tutor / examiner
+	Role             string                 `bun:"role,notnull" json:"role"`                                                // 消息角色
+	AgentType        *string                `bun:"agent_type" json:"agent_type,omitempty"`                                  // Agent类型
 	Content          string                 `bun:"content,notnull" json:"content"`                                          // 消息内容
-	ToolUsed         *string                `bun:"tool_used" json:"tool_used,omitempty"`                                    // 使用的工具
-	ToolResult       map[string]interface{} `bun:"tool_result,type:jsonb" json:"tool_result,omitempty"`                     // 工具返回结果
+	ToolUsed         *string                `bun:"tool_used" json:"tool_used,omitempty"`                                    // 工具名称
+	ToolResult       map[string]interface{} `bun:"tool_result,type:jsonb" json:"tool_result,omitempty"`                     // 工具结果
 	PromptTokens     *int64                 `bun:"prompt_tokens" json:"prompt_tokens,omitempty"`                            // 输入 token 数
 	CompletionTokens *int64                 `bun:"completion_tokens" json:"completion_tokens,omitempty"`                    // 输出 token 数
 	TotalTokens      *int64                 `bun:"total_tokens" json:"total_tokens,omitempty"`                              // 总 token 数

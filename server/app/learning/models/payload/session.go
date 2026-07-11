@@ -1,10 +1,11 @@
 package payload
 
-// 开始一节学习会话请求
+// 创建学习会话请求
 type CreateSessionRequest struct {
-	DocumentID string `json:"document_id"`
+	DocumentID string `json:"document_id"` // Wiki文档ID
 }
 
+// 提交解释请求
 type ReviewExplanationRequest struct {
-	Explanation string `json:"explanation"`
+	Explanation string `json:"explanation"` // 学习者解释
 }
