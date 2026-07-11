@@ -10,6 +10,7 @@ import (
 	"github.com/cloudwego/eino/components/tool/utils"
 
 	learning_service "verve/app/learning/service"
+	rag_payload "verve/app/rag/models/payload"
 	rag_service "verve/app/rag/service"
 	wiki_db "verve/app/wiki/models/db"
 	"verve/infrastructure/database"
@@ -30,6 +31,10 @@ type coachFolderLister interface {
 
 type coachDocumentLister interface {
 	List(context.Context, string, string) ([]*wiki_db.Document, error)
+}
+
+type coachKnowledgeSearcher interface {
+	Search(context.Context, string, string, int) ([]rag_payload.SearchResult, error)
 }
 
 type SearchLearningMemoryInput struct {
@@ -75,34 +80,56 @@ func NewCoachTools(db *database.DatabaseService, retriever *rag_service.Retrieve
 		newCompleteTaskTool(),
 	}
 	if retriever != nil {
-		tools = append(tools, newSearchWikiKnowledgeTool(retriever))
+		tools = append(tools, newSearchWikiKnowledgeTool(db.Folders, retriever, userID))
 	}
 	return tools
 }
 
-func newSearchWikiKnowledgeTool(retriever *rag_service.Retriever) tool.InvokableTool {
+func newSearchWikiKnowledgeTool(folders coachFolderLister, retriever coachKnowledgeSearcher, userID string) tool.InvokableTool {
 	t, err := utils.InferTool("search_wiki_knowledge", "按 Wiki 根目录检索真实文档片段,用于回答概念问题或决定下一步学习内容",
 		func(ctx context.Context, input *SearchWikiKnowledgeInput) (*SearchWikiKnowledgeOutput, error) {
-			results, err := retriever.Search(ctx, input.RootFolderID, input.Query, input.Limit)
-			if err != nil {
-				return nil, err
-			}
-			out := &SearchWikiKnowledgeOutput{Results: make([]map[string]interface{}, 0, len(results))}
-			for _, result := range results {
-				out.Results = append(out.Results, map[string]interface{}{
-					"document_title": result.DocumentTitle,
-					"folder_path":    result.FolderPath,
-					"heading_path":   result.HeadingPath,
-					"content":        result.Content,
-					"score":          result.Score,
-				})
-			}
-			return out, nil
+			return searchAccessibleWikiKnowledge(ctx, folders, retriever, userID, input)
 		})
 	if err != nil {
 		log.Fatal(err)
 	}
 	return t
+}
+
+func searchAccessibleWikiKnowledge(
+	ctx context.Context,
+	folders coachFolderLister,
+	retriever coachKnowledgeSearcher,
+	userID string,
+	input *SearchWikiKnowledgeInput,
+) (*SearchWikiKnowledgeOutput, error) {
+	if input == nil {
+		return nil, sql.ErrNoRows
+	}
+	allFolders, err := folders.List(ctx, map[string]interface{}{})
+	if err != nil {
+		return nil, err
+	}
+	accessibleFolders := learning_service.FilterCoachFoldersForUser(allFolders, userID)
+	rootFolderID := strings.TrimSpace(input.RootFolderID)
+	if !learning_service.CoachFolderIsAccessible(accessibleFolders, rootFolderID) {
+		return nil, sql.ErrNoRows
+	}
+	results, err := retriever.Search(ctx, rootFolderID, input.Query, input.Limit)
+	if err != nil {
+		return nil, err
+	}
+	out := &SearchWikiKnowledgeOutput{Results: make([]map[string]interface{}, 0, len(results))}
+	for _, result := range results {
+		out.Results = append(out.Results, map[string]interface{}{
+			"document_title": result.DocumentTitle,
+			"folder_path":    result.FolderPath,
+			"heading_path":   result.HeadingPath,
+			"content":        result.Content,
+			"score":          result.Score,
+		})
+	}
+	return out, nil
 }
 
 func newSearchLearningMemoryTool(db *database.DatabaseService, userID string) tool.InvokableTool {
