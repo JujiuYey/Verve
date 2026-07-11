@@ -10,24 +10,6 @@ import (
 	"github.com/cloudwego/eino/compose"
 )
 
-// NewObjectiveGeneratorAgent 读取 Markdown 并生成学习小节。
-func NewObjectiveGeneratorAgent(ctx context.Context) (adk.Agent, error) {
-	chatModel, err := NewStructuredChatModel(ctx)
-	if err != nil {
-		return nil, err
-	}
-	a, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
-		Name:        "ObjectiveGenerator",
-		Description: "从 Wiki Markdown 资料生成费曼学习小节",
-		Instruction: prompts.ObjectiveGeneratorPrompt(prompts.Input{}),
-		Model:       chatModel,
-	})
-	if err != nil {
-		return nil, err
-	}
-	return a, nil
-}
-
 // NewFeynmanReviewerAgent listens to a learner explanation and returns structured feedback.
 func NewFeynmanReviewerAgent(ctx context.Context) (adk.Agent, error) {
 	chatModel, err := NewStructuredChatModel(ctx)

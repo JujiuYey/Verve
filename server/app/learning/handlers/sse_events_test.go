@@ -80,7 +80,7 @@ func TestWriteLearningSSEContentEmitsReasoningToolAndText(t *testing.T) {
 	// 3. assistant: 文本主体(含 <ACTION> 标签)
 	gen.Send(makeEvent("LearningCoach", &schema.Message{
 		Role:    schema.Assistant,
-		Content: "我们继续 Go 基础。<ACTION>{\"type\":\"navigate_to_practice\",\"objective_id\":\"obj-1\",\"label\":\"进入练习\"}</ACTION>",
+		Content: "我们继续 Go 基础。<ACTION>{\"type\":\"navigate_to_practice\",\"document_id\":\"doc-1\",\"label\":\"开始费曼练习\"}</ACTION>",
 	}))
 
 	gen.Close()

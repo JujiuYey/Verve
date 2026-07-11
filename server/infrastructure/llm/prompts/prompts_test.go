@@ -13,15 +13,6 @@ func TestDefaultAgentPromptsContainCriticalContracts(t *testing.T) {
 		want   []string
 	}{
 		{
-			name:   "objective generator",
-			render: ObjectiveGeneratorPrompt,
-			want: []string{
-				"只输出 JSON",
-				`"objectives"`,
-				"通常生成 3-8 个小节",
-			},
-		},
-		{
 			name:   "coach",
 			render: CoachPrompt,
 			want: []string{
@@ -68,7 +59,6 @@ func TestAgentPromptsFallBackToDefaultPreset(t *testing.T) {
 		name   string
 		render func(Input) string
 	}{
-		{name: "objective generator", render: ObjectiveGeneratorPrompt},
 		{name: "coach", render: CoachPrompt},
 		{name: "feynman reviewer", render: FeynmanReviewerPrompt},
 	}
@@ -218,32 +208,12 @@ func TestCoachQueryPromptRendersRuntimeContext(t *testing.T) {
 		Documents: []CoachDocument{
 			{ID: "doc-interface", FolderID: "folder-go", Filename: "interface.md"},
 		},
-		Objectives: []CoachObjective{
-			{
-				ID:               "obj-interface",
-				Title:            "接口基础",
-				Detail:           "理解接口定义和实现关系",
-				SourceFolderID:   "folder-go",
-				SourceDocumentID: "doc-interface",
-				Status:           "active",
-				MasteryLevel:     "heard",
-			},
-		},
 		MemoryItems: []CoachMemoryItem{
 			{
 				FolderID:   "folder-go",
-				Kind:       "mastered_concept",
+				Kind:       "explanation_evidence",
 				Statement:  "用户已经能用自己的话解释 Go 接口的隐式实现",
 				Confidence: "confirmed",
-			},
-		},
-		Profiles: []CoachProfile{
-			{
-				FolderID:        "folder-go",
-				CurrentLevel:    "explained",
-				CompletedTopics: []string{"值类型"},
-				WeakPoints:      []string{"缺少反例"},
-				NextGoal:        "继续讲接口组合",
 			},
 		},
 		Journals: []CoachJournal{
@@ -260,13 +230,9 @@ func TestCoachQueryPromptRendersRuntimeContext(t *testing.T) {
 		"学习者说:继续学习",
 		"Go 基础 (folder-go) - 接口和组合",
 		"interface.md (doc-interface), folder=folder-go",
-		"接口基础 (obj-interface), status=active, mastery=heard, folder=folder-go, document=doc-interface",
-		"要点:理解接口定义和实现关系",
 		"## 学习记忆",
-		"已掌握",
+		"解释证据",
 		"用户已经能用自己的话解释 Go 接口的隐式实现",
-		"当前水平:explained",
-		"已掌握内容:值类型",
 		"上次建议:复述 interface 的隐式实现",
 		"<ACTION>",
 	} {
@@ -274,8 +240,10 @@ func TestCoachQueryPromptRendersRuntimeContext(t *testing.T) {
 			t.Fatalf("prompt does not contain %q:\n%s", want, prompt)
 		}
 	}
-	if strings.Index(prompt, "## 学习记忆") > strings.Index(prompt, "## 学习画像") {
-		t.Fatalf("learning memory should appear before profiles:\n%s", prompt)
+	for _, forbidden := range []string{"objective", "学习小节", "mastery", "掌握度", "create_learning_objectives", "first_objective_id"} {
+		if strings.Contains(prompt, forbidden) {
+			t.Fatalf("prompt contains removed concept %q:\n%s", forbidden, prompt)
+		}
 	}
 }
 
@@ -285,9 +253,7 @@ func TestCoachQueryPromptRendersExplicitEmptyStates(t *testing.T) {
 	for _, want := range []string{
 		"- 暂无文件夹",
 		"- 暂无文档",
-		"- 暂无学习小节。可以建议用户先去 Wiki 补充资料。",
 		"- 暂无学习记忆",
-		"- 暂无画像",
 		"- 暂无记录",
 		"如果不能确定,只问用户一个选择题。",
 	} {
@@ -301,7 +267,7 @@ func TestCoachQueryPromptSkipsBlankMemoryStatements(t *testing.T) {
 	prompt := CoachQueryPrompt(CoachQueryInput{
 		Message: "继续学习",
 		MemoryItems: []CoachMemoryItem{
-			{Kind: "mastered_concept", Statement: "  "},
+			{Kind: "explanation_evidence", Statement: "  "},
 		},
 	})
 
@@ -329,7 +295,7 @@ func TestCoachQueryPromptUsesFallbackMemoryKindLabel(t *testing.T) {
 	}
 }
 
-func TestCoachQueryPromptTellsAgentToGenerateObjectivesWhenDocumentsExist(t *testing.T) {
+func TestCoachQueryPromptNavigatesDirectlyToDocuments(t *testing.T) {
 	prompt := CoachQueryPrompt(CoachQueryInput{
 		Message: "继续学习",
 		Documents: []CoachDocument{
@@ -337,14 +303,14 @@ func TestCoachQueryPromptTellsAgentToGenerateObjectivesWhenDocumentsExist(t *tes
 		},
 	})
 
-	for _, want := range []string{
-		"create_learning_objectives",
-		"doc-hello",
-		"生成学习小节",
-		"first_objective_id",
-	} {
+	for _, want := range []string{"doc-hello", `"document_id":"..."`} {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("prompt does not contain %q:\n%s", want, prompt)
+		}
+	}
+	for _, forbidden := range []string{"create_learning_objectives", "first_objective_id", "objective"} {
+		if strings.Contains(prompt, forbidden) {
+			t.Fatalf("prompt contains removed concept %q:\n%s", forbidden, prompt)
 		}
 	}
 }

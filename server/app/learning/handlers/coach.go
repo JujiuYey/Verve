@@ -3,7 +3,6 @@ package handlers
 import (
 	"bufio"
 	"context"
-	"database/sql"
 	"errors"
 	"log"
 	"strings"
@@ -20,18 +19,16 @@ import (
 	"verve/common/response"
 	"verve/infrastructure/database"
 	"verve/infrastructure/llm"
-	"verve/infrastructure/storage"
 )
 
 type CoachHandler struct {
 	db        *database.DatabaseService
-	minio     *storage.MinIOService
 	retriever *rag_service.Retriever
 }
 
 // NewCoachHandler 构造陪练 handler,持有 db 供 runtime context 与 tools 共用。
-func NewCoachHandler(db *database.DatabaseService, minio *storage.MinIOService, retriever *rag_service.Retriever) *CoachHandler {
-	return &CoachHandler{db: db, minio: minio, retriever: retriever}
+func NewCoachHandler(db *database.DatabaseService, retriever *rag_service.Retriever) *CoachHandler {
+	return &CoachHandler{db: db, retriever: retriever}
 }
 
 // Chat 处理 POST /api/learning/coach/chat 陪练对话请求(SSE)。
@@ -58,7 +55,7 @@ func (h *CoachHandler) Chat(c *fiber.Ctx) error {
 		return response.InternalServerCtx(c, "构建学习上下文失败")
 	}
 
-	tools := learning_tools.NewCoachTools(h.db, h.minio, h.retriever, userID)
+	tools := learning_tools.NewCoachTools(h.db, h.retriever, userID)
 	agent, err := llm.NewCoachAgent(c.Context(), tools)
 	if err != nil {
 		return response.InternalServerCtx(c, "学习 agent 初始化失败: "+err.Error())
@@ -84,7 +81,7 @@ func (h *CoachHandler) Chat(c *fiber.Ctx) error {
 }
 
 // buildRuntimeContext 聚合陪练 agent 所需的运行时上下文:用户文件夹(已过滤)、
-// 文档、最近 objective、每个文件夹的 LearningProfile、最近 journal。
+// 文档、学习记忆和最近 journal。
 func (h *CoachHandler) buildRuntimeContext(ctx context.Context, userID string, agentInstanceID string, rootFolderID string) (learning_service.CoachRuntimeContext, error) {
 	if h == nil || h.db == nil {
 		return learning_service.CoachRuntimeContext{}, errors.New("learning coach database is not configured")
@@ -125,11 +122,6 @@ func (h *CoachHandler) buildRuntimeContext(ctx context.Context, userID string, a
 		}
 	}
 
-	objectives, err := h.db.Objectives.FindRecentByUser(ctx, userID, 50)
-	if err != nil {
-		return learning_service.CoachRuntimeContext{}, err
-	}
-
 	journals, _, err := h.db.Journals.FindByUser(ctx, userID, 0, 10)
 	if err != nil {
 		return learning_service.CoachRuntimeContext{}, err
@@ -143,21 +135,6 @@ func (h *CoachHandler) buildRuntimeContext(ctx context.Context, userID string, a
 		}
 	}
 
-	profiles := make([]*learning_db.LearningProfile, 0)
-	seenFolders := make(map[string]bool)
-	for _, folder := range folders {
-		if seenFolders[folder.ID] {
-			continue
-		}
-		seenFolders[folder.ID] = true
-		profile, err := h.db.Profiles.FindByFolder(ctx, folder.ID)
-		if err == nil {
-			profiles = append(profiles, profile)
-		} else if err != sql.ErrNoRows {
-			return learning_service.CoachRuntimeContext{}, err
-		}
-	}
-
 	return learning_service.CoachRuntimeContext{
 		UserID:          userID,
 		AgentInstanceID: agentInstanceID,
@@ -166,9 +143,7 @@ func (h *CoachHandler) buildRuntimeContext(ctx context.Context, userID string, a
 		RootFolderName:  rootFolderName,
 		Folders:         folders,
 		Documents:       docs,
-		Objectives:      objectives,
 		MemoryItems:     memoryItems,
-		Profiles:        profiles,
 		Journals:        journals,
 	}, nil
 }

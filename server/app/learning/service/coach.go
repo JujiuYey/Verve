@@ -17,17 +17,15 @@ type CoachRuntimeContext struct {
 	RootFolderName  string
 	Folders         []*wiki_db.Folder
 	Documents       []*wiki_db.Document
-	Objectives      []*learning_db.LearningObjective
 	MemoryItems     []*learning_db.LearningMemoryItem
-	Profiles        []*learning_db.LearningProfile
 	Journals        []*learning_db.LearningJournal
 }
 
 type CoachAction struct {
-	Type        string `json:"type"`
-	ObjectiveID string `json:"objective_id,omitempty"`
-	FolderID    string `json:"folder_id,omitempty"`
-	Label       string `json:"label,omitempty"`
+	Type       string `json:"type"`
+	DocumentID string `json:"document_id,omitempty"`
+	FolderID   string `json:"folder_id,omitempty"`
+	Label      string `json:"label,omitempty"`
 }
 
 // BuildCoachQuery 把 runtime context + 用户消息拼成一段 prompt 喂给陪练 agent。
@@ -44,9 +42,7 @@ func BuildCoachQuery(ctx CoachRuntimeContext, message string) string {
 		},
 		Folders:     mapCoachFolders(ctx.Folders),
 		Documents:   mapCoachDocuments(ctx.Documents),
-		Objectives:  mapCoachObjectives(ctx.Objectives),
 		MemoryItems: mapCoachMemoryItems(ctx.MemoryItems),
-		Profiles:    mapCoachProfiles(ctx.Profiles),
 		Journals:    mapCoachJournals(ctx.Journals),
 	})
 }
@@ -81,25 +77,6 @@ func mapCoachDocuments(documents []*wiki_db.Document) []prompts.CoachDocument {
 	return result
 }
 
-func mapCoachObjectives(objectives []*learning_db.LearningObjective) []prompts.CoachObjective {
-	result := make([]prompts.CoachObjective, 0, len(objectives))
-	for _, obj := range objectives {
-		if obj == nil {
-			continue
-		}
-		result = append(result, prompts.CoachObjective{
-			ID:               obj.ID,
-			Title:            obj.Title,
-			Detail:           trimStringPtr(obj.Detail),
-			SourceFolderID:   trimStringPtr(obj.SourceFolderID),
-			SourceDocumentID: trimStringPtr(obj.SourceDocumentID),
-			Status:           obj.Status,
-			MasteryLevel:     obj.MasteryLevel,
-		})
-	}
-	return result
-}
-
 func mapCoachMemoryItems(items []*learning_db.LearningMemoryItem) []prompts.CoachMemoryItem {
 	result := make([]prompts.CoachMemoryItem, 0, len(items))
 	for _, item := range items {
@@ -111,23 +88,6 @@ func mapCoachMemoryItems(items []*learning_db.LearningMemoryItem) []prompts.Coac
 			Kind:       item.Kind,
 			Statement:  item.Statement,
 			Confidence: item.Confidence,
-		})
-	}
-	return result
-}
-
-func mapCoachProfiles(profiles []*learning_db.LearningProfile) []prompts.CoachProfile {
-	result := make([]prompts.CoachProfile, 0, len(profiles))
-	for _, profile := range profiles {
-		if profile == nil {
-			continue
-		}
-		result = append(result, prompts.CoachProfile{
-			FolderID:        profile.FolderID,
-			CurrentLevel:    trimStringPtr(profile.CurrentLevel),
-			CompletedTopics: profile.CompletedTopics,
-			WeakPoints:      profile.WeakPoints,
-			NextGoal:        trimStringPtr(profile.NextGoal),
 		})
 	}
 	return result
@@ -169,6 +129,9 @@ func ParseCoachAction(content string) *CoachAction {
 		return nil
 	}
 	if strings.TrimSpace(action.Type) == "" {
+		return nil
+	}
+	if action.Type == "navigate_to_practice" && strings.TrimSpace(action.DocumentID) == "" {
 		return nil
 	}
 	return &action

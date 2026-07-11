@@ -2,18 +2,14 @@ package tools
 
 import (
 	"context"
-	"database/sql"
 	"log"
 	"strings"
 
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
 
-	learning_db "verve/app/learning/models/db"
-	learning_service "verve/app/learning/service"
 	rag_service "verve/app/rag/service"
 	"verve/infrastructure/database"
-	"verve/infrastructure/storage"
 )
 
 type ListFoldersInput struct {
@@ -23,15 +19,6 @@ type ListFoldersInput struct {
 type ListDocumentsInput struct {
 	FolderID string `json:"folder_id" jsonschema_description:"文件夹 ID,可留空"`
 	Limit    int    `json:"limit" jsonschema_description:"最多返回多少个文档,默认 50"`
-}
-
-type ListObjectivesInput struct {
-	FolderID string `json:"folder_id" jsonschema_description:"文件夹 ID,可留空表示返回最近的小节"`
-	Limit    int    `json:"limit" jsonschema_description:"最多返回多少个小节,默认 50"`
-}
-
-type GetLearningProfileInput struct {
-	FolderID string `json:"folder_id" jsonschema_description:"文件夹 ID"`
 }
 
 type SearchLearningMemoryInput struct {
@@ -48,14 +35,6 @@ type ListJournalsInput struct {
 	Limit int `json:"limit" jsonschema_description:"最多返回多少条最近学习记录,默认 10"`
 }
 
-type CreatePracticeSessionInput struct {
-	ObjectiveID string `json:"objective_id" jsonschema_description:"要进入练习的小节 ID"`
-}
-
-type CreateLearningObjectivesInput struct {
-	DocumentID string `json:"document_id" jsonschema_description:"要从哪篇 Wiki 文档生成学习小节"`
-}
-
 type SearchWikiKnowledgeInput struct {
 	RootFolderID string `json:"root_folder_id" jsonschema_description:"限定检索的 Wiki 根目录 ID"`
 	Query        string `json:"query" jsonschema_description:"要检索的学习问题或概念"`
@@ -64,19 +43,6 @@ type SearchWikiKnowledgeInput struct {
 
 type SearchWikiKnowledgeOutput struct {
 	Results []map[string]interface{} `json:"results"`
-}
-
-type CreateLearningObjectivesOutput struct {
-	DocumentID       string                   `json:"document_id"`
-	CreatedCount     int                      `json:"created_count"`
-	FirstObjectiveID string                   `json:"first_objective_id"`
-	Objectives       []map[string]interface{} `json:"objectives"`
-	Reused           bool                     `json:"reused"`
-}
-
-type CreatePracticeSessionOutput struct {
-	SessionID   string `json:"session_id"`
-	ObjectiveID string `json:"objective_id"`
 }
 
 type CompleteTaskInput struct {
@@ -89,16 +55,12 @@ type CompleteTaskOutput struct {
 	Status  string `json:"status"`
 }
 
-func NewCoachTools(db *database.DatabaseService, minio *storage.MinIOService, retriever *rag_service.Retriever, userID string) []tool.BaseTool {
+func NewCoachTools(db *database.DatabaseService, retriever *rag_service.Retriever, userID string) []tool.BaseTool {
 	tools := []tool.BaseTool{
 		newListFoldersTool(db, userID),
 		newListDocumentsTool(db),
-		newListObjectivesTool(db, userID),
 		newSearchLearningMemoryTool(db, userID),
-		newGetLearningProfileTool(db),
 		newListJournalsTool(db, userID),
-		newCreateLearningObjectivesTool(db, minio, userID),
-		newCreatePracticeSessionTool(db, userID),
 		newCompleteTaskTool(),
 	}
 	if retriever != nil {
@@ -133,7 +95,7 @@ func newSearchWikiKnowledgeTool(retriever *rag_service.Retriever) tool.Invokable
 }
 
 func newSearchLearningMemoryTool(db *database.DatabaseService, userID string) tool.InvokableTool {
-	t, err := utils.InferTool("search_learning_memory", "搜索首选学习记忆; get_learning_profile 是旧版 fallback",
+	t, err := utils.InferTool("search_learning_memory", "搜索学习记忆",
 		func(ctx context.Context, input *SearchLearningMemoryInput) (*SearchLearningMemoryOutput, error) {
 			out := &SearchLearningMemoryOutput{Results: []map[string]interface{}{}}
 			if db == nil || db.Memories == nil {
@@ -172,7 +134,6 @@ func newSearchLearningMemoryTool(db *database.DatabaseService, userID string) to
 					"id":           item.ID,
 					"folder_id":    stringValue(item.FolderID),
 					"document_id":  stringValue(item.DocumentID),
-					"objective_id": stringValue(item.ObjectiveID),
 					"kind":         item.Kind,
 					"statement":    item.Statement,
 					"confidence":   item.Confidence,
@@ -246,68 +207,6 @@ func newListDocumentsTool(db *database.DatabaseService) tool.InvokableTool {
 	return t
 }
 
-func newListObjectivesTool(db *database.DatabaseService, userID string) tool.InvokableTool {
-	t, err := utils.InferTool("list_objectives", "列出学习小节,用于选择继续学习或复习的小点",
-		func(ctx context.Context, input *ListObjectivesInput) ([]map[string]interface{}, error) {
-			var objectives []*learning_db.LearningObjective
-			var err error
-			if strings.TrimSpace(input.FolderID) != "" {
-				objectives, err = db.Objectives.FindByFolder(ctx, input.FolderID)
-			} else {
-				objectives, err = db.Objectives.FindRecentByUser(ctx, userID, normalizeLimit(input.Limit, 50))
-			}
-			if err != nil {
-				return nil, err
-			}
-			limit := normalizeLimit(input.Limit, 50)
-			result := make([]map[string]interface{}, 0, min(len(objectives), limit))
-			for _, obj := range objectives {
-				result = append(result, map[string]interface{}{
-					"id":                 obj.ID,
-					"title":              obj.Title,
-					"detail":             stringValue(obj.Detail),
-					"status":             obj.Status,
-					"mastery_level":      obj.MasteryLevel,
-					"source_folder_id":   stringValue(obj.SourceFolderID),
-					"source_document_id": stringValue(obj.SourceDocumentID),
-				})
-				if len(result) >= limit {
-					break
-				}
-			}
-			return result, nil
-		})
-	if err != nil {
-		log.Fatal(err)
-	}
-	return t
-}
-
-func newGetLearningProfileTool(db *database.DatabaseService) tool.InvokableTool {
-	t, err := utils.InferTool("get_learning_profile", "读取某个 Wiki 文件夹的学习画像",
-		func(ctx context.Context, input *GetLearningProfileInput) (map[string]interface{}, error) {
-			profile, err := db.Profiles.FindByFolder(ctx, input.FolderID)
-			if err == sql.ErrNoRows {
-				return map[string]interface{}{"folder_id": input.FolderID, "empty": true}, nil
-			}
-			if err != nil {
-				return nil, err
-			}
-			return map[string]interface{}{
-				"folder_id":           profile.FolderID,
-				"current_level":       stringValue(profile.CurrentLevel),
-				"completed_topics":    profile.CompletedTopics,
-				"weak_points":         profile.WeakPoints,
-				"verification_habits": stringValue(profile.VerificationHabits),
-				"next_goal":           stringValue(profile.NextGoal),
-			}, nil
-		})
-	if err != nil {
-		log.Fatal(err)
-	}
-	return t
-}
-
 func newListJournalsTool(db *database.DatabaseService, userID string) tool.InvokableTool {
 	t, err := utils.InferTool("list_learning_journals", "列出最近学习记录",
 		func(ctx context.Context, input *ListJournalsInput) ([]map[string]interface{}, error) {
@@ -334,108 +233,6 @@ func newListJournalsTool(db *database.DatabaseService, userID string) tool.Invok
 		log.Fatal(err)
 	}
 	return t
-}
-
-func newCreateLearningObjectivesTool(db *database.DatabaseService, minio *storage.MinIOService, userID string) tool.InvokableTool {
-	t, err := utils.InferTool("create_learning_objectives", "读取指定 Wiki 文档并生成可进入练习的学习小节",
-		func(ctx context.Context, input *CreateLearningObjectivesInput) (*CreateLearningObjectivesOutput, error) {
-			documentID := strings.TrimSpace(input.DocumentID)
-			if documentID == "" {
-				return nil, sql.ErrNoRows
-			}
-			doc, err := db.Documents.FindOne(ctx, documentID)
-			if err != nil {
-				return nil, err
-			}
-			folder, err := db.Folders.FindOne(ctx, doc.FolderID)
-			if err != nil {
-				return nil, err
-			}
-			if folder.UserID != nil && *folder.UserID != "" && *folder.UserID != userID {
-				return nil, sql.ErrNoRows
-			}
-
-			existing, err := db.Objectives.FindByFolder(ctx, doc.FolderID)
-			if err != nil {
-				return nil, err
-			}
-			reused := filterObjectivesByDocument(existing, doc.ID)
-			if len(reused) > 0 {
-				return buildCreateLearningObjectivesOutput(doc.ID, reused, true), nil
-			}
-
-			content, err := minio.GetFileContent(ctx, doc.FilePath)
-			if err != nil {
-				return nil, err
-			}
-			objectives, err := learning_service.NewObjectiveGenerationService(db).GenerateFromMarkdown(ctx, userID, doc, folder, content)
-			if err != nil {
-				return nil, err
-			}
-			return buildCreateLearningObjectivesOutput(doc.ID, objectives, false), nil
-		})
-	if err != nil {
-		log.Fatal(err)
-	}
-	return t
-}
-
-func newCreatePracticeSessionTool(db *database.DatabaseService, userID string) tool.InvokableTool {
-	t, err := utils.InferTool("create_practice_session", "为指定学习小节创建练习会话",
-		func(ctx context.Context, input *CreatePracticeSessionInput) (*CreatePracticeSessionOutput, error) {
-			obj, err := db.Objectives.FindOne(ctx, input.ObjectiveID)
-			if err != nil {
-				return nil, err
-			}
-			if obj.UserID != userID {
-				return nil, sql.ErrNoRows
-			}
-			session := &learning_db.LearningSession{
-				UserID:      userID,
-				ObjectiveID: obj.ID,
-				Status:      "active",
-			}
-			if err := db.Sessions.Create(ctx, session); err != nil {
-				return nil, err
-			}
-			return &CreatePracticeSessionOutput{SessionID: session.ID, ObjectiveID: obj.ID}, nil
-		})
-	if err != nil {
-		log.Fatal(err)
-	}
-	return t
-}
-
-func filterObjectivesByDocument(objectives []*learning_db.LearningObjective, documentID string) []*learning_db.LearningObjective {
-	result := make([]*learning_db.LearningObjective, 0)
-	for _, obj := range objectives {
-		if stringValue(obj.SourceDocumentID) == documentID {
-			result = append(result, obj)
-		}
-	}
-	return result
-}
-
-func buildCreateLearningObjectivesOutput(documentID string, objectives []*learning_db.LearningObjective, reused bool) *CreateLearningObjectivesOutput {
-	out := &CreateLearningObjectivesOutput{
-		DocumentID:   documentID,
-		CreatedCount: len(objectives),
-		Objectives:   make([]map[string]interface{}, 0, len(objectives)),
-		Reused:       reused,
-	}
-	for _, obj := range objectives {
-		if out.FirstObjectiveID == "" {
-			out.FirstObjectiveID = obj.ID
-		}
-		out.Objectives = append(out.Objectives, map[string]interface{}{
-			"id":            obj.ID,
-			"title":         obj.Title,
-			"detail":        stringValue(obj.Detail),
-			"status":        obj.Status,
-			"mastery_level": obj.MasteryLevel,
-		})
-	}
-	return out
 }
 
 func newCompleteTaskTool() tool.InvokableTool {

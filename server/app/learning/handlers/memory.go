@@ -27,14 +27,13 @@ type memoryResponse struct {
 }
 
 type memoryItem struct {
-	ID          string    `json:"id"`
-	Kind        string    `json:"kind"`
-	Statement   string    `json:"statement"`
-	Confidence  string    `json:"confidence"`
-	FolderID    *string   `json:"folder_id"`
-	DocumentID  *string   `json:"document_id"`
-	ObjectiveID *string   `json:"objective_id"`
-	LastSeenAt  time.Time `json:"last_seen_at"`
+	ID         string    `json:"id"`
+	Kind       string    `json:"kind"`
+	Statement  string    `json:"statement"`
+	Confidence string    `json:"confidence"`
+	FolderID   *string   `json:"folder_id"`
+	DocumentID *string   `json:"document_id"`
+	LastSeenAt time.Time `json:"last_seen_at"`
 }
 
 // 学习记忆读取(全局或按文件夹)
@@ -75,14 +74,13 @@ func (h *MemoryHandler) Get(c *fiber.Ctx) error {
 			continue
 		}
 		resp.Items = append(resp.Items, memoryItem{
-			ID:          item.ID,
-			Kind:        item.Kind,
-			Statement:   item.Statement,
-			Confidence:  item.Confidence,
-			FolderID:    item.FolderID,
-			DocumentID:  item.DocumentID,
-			ObjectiveID: item.ObjectiveID,
-			LastSeenAt:  item.LastSeenAt,
+			ID:         item.ID,
+			Kind:       item.Kind,
+			Statement:  item.Statement,
+			Confidence: item.Confidence,
+			FolderID:   item.FolderID,
+			DocumentID: item.DocumentID,
+			LastSeenAt: item.LastSeenAt,
 		})
 	}
 

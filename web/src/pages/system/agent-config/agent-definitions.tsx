@@ -1,9 +1,6 @@
 import {
-  IconChecklist,
   IconRoute,
   IconStack2,
-  IconTargetArrow,
-  IconUserQuestion,
 } from "@tabler/icons-react";
 import type { ComponentType, SVGProps } from "react";
 
@@ -33,22 +30,6 @@ export type SceneConfigState = {
 
 export const AGENTS: AgentDefinition[] = [
   {
-    key: "objective_generator",
-    name: "学习小节生成 Agent",
-    shortName: "小节生成",
-    description: "把 Markdown 学习资料拆成适合费曼学习的小节。",
-    runtime: "ObjectiveGeneratorAgent",
-    icon: IconTargetArrow,
-    scenes: [
-      {
-        key: "default",
-        name: "默认模型",
-        required: true,
-        description: "用于结构化生成学习小节和练习入口。",
-      },
-    ],
-  },
-  {
     key: "coach",
     name: "学习调度 Agent",
     shortName: "调度",
@@ -61,38 +42,6 @@ export const AGENTS: AgentDefinition[] = [
         name: "默认模型",
         required: true,
         description: "用于对话、工具调用决策和下一步动作规划。",
-      },
-    ],
-  },
-  {
-    key: "tutor",
-    name: "费曼陪练 Agent",
-    shortName: "陪练",
-    description: "围绕当前资料追问、提示并帮助学习者复述。",
-    runtime: "TutorAgent",
-    icon: IconUserQuestion,
-    scenes: [
-      {
-        key: "default",
-        name: "默认模型",
-        required: true,
-        description: "用于费曼练习中的追问、反馈和引导。",
-      },
-    ],
-  },
-  {
-    key: "examiner",
-    name: "学习监督 Agent",
-    shortName: "监督",
-    description: "判断一次作答是否达标，并给出改进建议。",
-    runtime: "ExaminerAgent",
-    icon: IconChecklist,
-    scenes: [
-      {
-        key: "default",
-        name: "默认模型",
-        required: true,
-        description: "用于评估作答质量和生成判定结果。",
       },
     ],
   },

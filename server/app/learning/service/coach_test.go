@@ -10,13 +10,10 @@ import (
 )
 
 func TestBuildCoachQueryIncludesRuntimeContext(t *testing.T) {
-	level := "explained"
-	nextGoal := "继续讲接口组合"
 	learned := "接口基础"
 	nextStep := "复述 interface 的隐式实现"
 	folderID := "folder-go"
 	docID := "doc-interface"
-	detail := "理解接口定义和实现关系"
 
 	ctx := CoachRuntimeContext{
 		UserID: "user-1",
@@ -26,25 +23,8 @@ func TestBuildCoachQueryIncludesRuntimeContext(t *testing.T) {
 		Documents: []*wiki_db.Document{
 			{ID: docID, FolderID: folderID, Filename: "interface.md"},
 		},
-		Objectives: []*learning_db.LearningObjective{
-			{
-				ID:               "obj-interface",
-				Title:            "接口基础",
-				Detail:           &detail,
-				SourceFolderID:   &folderID,
-				SourceDocumentID: &docID,
-				Status:           "active",
-				MasteryLevel:     "heard",
-			},
-		},
-		Profiles: []*learning_db.LearningProfile{
-			{
-				FolderID:        folderID,
-				CurrentLevel:    &level,
-				CompletedTopics: []string{"值类型"},
-				WeakPoints:      []string{"缺少反例"},
-				NextGoal:        &nextGoal,
-			},
+		MemoryItems: []*learning_db.LearningMemoryItem{
+			{Kind: "explanation_evidence", Statement: "能解释接口的隐式实现"},
 		},
 		Journals: []*learning_db.LearningJournal{
 			{
@@ -62,18 +42,21 @@ func TestBuildCoachQueryIncludesRuntimeContext(t *testing.T) {
 		"学习者说:继续学习",
 		"Go 基础",
 		"interface.md",
-		"接口基础",
-		"当前水平:explained",
-		"缺少反例",
+		"能解释接口的隐式实现",
 		"复述 interface 的隐式实现",
 	} {
 		if !strings.Contains(query, want) {
 			t.Fatalf("query does not contain %q:\n%s", want, query)
 		}
 	}
+	for _, forbidden := range []string{"objective", "学习小节", "mastery", "掌握度", "create_learning_objectives", "first_objective_id"} {
+		if strings.Contains(query, forbidden) {
+			t.Fatalf("query contains removed concept %q:\n%s", forbidden, query)
+		}
+	}
 }
 
-func TestBuildCoachQueryTellsAgentToGenerateObjectivesWhenDocumentsExist(t *testing.T) {
+func TestBuildCoachQueryNavigatesDirectlyToDocuments(t *testing.T) {
 	ctx := CoachRuntimeContext{
 		UserID: "user-1",
 		Folders: []*wiki_db.Folder{
@@ -86,11 +69,7 @@ func TestBuildCoachQueryTellsAgentToGenerateObjectivesWhenDocumentsExist(t *test
 
 	query := BuildCoachQuery(ctx, "继续学习")
 
-	for _, want := range []string{
-		"create_learning_objectives",
-		"doc-hello",
-		"生成学习小节",
-	} {
+	for _, want := range []string{"doc-hello", `"document_id":"..."`} {
 		if !strings.Contains(query, want) {
 			t.Fatalf("query does not contain %q:\n%s", want, query)
 		}
@@ -103,8 +82,7 @@ func TestBuildCoachQueryIncludesExplicitEmptyStates(t *testing.T) {
 	for _, want := range []string{
 		"- 暂无文件夹",
 		"- 暂无文档",
-		"- 暂无学习小节。可以建议用户先去 Wiki 补充资料。",
-		"- 暂无画像",
+		"- 暂无学习记忆",
 		"- 暂无记录",
 	} {
 		if !strings.Contains(query, want) {
@@ -114,7 +92,7 @@ func TestBuildCoachQueryIncludesExplicitEmptyStates(t *testing.T) {
 }
 
 func TestParseCoachActionFindsNavigateAction(t *testing.T) {
-	content := "我们继续接口基础。\n\n<ACTION>{\"type\":\"navigate_to_practice\",\"objective_id\":\"obj-interface\",\"label\":\"进入练习\"}</ACTION>"
+	content := "我们继续接口基础。\n\n<ACTION>{\"type\":\"navigate_to_practice\",\"document_id\":\"doc-interface\",\"label\":\"开始费曼练习\"}</ACTION>"
 
 	action := ParseCoachAction(content)
 
@@ -124,10 +102,21 @@ func TestParseCoachActionFindsNavigateAction(t *testing.T) {
 	if action.Type != "navigate_to_practice" {
 		t.Fatalf("type = %q", action.Type)
 	}
-	if action.ObjectiveID != "obj-interface" {
-		t.Fatalf("objective id = %q", action.ObjectiveID)
+	if action.DocumentID != "doc-interface" {
+		t.Fatalf("document id = %q", action.DocumentID)
 	}
-	if action.Label != "进入练习" {
+	if action.Label != "开始费曼练习" {
 		t.Fatalf("label = %q", action.Label)
+	}
+}
+
+func TestParseCoachActionRejectsNavigateActionWithoutDocument(t *testing.T) {
+	for _, content := range []string{
+		`<ACTION>{"type":"navigate_to_practice","label":"开始费曼练习"}</ACTION>`,
+		`<ACTION>{"type":"navigate_to_practice","objective_id":"obj-legacy","label":"进入练习"}</ACTION>`,
+	} {
+		if action := ParseCoachAction(content); action != nil {
+			t.Fatalf("expected invalid navigation action to be rejected: %#v", action)
+		}
 	}
 }

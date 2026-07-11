@@ -29,14 +29,11 @@ type DatabaseService struct {
 	ModelConfigs system_repo.ModelConfigRepository
 
 	// Learning Repositories
-	Objectives *learning_repo.ObjectiveRepository
-	Sessions   *learning_repo.SessionRepository
-	Messages   *learning_repo.MessageRepository
-	Reviews    *learning_repo.ReviewRepository
-	Exercises  *learning_repo.ExerciseRepository
-	Profiles   *learning_repo.ProfileRepository
-	Journals   *learning_repo.JournalRepository
-	Memories   *learning_repo.MemoryRepository
+	Sessions *learning_repo.SessionRepository
+	Messages *learning_repo.MessageRepository
+	Reviews  *learning_repo.ReviewRepository
+	Journals *learning_repo.JournalRepository
+	Memories *learning_repo.MemoryRepository
 
 	// Wiki Repositories
 	Folders    wiki_repo.FolderRepository
@@ -67,12 +64,9 @@ func NewDatabaseService(dsn string) (*DatabaseService, error) {
 	db.RegisterModel((*system_db.SysModelPlatform)(nil))
 	db.RegisterModel((*system_db.SysModel)(nil))
 	db.RegisterModel((*system_db.AgentModelConfig)(nil))
-	db.RegisterModel((*learning_db.LearningObjective)(nil))
 	db.RegisterModel((*learning_db.LearningSession)(nil))
 	db.RegisterModel((*learning_db.LearningMessage)(nil))
 	db.RegisterModel((*learning_db.LearningExplanationReview)(nil))
-	db.RegisterModel((*learning_db.LearningExercise)(nil))
-	db.RegisterModel((*learning_db.LearningProfile)(nil))
 	db.RegisterModel((*learning_db.LearningJournal)(nil))
 	db.RegisterModel((*learning_db.LearningMemoryEvent)(nil))
 	db.RegisterModel((*learning_db.LearningMemoryItem)(nil))
@@ -106,14 +100,11 @@ func NewDatabaseService(dsn string) (*DatabaseService, error) {
 		ModelConfigs: system_repo.NewModelConfigRepository(db),
 
 		// Learning Repositories
-		Objectives: learning_repo.NewObjectiveRepository(db),
-		Sessions:   learning_repo.NewSessionRepository(db),
-		Messages:   learning_repo.NewMessageRepository(db),
-		Reviews:    learning_repo.NewReviewRepository(db),
-		Exercises:  learning_repo.NewExerciseRepository(db),
-		Profiles:   learning_repo.NewProfileRepository(db),
-		Journals:   learning_repo.NewJournalRepository(db),
-		Memories:   learning_repo.NewMemoryRepository(db),
+		Sessions: learning_repo.NewSessionRepository(db),
+		Messages: learning_repo.NewMessageRepository(db),
+		Reviews:  learning_repo.NewReviewRepository(db),
+		Journals: learning_repo.NewJournalRepository(db),
+		Memories: learning_repo.NewMemoryRepository(db),
 
 		// Wiki Repositories
 		Folders:    wiki_repo.NewFolderRepository(db),

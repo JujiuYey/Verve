@@ -15,7 +15,6 @@ const (
 	SSEMessage     = "message"
 	SSEToolCall    = "tool_call"
 	SSEToolResult  = "tool_result"
-	SSEExercise    = "exercise"
 	SSEAction      = "action"
 	SSEError       = "error"
 

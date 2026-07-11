@@ -13,9 +13,7 @@ import (
 func SetupLearningRoutes(router fiber.Router, dbService *database.DatabaseService, minioService *storage.MinIOService, retriever *rag_service.Retriever) {
 	sessionHandler := learning_handlers.NewSessionHandler(dbService, minioService, retriever)
 	journalHandler := learning_handlers.NewJournalHandler(dbService)
-	exerciseHandler := learning_handlers.NewExerciseHandler(dbService)
-	objectiveHandler := learning_handlers.NewObjectiveHandler(dbService, minioService)
-	coachHandler := learning_handlers.NewCoachHandler(dbService, minioService, retriever)
+	coachHandler := learning_handlers.NewCoachHandler(dbService, retriever)
 	memoryHandler := learning_handlers.NewMemoryHandler(dbService)
 
 	learning := router.Group("/learning")
@@ -33,19 +31,6 @@ func SetupLearningRoutes(router fiber.Router, dbService *database.DatabaseServic
 		journal := learning.Group("/journal")
 		{
 			journal.Get("/page", journalHandler.FindPage)
-		}
-
-		// 费曼练习记录
-		exercise := learning.Group("/exercise")
-		{
-			exercise.Get("/page", exerciseHandler.FindPage)
-		}
-
-		objective := learning.Group("/objective")
-		{
-			objective.Get("/", objectiveHandler.List)
-			objective.Post("/ensure-by-document", objectiveHandler.EnsureByDocument)
-			objective.Get("/:id", objectiveHandler.FindOne)
 		}
 
 		coach := learning.Group("/coach")
