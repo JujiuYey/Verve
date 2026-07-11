@@ -22,12 +22,14 @@ type FeynmanAnswerEditorProps = {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  disabled?: boolean;
 };
 
 export function FeynmanAnswerEditor({
   value,
   onChange,
   placeholder = "把你的解释写在这里。可以插入代码块，也可以直接写卡住的地方。",
+  disabled = false,
 }: FeynmanAnswerEditorProps) {
   const editor = useEditor({
     extensions: [
@@ -57,9 +59,18 @@ export function FeynmanAnswerEditor({
     }
   }, [editor, value]);
 
+  useEffect(() => {
+    editor?.setEditable(!disabled);
+  }, [disabled, editor]);
+
   return (
-    <div className="feynman-answer-editor flex h-96 min-h-96 shrink-0 flex-col overflow-hidden rounded-md border bg-background">
-      <EditorToolbar editor={editor} onClear={() => onChange("")} />
+    <div
+      className={cn(
+        "feynman-answer-editor flex h-96 min-h-96 shrink-0 flex-col overflow-hidden rounded-md border bg-background",
+        disabled && "cursor-not-allowed opacity-60",
+      )}
+    >
+      <EditorToolbar editor={editor} disabled={disabled} onClear={() => onChange("")} />
       <div className="min-h-0 flex-1 overflow-auto">
         <EditorContent editor={editor} />
       </div>
@@ -67,7 +78,15 @@ export function FeynmanAnswerEditor({
   );
 }
 
-function EditorToolbar({ editor, onClear }: { editor: Editor | null; onClear: () => void }) {
+function EditorToolbar({
+  editor,
+  disabled: readOnly,
+  onClear,
+}: {
+  editor: Editor | null;
+  disabled: boolean;
+  onClear: () => void;
+}) {
   const state = useEditorState({
     editor,
     selector: ({ editor }) => ({
@@ -89,7 +108,7 @@ function EditorToolbar({ editor, onClear }: { editor: Editor | null; onClear: ()
     isEmpty: true,
   };
 
-  const disabled = !editor;
+  const disabled = !editor || readOnly;
 
   return (
     <div className="flex shrink-0 flex-wrap items-center gap-1 border-b bg-muted/20 p-2">

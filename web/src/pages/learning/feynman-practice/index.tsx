@@ -1,10 +1,11 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { BookOpenIcon, CircleAlertIcon, MessageSquareTextIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import {
+  sessionKeys,
   useCompleteSession,
   useCreateSession,
   useReviewExplanation,
@@ -12,7 +13,6 @@ import {
   type LearningExplanationReview,
 } from "@/api/learning";
 import { documentApi } from "@/api/wiki/document";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Empty,
@@ -32,69 +32,134 @@ const routeApi = getRouteApi("/_layout/learn/feynman-practice/$documentId");
 
 export function FeynmanWorkbenchPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { documentId } = routeApi.useParams();
+  const { sessionId: searchSessionId } = routeApi.useSearch();
+  const requestedSessionId = searchSessionId?.trim() || "";
+  const routeIdentity = `${documentId}:${requestedSessionId || "new"}`;
+
   const createSession = useCreateSession();
-  const creatingDocumentRef = useRef("");
-  const currentDocumentRef = useRef(documentId);
-  const previousDocumentRef = useRef(documentId);
+  const creatingRouteRef = useRef("");
+  const currentRouteIdentityRef = useRef(routeIdentity);
+  const previousRouteIdentityRef = useRef(routeIdentity);
+  const currentRequestIdentityRef = useRef("");
+  const answerRef = useRef("");
+
   const [createAttempt, setCreateAttempt] = useState(0);
-  const [sessionId, setSessionId] = useState("");
+  const [createdSession, setCreatedSession] = useState<{
+    routeIdentity: string;
+    id: string;
+  } | null>(null);
+  const [creatingIdentity, setCreatingIdentity] = useState("");
+  const [createFailureIdentity, setCreateFailureIdentity] = useState("");
   const [activeView, setActiveView] = useState("source");
   const [answer, setAnswer] = useState("");
   const [turns, setTurns] = useState<LearningExplanationReview[]>([]);
   const [completedSummary, setCompletedSummary] = useState("");
+  const [reviewingIdentity, setReviewingIdentity] = useState("");
+  const [completingIdentity, setCompletingIdentity] = useState("");
 
-  currentDocumentRef.current = documentId;
+  const createdSessionId = createdSession?.routeIdentity === routeIdentity ? createdSession.id : "";
+  const sessionId = requestedSessionId || createdSessionId;
+  const isCreating = creatingIdentity === routeIdentity;
+  const createFailed = createFailureIdentity === routeIdentity;
+  const requestIdentity = `${documentId}:${sessionId}`;
+  currentRouteIdentityRef.current = routeIdentity;
+  currentRequestIdentityRef.current = requestIdentity;
+  answerRef.current = answer;
 
   const { data: document, isLoading: isDocumentLoading } = useQuery({
     queryKey: ["wiki-document", documentId],
     queryFn: () => documentApi.findOne(documentId),
     enabled: !!documentId,
   });
-  const { data: sessionDetail, isError: isSessionDetailError } = useSessionDetail(sessionId);
+  const sessionDetailQuery = useSessionDetail(sessionId);
+  const sessionDetail = sessionDetailQuery.data;
   const reviewExplanation = useReviewExplanation(sessionId);
   const completeSession = useCompleteSession(sessionId);
 
   useEffect(() => {
-    if (previousDocumentRef.current === documentId) return;
-    previousDocumentRef.current = documentId;
-    setSessionId("");
+    if (previousRouteIdentityRef.current === routeIdentity) return;
+    previousRouteIdentityRef.current = routeIdentity;
+    setCreatedSession(null);
+    setCreatingIdentity("");
+    setCreateFailureIdentity("");
     setActiveView("source");
     setAnswer("");
     setTurns([]);
     setCompletedSummary("");
-    creatingDocumentRef.current = "";
-  }, [documentId]);
+    setReviewingIdentity("");
+    setCompletingIdentity("");
+    creatingRouteRef.current = "";
+  }, [routeIdentity]);
 
   useEffect(() => {
-    if (!documentId || sessionId || creatingDocumentRef.current === documentId) return;
-    creatingDocumentRef.current = documentId;
+    if (
+      requestedSessionId ||
+      !documentId ||
+      createdSessionId ||
+      creatingRouteRef.current === routeIdentity
+    ) {
+      return;
+    }
+
+    creatingRouteRef.current = routeIdentity;
+    setCreatingIdentity(routeIdentity);
+    setCreateFailureIdentity("");
     createSession
       .mutateAsync({ document_id: documentId })
       .then((result) => {
-        if (currentDocumentRef.current === documentId) {
-          setSessionId(result.session_id);
+        if (currentRouteIdentityRef.current === routeIdentity) {
+          setCreatedSession({ routeIdentity, id: result.session_id });
         }
       })
       .catch(() => {
-        // Keep the document marked until the user explicitly retries.
+        if (currentRouteIdentityRef.current === routeIdentity) {
+          setCreateFailureIdentity(routeIdentity);
+        }
+      })
+      .finally(() => {
+        if (currentRouteIdentityRef.current === routeIdentity) {
+          setCreatingIdentity("");
+        }
       });
-  }, [createAttempt, createSession, documentId, sessionId]);
+  }, [
+    createAttempt,
+    createSession,
+    createdSessionId,
+    documentId,
+    requestedSessionId,
+    routeIdentity,
+  ]);
 
   useEffect(() => {
-    if (!sessionDetail) return;
-    setTurns(sessionDetail.reviews || []);
-    if (sessionDetail.session.status === "completed") {
-      setCompletedSummary(sessionDetail.session.summary || "");
+    if (
+      !sessionDetail ||
+      sessionDetail.session.id !== sessionId ||
+      sessionDetail.session.document_id !== documentId
+    ) {
+      return;
     }
-  }, [sessionDetail]);
+
+    setTurns(sessionDetail.reviews || []);
+    setCompletedSummary(
+      sessionDetail.session.status === "completed"
+        ? sessionDetail.session.summary || "你的解释记录已经保存。"
+        : "",
+    );
+  }, [documentId, sessionDetail, sessionId]);
 
   const submitExplanation = async () => {
-    const explanation = answer.trim();
-    if (!sessionId || !explanation) return;
+    const submittedAnswer = answer;
+    const explanation = submittedAnswer.trim();
+    const submittedIdentity = requestIdentity;
+    if (!sessionReady || !explanation || reviewingIdentity === submittedIdentity) return;
 
+    setReviewingIdentity(submittedIdentity);
     try {
       const review = await reviewExplanation.mutateAsync({ explanation });
+      if (currentRequestIdentityRef.current !== submittedIdentity) return;
+
       const createdAt = new Date().toISOString();
       setTurns((current) => [
         ...current,
@@ -108,57 +173,111 @@ export function FeynmanWorkbenchPage() {
           created_at: createdAt,
         },
       ]);
-      setAnswer("");
+      if (answerRef.current === submittedAnswer) {
+        setAnswer("");
+      }
+      void queryClient.invalidateQueries({ queryKey: sessionKeys.detail(sessionId) });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "审阅解释失败，请重试");
+      if (currentRequestIdentityRef.current === submittedIdentity) {
+        toast.error(error instanceof Error ? error.message : "审阅解释失败，请重试");
+      }
+    } finally {
+      if (currentRequestIdentityRef.current === submittedIdentity) {
+        setReviewingIdentity("");
+      }
     }
   };
 
   const finishPractice = async () => {
-    if (!sessionId || turns.length === 0) return;
+    const submittedIdentity = requestIdentity;
+    if (!sessionReady || turns.length === 0 || completingIdentity === submittedIdentity) return;
+
+    setCompletingIdentity(submittedIdentity);
     try {
       const result = await completeSession.mutateAsync();
+      if (currentRequestIdentityRef.current !== submittedIdentity) return;
       setCompletedSummary(result.summary || "你的解释记录已经保存。");
+      void queryClient.invalidateQueries({ queryKey: sessionKeys.detail(sessionId) });
       toast.success("本次费曼练习已结束");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "结束练习失败");
+      if (currentRequestIdentityRef.current === submittedIdentity) {
+        toast.error(error instanceof Error ? error.message : "结束练习失败");
+      }
+    } finally {
+      if (currentRequestIdentityRef.current === submittedIdentity) {
+        setCompletingIdentity("");
+      }
     }
   };
 
   const retryCreateSession = () => {
-    createSession.reset();
-    creatingDocumentRef.current = "";
+    creatingRouteRef.current = "";
+    setCreateFailureIdentity("");
     setCreateAttempt((attempt) => attempt + 1);
   };
 
-  if (createSession.isError && !sessionId) {
+  const startNewSession = () => {
+    navigate({
+      to: "/learn/feynman-practice/$documentId",
+      params: { documentId },
+      search: {},
+      replace: true,
+    });
+  };
+
+  if (createFailed && !sessionId) {
     return (
-      <Empty className="h-full border-0 p-6">
-        <EmptyHeader>
-          <EmptyMedia variant="icon">
-            <CircleAlertIcon />
-          </EmptyMedia>
-          <EmptyTitle>无法开始这次练习</EmptyTitle>
-          <EmptyDescription>文档可能不存在，或者当前账号没有访问权限。</EmptyDescription>
-        </EmptyHeader>
-        <EmptyContent>
-          <div className="flex flex-wrap justify-center gap-2">
-            <Button variant="outline" onClick={() => navigate({ to: "/wiki" })}>
-              返回 Wiki
-            </Button>
-            <Button onClick={retryCreateSession}>重试</Button>
-          </div>
-        </EmptyContent>
-      </Empty>
+      <SessionProblem
+        title="无法开始这次练习"
+        description="文档可能不存在，或者当前账号没有访问权限。"
+        primaryLabel="重试"
+        onPrimary={retryCreateSession}
+        onBack={() => navigate({ to: "/wiki" })}
+      />
     );
   }
 
-  if (isDocumentLoading || (!sessionId && createSession.isPending)) {
+  if (
+    isDocumentLoading ||
+    isCreating ||
+    !sessionId ||
+    sessionDetailQuery.isLoading ||
+    sessionDetailQuery.isPending
+  ) {
     return <WorkbenchSkeleton />;
   }
 
+  if (sessionDetailQuery.isError || !sessionDetail) {
+    return (
+      <SessionProblem
+        title="无法读取练习会话"
+        description="会话可能已被删除，或者当前账号没有访问权限。"
+        primaryLabel="重试读取"
+        onPrimary={() => void sessionDetailQuery.refetch()}
+        secondaryLabel={requestedSessionId ? "新建练习" : undefined}
+        onSecondary={requestedSessionId ? startNewSession : undefined}
+        onBack={() => navigate({ to: "/wiki" })}
+      />
+    );
+  }
+
+  if (sessionDetail.session.document_id !== documentId) {
+    return (
+      <SessionProblem
+        title="会话与文章不匹配"
+        description="这个会话属于另一篇文章，不能在当前页面继续。"
+        primaryLabel="为本文新建练习"
+        onPrimary={startNewSession}
+        onBack={() => navigate({ to: "/wiki" })}
+      />
+    );
+  }
+
+  const sessionReady = sessionDetail.session.id === sessionId;
+  const isReviewing = reviewingIdentity === requestIdentity;
+  const isCompleting = completingIdentity === requestIdentity;
+  const isCompleted = Boolean(completedSummary || sessionDetail.session.status === "completed");
   const title = document?.filename?.replace(/\.md$/i, "") || "整篇费曼练习";
-  const isCompleted = Boolean(completedSummary || sessionDetail?.session.status === "completed");
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4 overflow-hidden p-6">
@@ -176,16 +295,6 @@ export function FeynmanWorkbenchPage() {
           </Button>
         </div>
       </div>
-
-      {isSessionDetailError ? (
-        <Alert>
-          <CircleAlertIcon />
-          <AlertTitle>历史记录读取失败</AlertTitle>
-          <AlertDescription>
-            <p>你仍然可以继续解释，新提交会保存在当前会话中。</p>
-          </AlertDescription>
-        </Alert>
-      ) : null}
 
       <Tabs
         value={activeView}
@@ -209,9 +318,9 @@ export function FeynmanWorkbenchPage() {
           <PracticePanel
             answer={answer}
             turns={turns}
-            disabled={!sessionId || reviewExplanation.isPending || isCompleted}
-            isSubmitting={reviewExplanation.isPending}
-            isCompleting={completeSession.isPending}
+            disabled={!sessionReady || isReviewing || isCompleting || isCompleted}
+            isSubmitting={isReviewing}
+            isCompleting={isCompleting}
             isCompleted={isCompleted}
             completedSummary={completedSummary}
             onAnswerChange={setAnswer}
@@ -221,6 +330,49 @@ export function FeynmanWorkbenchPage() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+function SessionProblem({
+  title,
+  description,
+  primaryLabel,
+  secondaryLabel,
+  onPrimary,
+  onSecondary,
+  onBack,
+}: {
+  title: string;
+  description: string;
+  primaryLabel: string;
+  secondaryLabel?: string;
+  onPrimary: () => void;
+  onSecondary?: () => void;
+  onBack: () => void;
+}) {
+  return (
+    <Empty className="h-full border-0 p-6">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <CircleAlertIcon />
+        </EmptyMedia>
+        <EmptyTitle>{title}</EmptyTitle>
+        <EmptyDescription>{description}</EmptyDescription>
+      </EmptyHeader>
+      <EmptyContent>
+        <div className="flex flex-wrap justify-center gap-2">
+          <Button variant="outline" onClick={onBack}>
+            返回 Wiki
+          </Button>
+          {secondaryLabel && onSecondary ? (
+            <Button variant="secondary" onClick={onSecondary}>
+              {secondaryLabel}
+            </Button>
+          ) : null}
+          <Button onClick={onPrimary}>{primaryLabel}</Button>
+        </div>
+      </EmptyContent>
+    </Empty>
   );
 }
 

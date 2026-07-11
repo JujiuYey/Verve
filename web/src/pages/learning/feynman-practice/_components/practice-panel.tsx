@@ -116,6 +116,7 @@ export function PracticePanel({
               <FeynmanAnswerEditor
                 value={answer}
                 onChange={onAnswerChange}
+                disabled={disabled || isSubmitting || isCompleting || isCompleted}
                 placeholder={
                   turns.length > 0
                     ? "继续补充你的解释，回应上面的疑问，或者换一种更通俗的说法。"

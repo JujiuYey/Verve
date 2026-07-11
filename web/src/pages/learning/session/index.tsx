@@ -23,9 +23,10 @@ export function SessionPage() {
     navigate({
       to: "/learn/feynman-practice/$documentId",
       params: { documentId: detail.session.document_id },
+      search: { sessionId },
       replace: true,
     });
-  }, [detail, navigate]);
+  }, [detail, navigate, sessionId]);
 
   return (
     <Empty className="h-full border-0 p-6">
