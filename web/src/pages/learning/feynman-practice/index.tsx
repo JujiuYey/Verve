@@ -158,7 +158,10 @@ export function FeynmanWorkbenchPage() {
 
     setReviewingIdentity(submittedIdentity);
     try {
-      const review = await reviewExplanation.mutateAsync({ explanation });
+      const review = await reviewExplanation.mutateAsync({
+        request_id: crypto.randomUUID(),
+        explanation,
+      });
       if (currentRequestIdentityRef.current !== submittedIdentity) return;
 
       const createdAt = new Date().toISOString();
@@ -167,6 +170,7 @@ export function FeynmanWorkbenchPage() {
         {
           ...review,
           id: `local-${createdAt}-${current.length}`,
+          turn_id: "",
           session_id: sessionId,
           document_id: documentId,
           user_id: "",

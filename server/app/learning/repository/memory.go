@@ -22,7 +22,10 @@ func NewMemoryRepository(database *bun.DB) *MemoryRepository {
 
 func (r *MemoryRepository) CreateEvent(ctx context.Context, event *learning_db.LearningMemoryEvent) error {
 	event.ID = strings.ReplaceAll(uuid.New().String(), "-", "")
-	_, err := r.db.NewInsert().Model(event).Exec(ctx)
+	_, err := r.db.NewInsert().Model(event).
+		On("CONFLICT (source_type, source_id, event_type) WHERE source_id IS NOT NULL DO UPDATE SET id = learning_memory_events.id").
+		Returning("id").
+		Exec(ctx)
 	return err
 }
 

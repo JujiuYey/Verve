@@ -30,6 +30,7 @@ type DatabaseService struct {
 
 	// Learning Repositories
 	Sessions *learning_repo.SessionRepository
+	Turns    *learning_repo.TurnRepository
 	Messages *learning_repo.MessageRepository
 	Reviews  *learning_repo.ReviewRepository
 	Memories *learning_repo.MemoryRepository
@@ -63,8 +64,10 @@ func NewDatabaseService(dsn string) (*DatabaseService, error) {
 	db.RegisterModel((*system_db.SysModel)(nil))
 	db.RegisterModel((*system_db.AgentModelConfig)(nil))
 	db.RegisterModel((*learning_db.LearningSession)(nil))
+	db.RegisterModel((*learning_db.LearningTurn)(nil))
 	db.RegisterModel((*learning_db.LearningMessage)(nil))
 	db.RegisterModel((*learning_db.LearningExplanationReview)(nil))
+	db.RegisterModel((*learning_db.LearningTeachingIntervention)(nil))
 	db.RegisterModel((*learning_db.LearningMemoryEvent)(nil))
 	db.RegisterModel((*learning_db.LearningMemoryItem)(nil))
 	db.RegisterModel((*learning_db.LearningMemorySummary)(nil))
@@ -97,6 +100,7 @@ func NewDatabaseService(dsn string) (*DatabaseService, error) {
 
 		// Learning Repositories
 		Sessions: learning_repo.NewSessionRepository(db),
+		Turns:    learning_repo.NewTurnRepository(db),
 		Messages: learning_repo.NewMessageRepository(db),
 		Reviews:  learning_repo.NewReviewRepository(db),
 		Memories: learning_repo.NewMemoryRepository(db),

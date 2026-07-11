@@ -107,7 +107,7 @@ func TestRecordExplanationReviewStoresEvidenceAndMisconceptionsWithoutMastery(t 
 	if err := service.RecordExplanationReview(context.Background(), "user-1", session, review); err != nil {
 		t.Fatal(err)
 	}
-	if writer.event == nil || writer.event.EventType != "explanation_review" || writer.event.DocumentID == nil || *writer.event.DocumentID != "doc-1" {
+	if writer.event == nil || writer.event.SourceType != "explanation_review" || writer.event.EventType != "explanation_review" || writer.event.DocumentID == nil || *writer.event.DocumentID != "doc-1" {
 		t.Fatalf("event = %#v", writer.event)
 	}
 	if writer.event.FolderID == nil || *writer.event.FolderID != "folder-child" {

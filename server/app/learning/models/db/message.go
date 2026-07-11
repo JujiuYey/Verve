@@ -12,8 +12,8 @@ type LearningMessage struct {
 
 	ID               string                 `bun:"id,pk,type:varchar(32)" json:"id"`                                        // 消息ID
 	SessionID        string                 `bun:"session_id,notnull" json:"session_id"`                                    // 会话ID
+	TurnID           string                 `bun:"turn_id,notnull" json:"turn_id"`                                          // 处理轮次ID
 	Role             string                 `bun:"role,notnull" json:"role"`                                                // 消息角色
-	AgentType        *string                `bun:"agent_type" json:"agent_type,omitempty"`                                  // Agent类型
 	Content          string                 `bun:"content,notnull" json:"content"`                                          // 消息内容
 	ToolUsed         *string                `bun:"tool_used" json:"tool_used,omitempty"`                                    // 工具名称
 	ToolResult       map[string]interface{} `bun:"tool_result,type:jsonb" json:"tool_result,omitempty"`                     // 工具结果

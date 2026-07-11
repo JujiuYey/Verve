@@ -11,10 +11,11 @@ type LearningExplanationReview struct {
 	bun.BaseModel `bun:"table:learning_explanation_reviews,alias:ler"`
 
 	ID                 string    `bun:"id,pk,type:varchar(32)" json:"id"`                                        // 审阅ID
-	SessionID          string    `bun:"session_id,notnull,type:varchar(32)" json:"session_id"`                   // 会话ID
-	DocumentID         string    `bun:"document_id,notnull,type:varchar(32)" json:"document_id"`                 // Wiki文档ID
-	UserID             string    `bun:"user_id,notnull,type:varchar(32)" json:"user_id"`                         // 用户ID
-	Explanation        string    `bun:"explanation,notnull" json:"explanation"`                                  // 学习者解释
+	TurnID             string    `bun:"turn_id,notnull,type:varchar(32)" json:"turn_id"`                         // 倾听轮次ID
+	SessionID          string    `bun:"session_id,scanonly" json:"session_id"`                                   // 会话ID
+	DocumentID         string    `bun:"document_id,scanonly" json:"document_id"`                                 // Wiki文档ID
+	UserID             string    `bun:"user_id,scanonly" json:"user_id"`                                         // 用户ID
+	Explanation        string    `bun:"explanation,scanonly" json:"explanation"`                                 // 学习者解释
 	HeardSummary       string    `bun:"heard_summary,notnull" json:"heard_summary"`                              // 倾听摘要
 	ClearPoints        []string  `bun:"clear_points,type:jsonb,notnull" json:"clear_points"`                     // 已讲清内容
 	ConfusingPoints    []string  `bun:"confusing_points,type:jsonb,notnull" json:"confusing_points"`             // 含混内容

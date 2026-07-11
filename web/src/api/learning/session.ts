@@ -9,8 +9,8 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 export interface LearningMessage {
   id: string;
   session_id: string;
+  turn_id: string;
   role: string;
-  agent_type?: string;
   content: string;
   created_at: string;
 }
@@ -21,7 +21,6 @@ export interface LearningSession {
   document_id: string;
   status: "active" | "completed" | "abandoned";
   summary?: string;
-  message_count: number;
   started_at: string;
   ended_at?: string;
   created_at: string;
@@ -41,6 +40,7 @@ export interface FeynmanReview {
 
 export interface LearningExplanationReview extends FeynmanReview {
   id: string;
+  turn_id: string;
   session_id: string;
   document_id: string;
   user_id: string;
@@ -59,6 +59,7 @@ export interface CreateSessionRequest {
 }
 
 export interface ReviewExplanationRequest {
+  request_id: string;
   explanation: string;
 }
 

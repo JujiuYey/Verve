@@ -14,6 +14,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 
 	learning_db "verve/app/learning/models/db"
+	learning_repo "verve/app/learning/repository"
 	learning_service "verve/app/learning/service"
 	rag_db "verve/app/rag/models/db"
 	rag_payload "verve/app/rag/models/payload"
@@ -72,27 +73,96 @@ func (f fakeMessageStore) FindBySession(context.Context, string) ([]*learning_db
 }
 
 type fakeReviewStore struct {
-	reviews []*learning_db.LearningExplanationReview
-	created *learning_db.LearningExplanationReview
-}
-
-func (f *fakeReviewStore) Create(_ context.Context, review *learning_db.LearningExplanationReview) error {
-	review.ID = "review-new"
-	f.created = review
-	f.reviews = append(f.reviews, review)
-	return nil
+	reviews        []*learning_db.LearningExplanationReview
+	byTurn         *learning_db.LearningExplanationReview
+	findSessionErr error
 }
 
 func (f *fakeReviewStore) FindBySession(context.Context, string) ([]*learning_db.LearningExplanationReview, error) {
+	if f.findSessionErr != nil {
+		return nil, f.findSessionErr
+	}
 	return f.reviews, nil
+}
+
+func (f *fakeReviewStore) FindByTurn(context.Context, string) (*learning_db.LearningExplanationReview, error) {
+	if f.byTurn == nil {
+		return nil, sql.ErrNoRows
+	}
+	return f.byTurn, nil
+}
+
+type fakeListenerTurnStore struct {
+	result          *learning_repo.BeginTurnResult
+	beginErr        error
+	completeErr     error
+	retryErr        error
+	failErr         error
+	begunSessionID  string
+	begunRequestID  string
+	begunInput      string
+	completedTurnID string
+	completedReview *learning_db.LearningExplanationReview
+	retriedTurnID   string
+	failedTurnID    string
+	failureCode     string
+	events          *[]string
+}
+
+func (f *fakeListenerTurnStore) BeginListenerTurn(_ context.Context, sessionID, requestID, input string) (*learning_repo.BeginTurnResult, error) {
+	f.begunSessionID, f.begunRequestID, f.begunInput = sessionID, requestID, input
+	if f.events != nil {
+		*f.events = append(*f.events, "begin")
+	}
+	if f.beginErr != nil {
+		return nil, f.beginErr
+	}
+	if f.result == nil {
+		f.result = &learning_repo.BeginTurnResult{Turn: &learning_db.LearningTurn{ID: "turn-1", SessionID: sessionID, RequestID: requestID, AgentType: learning_db.LearningAgentListener, Status: learning_db.LearningTurnProcessing}, Created: true}
+	}
+	return f.result, nil
+}
+
+func (f *fakeListenerTurnStore) CompleteListenerTurn(_ context.Context, _ string, turnID, _ string, review *learning_db.LearningExplanationReview) error {
+	f.completedTurnID = turnID
+	f.completedReview = review
+	if f.events != nil {
+		*f.events = append(*f.events, "complete")
+	}
+	if f.completeErr == nil {
+		review.ID = "review-new"
+		review.TurnID = turnID
+	}
+	return f.completeErr
+}
+
+func (f *fakeListenerTurnStore) RetryFailedTurn(_ context.Context, turnID string) error {
+	f.retriedTurnID = turnID
+	return f.retryErr
+}
+
+func (f *fakeListenerTurnStore) FailTurn(_ context.Context, turnID, errorCode, _ string) error {
+	f.failedTurnID = turnID
+	f.failureCode = errorCode
+	return f.failErr
 }
 
 type fakeFeynmanReviewer struct {
 	request learning_service.FeynmanReviewRequest
+	err     error
+	calls   int
+	events  *[]string
 }
 
 func (f *fakeFeynmanReviewer) Review(_ context.Context, request learning_service.FeynmanReviewRequest) (*learning_service.FeynmanReview, error) {
 	f.request = request
+	f.calls++
+	if f.events != nil {
+		*f.events = append(*f.events, "review")
+	}
+	if f.err != nil {
+		return nil, f.err
+	}
 	return &learning_service.FeynmanReview{
 		HeardSummary:       "听到你解释了类型会约束操作",
 		ClearPoints:        []string{"值有具体类型"},
@@ -103,6 +173,173 @@ func (f *fakeFeynmanReviewer) Review(_ context.Context, request learning_service
 		ReadyToWrapUp:      false,
 		ContextSufficient:  true,
 	}, nil
+}
+
+func TestSessionReviewPersistsListenerTurnLifecycle(t *testing.T) {
+	events := make([]string, 0, 3)
+	turns := &fakeListenerTurnStore{events: &events}
+	reviewer := &fakeFeynmanReviewer{events: &events}
+	handler := NewSessionHandlerWithDependencies(SessionHandlerDependencies{
+		Sessions: &fakeSessionStore{sessions: map[string]*learning_db.LearningSession{
+			"session-1": {ID: "session-1", UserID: "user-1", DocumentID: "doc-1", Status: "active"},
+		}},
+		Documents: fakeDocumentStore{}, Turns: turns, Messages: fakeMessageStore{}, Reviews: &fakeReviewStore{},
+		Reviewer: reviewer, Memory: &fakeMemoryRecorder{},
+	})
+	app := sessionTestApp(handler)
+	req := httptest.NewRequest("POST", "/session/session-1/review", strings.NewReader(`{"request_id":"request-1","explanation":"值有类型"}`))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != fiber.StatusOK {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	if strings.Join(events, ",") != "begin,review,complete" {
+		t.Fatalf("events = %#v", events)
+	}
+	if turns.begunRequestID != "request-1" || turns.completedTurnID != "turn-1" || turns.completedReview == nil {
+		t.Fatalf("turn lifecycle = %#v", turns)
+	}
+}
+
+func TestSessionReviewReturnsCompletedIdempotentResultWithoutReviewer(t *testing.T) {
+	reviewer := &fakeFeynmanReviewer{}
+	turns := &fakeListenerTurnStore{result: &learning_repo.BeginTurnResult{
+		Turn: &learning_db.LearningTurn{ID: "turn-done", Status: learning_db.LearningTurnCompleted},
+	}}
+	reviews := &fakeReviewStore{byTurn: &learning_db.LearningExplanationReview{HeardSummary: "已经听过", ContextSufficient: true}}
+	handler := NewSessionHandlerWithDependencies(SessionHandlerDependencies{
+		Sessions: &fakeSessionStore{sessions: map[string]*learning_db.LearningSession{
+			"session-1": {ID: "session-1", UserID: "user-1", DocumentID: "doc-1", Status: "active"},
+		}},
+		Documents: fakeDocumentStore{}, Turns: turns, Messages: fakeMessageStore{}, Reviews: reviews,
+		Reviewer: reviewer, Memory: &fakeMemoryRecorder{},
+	})
+	app := sessionTestApp(handler)
+	req := httptest.NewRequest("POST", "/session/session-1/review", strings.NewReader(`{"request_id":"request-1","explanation":"值有类型"}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != fiber.StatusOK || reviewer.calls != 0 {
+		t.Fatalf("status=%d reviewer calls=%d", resp.StatusCode, reviewer.calls)
+	}
+}
+
+func TestSessionReviewMarksTurnFailedWhenReviewerFails(t *testing.T) {
+	turns := &fakeListenerTurnStore{}
+	handler := NewSessionHandlerWithDependencies(SessionHandlerDependencies{
+		Sessions: &fakeSessionStore{sessions: map[string]*learning_db.LearningSession{
+			"session-1": {ID: "session-1", UserID: "user-1", DocumentID: "doc-1", Status: "active"},
+		}},
+		Documents: fakeDocumentStore{}, Turns: turns, Messages: fakeMessageStore{}, Reviews: &fakeReviewStore{},
+		Reviewer: &fakeFeynmanReviewer{err: errors.New("model unavailable")}, Memory: &fakeMemoryRecorder{},
+	})
+	app := sessionTestApp(handler)
+	req := httptest.NewRequest("POST", "/session/session-1/review", strings.NewReader(`{"request_id":"request-1","explanation":"值有类型"}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != fiber.StatusInternalServerError || turns.failedTurnID != "turn-1" || turns.failureCode != "listener_failed" {
+		t.Fatalf("status=%d failed turn=%q code=%q", resp.StatusCode, turns.failedTurnID, turns.failureCode)
+	}
+}
+
+func TestSessionReviewRejectsProcessingDuplicate(t *testing.T) {
+	reviewer := &fakeFeynmanReviewer{}
+	turns := &fakeListenerTurnStore{result: &learning_repo.BeginTurnResult{
+		Turn: &learning_db.LearningTurn{ID: "turn-running", Status: learning_db.LearningTurnProcessing},
+	}}
+	handler := NewSessionHandlerWithDependencies(SessionHandlerDependencies{
+		Sessions: &fakeSessionStore{sessions: map[string]*learning_db.LearningSession{
+			"session-1": {ID: "session-1", UserID: "user-1", DocumentID: "doc-1", Status: "active"},
+		}},
+		Documents: fakeDocumentStore{}, Turns: turns, Messages: fakeMessageStore{}, Reviews: &fakeReviewStore{},
+		Reviewer: reviewer, Memory: &fakeMemoryRecorder{},
+	})
+	app := sessionTestApp(handler)
+	req := httptest.NewRequest("POST", "/session/session-1/review", strings.NewReader(`{"request_id":"request-1","explanation":"值有类型"}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != fiber.StatusConflict || reviewer.calls != 0 {
+		t.Fatalf("status=%d reviewer calls=%d", resp.StatusCode, reviewer.calls)
+	}
+}
+
+func TestSessionReviewRetriesFailedTurn(t *testing.T) {
+	turns := &fakeListenerTurnStore{result: &learning_repo.BeginTurnResult{
+		Turn: &learning_db.LearningTurn{ID: "turn-failed", Status: learning_db.LearningTurnFailed},
+	}}
+	handler := NewSessionHandlerWithDependencies(SessionHandlerDependencies{
+		Sessions: &fakeSessionStore{sessions: map[string]*learning_db.LearningSession{
+			"session-1": {ID: "session-1", UserID: "user-1", DocumentID: "doc-1", Status: "active"},
+		}},
+		Documents: fakeDocumentStore{}, Turns: turns, Messages: fakeMessageStore{}, Reviews: &fakeReviewStore{},
+		Reviewer: &fakeFeynmanReviewer{}, Memory: &fakeMemoryRecorder{},
+	})
+	app := sessionTestApp(handler)
+	req := httptest.NewRequest("POST", "/session/session-1/review", strings.NewReader(`{"request_id":"request-1","explanation":"值有类型"}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != fiber.StatusOK || turns.retriedTurnID != "turn-failed" || turns.completedTurnID != "turn-failed" {
+		t.Fatalf("status=%d retried=%q completed=%q", resp.StatusCode, turns.retriedTurnID, turns.completedTurnID)
+	}
+}
+
+func TestSessionReviewRequiresRequestID(t *testing.T) {
+	turns := &fakeListenerTurnStore{}
+	handler := NewSessionHandlerWithDependencies(SessionHandlerDependencies{
+		Sessions: &fakeSessionStore{sessions: map[string]*learning_db.LearningSession{
+			"session-1": {ID: "session-1", UserID: "user-1", DocumentID: "doc-1", Status: "active"},
+		}},
+		Documents: fakeDocumentStore{}, Turns: turns, Messages: fakeMessageStore{}, Reviews: &fakeReviewStore{},
+		Reviewer: &fakeFeynmanReviewer{}, Memory: &fakeMemoryRecorder{},
+	})
+	app := sessionTestApp(handler)
+	req := httptest.NewRequest("POST", "/session/session-1/review", strings.NewReader(`{"explanation":"值有类型"}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != fiber.StatusBadRequest || turns.begunRequestID != "" {
+		t.Fatalf("status=%d begun request=%q", resp.StatusCode, turns.begunRequestID)
+	}
+}
+
+func TestSessionReviewMarksTurnFailedWhenPriorContextCannotLoad(t *testing.T) {
+	turns := &fakeListenerTurnStore{}
+	reviewer := &fakeFeynmanReviewer{}
+	handler := NewSessionHandlerWithDependencies(SessionHandlerDependencies{
+		Sessions: &fakeSessionStore{sessions: map[string]*learning_db.LearningSession{
+			"session-1": {ID: "session-1", UserID: "user-1", DocumentID: "doc-1", Status: "active"},
+		}},
+		Documents: fakeDocumentStore{}, Turns: turns, Messages: fakeMessageStore{},
+		Reviews:  &fakeReviewStore{findSessionErr: errors.New("database unavailable")},
+		Reviewer: reviewer, Memory: &fakeMemoryRecorder{},
+	})
+	app := sessionTestApp(handler)
+	req := httptest.NewRequest("POST", "/session/session-1/review", strings.NewReader(`{"request_id":"request-1","explanation":"值有类型"}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != fiber.StatusInternalServerError || turns.failedTurnID != "turn-1" || turns.failureCode != "listener_context_failed" || reviewer.calls != 0 {
+		t.Fatalf("status=%d failed=%q code=%q reviewer calls=%d", resp.StatusCode, turns.failedTurnID, turns.failureCode, reviewer.calls)
+	}
 }
 
 type fakeMemoryRecorder struct {
@@ -220,16 +457,17 @@ func TestSessionReviewUsesPriorTurnsAndRecordsMemoryBestEffort(t *testing.T) {
 	prior := &learning_db.LearningExplanationReview{ID: "review-1", Explanation: "值有类型", CreatedAt: time.Now()}
 	reviews := &fakeReviewStore{reviews: []*learning_db.LearningExplanationReview{prior}}
 	reviewer := &fakeFeynmanReviewer{}
+	turns := &fakeListenerTurnStore{}
 	memory := &fakeMemoryRecorder{
 		err:   errors.New("memory unavailable"),
 		items: []*learning_db.LearningMemoryItem{{ID: "memory-1", Kind: "misconception", Statement: "曾把值和变量混为一谈"}},
 	}
 	handler := NewSessionHandlerWithDependencies(SessionHandlerDependencies{
 		Sessions:  &fakeSessionStore{sessions: map[string]*learning_db.LearningSession{"session-1": {ID: "session-1", UserID: "user-1", DocumentID: "doc-1", Status: "active"}}},
-		Documents: fakeDocumentStore{doc: &wiki_db.Document{ID: "doc-1"}}, Messages: fakeMessageStore{}, Reviews: reviews, Reviewer: reviewer, Memory: memory,
+		Documents: fakeDocumentStore{doc: &wiki_db.Document{ID: "doc-1"}}, Turns: turns, Messages: fakeMessageStore{}, Reviews: reviews, Reviewer: reviewer, Memory: memory,
 	})
 	app := sessionTestApp(handler)
-	req := httptest.NewRequest("POST", "/session/session-1/review", strings.NewReader(`{"explanation":"A value has a concrete type."}`))
+	req := httptest.NewRequest("POST", "/session/session-1/review", strings.NewReader(`{"request_id":"request-1","explanation":"A value has a concrete type."}`))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := app.Test(req)
 	if err != nil {
@@ -247,8 +485,8 @@ func TestSessionReviewUsesPriorTurnsAndRecordsMemoryBestEffort(t *testing.T) {
 	if len(reviewer.request.MemoryItems) != 1 || reviewer.request.MemoryItems[0].ID != "memory-1" {
 		t.Fatalf("reviewer memory = %#v", reviewer.request.MemoryItems)
 	}
-	if reviews.created == nil || reviews.created.Explanation != "A value has a concrete type." || reviews.created.SessionID != "session-1" {
-		t.Fatalf("stored review = %#v", reviews.created)
+	if turns.completedReview == nil || turns.completedReview.HeardSummary == "" || turns.completedTurnID != "turn-1" {
+		t.Fatalf("stored review = %#v", turns.completedReview)
 	}
 	if !memory.called {
 		t.Fatal("memory recorder was not called")
@@ -269,12 +507,13 @@ func TestSessionReviewUsesPriorTurnsAndRecordsMemoryBestEffort(t *testing.T) {
 func TestSessionReviewContinuesWithEmptyMemoryWhenReadFails(t *testing.T) {
 	reviewer := &fakeFeynmanReviewer{}
 	memory := &fakeMemoryRecorder{readErr: errors.New("memory unavailable")}
+	turns := &fakeListenerTurnStore{}
 	handler := NewSessionHandlerWithDependencies(SessionHandlerDependencies{
 		Sessions:  &fakeSessionStore{sessions: map[string]*learning_db.LearningSession{"session-1": {ID: "session-1", UserID: "user-1", DocumentID: "doc-1", Status: "active"}}},
-		Documents: fakeDocumentStore{}, Messages: fakeMessageStore{}, Reviews: &fakeReviewStore{}, Reviewer: reviewer, Memory: memory,
+		Documents: fakeDocumentStore{}, Turns: turns, Messages: fakeMessageStore{}, Reviews: &fakeReviewStore{}, Reviewer: reviewer, Memory: memory,
 	})
 	app := sessionTestApp(handler)
-	req := httptest.NewRequest("POST", "/session/session-1/review", strings.NewReader(`{"explanation":"值有类型"}`))
+	req := httptest.NewRequest("POST", "/session/session-1/review", strings.NewReader(`{"request_id":"request-2","explanation":"值有类型"}`))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := app.Test(req)
 	if err != nil {

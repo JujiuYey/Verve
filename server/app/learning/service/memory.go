@@ -169,7 +169,7 @@ func buildExplanationMemoryEvent(userID, folderID string, session *learning_db.L
 	sourceID := review.ID
 	return &learning_db.LearningMemoryEvent{
 		UserID: userID, FolderID: &folderIDCopy, DocumentID: &documentID, SessionID: &sessionID,
-		SourceType: "feynman_review", SourceID: &sourceID, EventType: "explanation_review",
+		SourceType: "explanation_review", SourceID: &sourceID, EventType: "explanation_review",
 		Content: firstNonBlank(review.ExplanationSummary, review.HeardSummary, review.Explanation),
 		Evidence: map[string]interface{}{
 			"clear_points":       review.ClearPoints,

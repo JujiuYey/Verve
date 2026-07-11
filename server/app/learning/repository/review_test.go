@@ -11,15 +11,12 @@ import (
 
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
-
-	learning_db "verve/app/learning/models/db"
 )
 
 type reviewQueryRecorder struct {
-	execQuery       string
-	selectQuery     string
-	insertCreatedAt time.Time
-	rows            driver.Rows
+	execQuery   string
+	selectQuery string
+	rows        driver.Rows
 }
 
 func (r *reviewQueryRecorder) Connect(context.Context) (driver.Conn, error) {
@@ -44,28 +41,8 @@ func (c reviewQueryConn) ExecContext(_ context.Context, query string, _ []driver
 	return driver.RowsAffected(1), nil
 }
 func (c reviewQueryConn) QueryContext(_ context.Context, query string, _ []driver.NamedValue) (driver.Rows, error) {
-	if strings.HasPrefix(query, "INSERT ") {
-		c.recorder.execQuery = query
-		return &reviewInsertRows{createdAt: c.recorder.insertCreatedAt}, nil
-	}
 	c.recorder.selectQuery = query
 	return c.recorder.rows, nil
-}
-
-type reviewInsertRows struct {
-	createdAt time.Time
-	done      bool
-}
-
-func (r *reviewInsertRows) Columns() []string { return []string{"created_at"} }
-func (r *reviewInsertRows) Close() error      { return nil }
-func (r *reviewInsertRows) Next(dest []driver.Value) error {
-	if r.done {
-		return io.EOF
-	}
-	dest[0] = r.createdAt
-	r.done = true
-	return nil
 }
 
 type reviewRows struct {
@@ -75,9 +52,10 @@ type reviewRows struct {
 
 func (r *reviewRows) Columns() []string {
 	return []string{
-		"id", "session_id", "document_id", "user_id", "explanation", "heard_summary",
+		"id", "turn_id", "heard_summary",
 		"clear_points", "confusing_points", "misconceptions", "follow_up_question",
 		"explanation_summary", "ready_to_wrap_up", "context_sufficient", "created_at",
+		"session_id", "document_id", "user_id", "explanation",
 	}
 }
 func (r *reviewRows) Close() error { return nil }
@@ -96,61 +74,11 @@ func newReviewRepositoryForTest(recorder *reviewQueryRecorder) (*ReviewRepositor
 	return NewReviewRepository(db), func() { _ = db.Close() }
 }
 
-func TestReviewRepositoryCreateAssignsIDAndPersistsReview(t *testing.T) {
-	createdAt := time.Date(2026, 7, 11, 10, 15, 0, 0, time.UTC)
-	recorder := &reviewQueryRecorder{insertCreatedAt: createdAt}
-	repo, closeDB := newReviewRepositoryForTest(recorder)
-	defer closeDB()
-
-	review := &learning_db.LearningExplanationReview{
-		SessionID:          "session-1",
-		DocumentID:         "document-1",
-		UserID:             "user-1",
-		Explanation:        "A channel coordinates communication.",
-		HeardSummary:       "Channels coordinate senders and receivers.",
-		ClearPoints:        []string{"coordination", "blocking"},
-		ConfusingPoints:    []string{"buffer capacity"},
-		Misconceptions:     []string{"all sends are asynchronous"},
-		FollowUpQuestion:   "What happens when the buffer is full?",
-		ExplanationSummary: "The learner understands coordination but not full buffers.",
-		ReadyToWrapUp:      false,
-		ContextSufficient:  true,
-	}
-
-	if err := repo.Create(context.Background(), review); err != nil {
-		t.Fatal(err)
-	}
-	if len(review.ID) != 32 || strings.Contains(review.ID, "-") {
-		t.Fatalf("review ID = %q, want 32-character UUID without hyphens", review.ID)
-	}
-	if !review.CreatedAt.Equal(createdAt) {
-		t.Fatalf("review created_at = %v, want returned value %v", review.CreatedAt, createdAt)
-	}
-
-	for _, want := range []string{
-		`"session_id"`, `"document_id"`, `"user_id"`, `"explanation"`, `"heard_summary"`,
-		`"clear_points"`, `"confusing_points"`, `"misconceptions"`, `"follow_up_question"`,
-		`"explanation_summary"`, `"ready_to_wrap_up"`, `"context_sufficient"`,
-		`'session-1'`, `'document-1'`, `'user-1'`,
-		`'A channel coordinates communication.'`,
-		`'Channels coordinate senders and receivers.'`,
-		`'["coordination","blocking"]'`, `'["buffer capacity"]'`,
-		`'["all sends are asynchronous"]'`,
-		`'What happens when the buffer is full?'`,
-		`'The learner understands coordination but not full buffers.'`,
-		`FALSE`, `TRUE`,
-	} {
-		if !strings.Contains(recorder.execQuery, want) {
-			t.Fatalf("insert query does not contain %q: %s", want, recorder.execQuery)
-		}
-	}
-}
-
 func TestReviewRepositoryFindBySessionOrdersOldestFirst(t *testing.T) {
 	createdAt := time.Date(2026, 7, 11, 9, 30, 0, 0, time.UTC)
 	recorder := &reviewQueryRecorder{rows: &reviewRows{values: [][]driver.Value{{
-		"review-1", "session-1", "document-1", "user-1", "explanation", "heard",
-		`["clear"]`, `[]`, `[]`, "follow up", "summary", false, true, createdAt,
+		"review-1", "turn-1", "heard", `["clear"]`, `[]`, `[]`, "follow up", "summary", false, true, createdAt,
+		"session-1", "document-1", "user-1", "explanation",
 	}}}}
 	repo, closeDB := newReviewRepositoryForTest(recorder)
 	defer closeDB()
@@ -159,17 +87,46 @@ func TestReviewRepositoryFindBySessionOrdersOldestFirst(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(recorder.selectQuery, `WHERE (session_id = 'session-1')`) {
+	if !strings.Contains(recorder.selectQuery, `WHERE (lt.session_id = 'session-1')`) {
 		t.Fatalf("query does not filter session: %s", recorder.selectQuery)
 	}
-	if !strings.Contains(recorder.selectQuery, `ORDER BY "created_at" ASC, "id" ASC`) {
+	if !strings.Contains(recorder.selectQuery, `ORDER BY ler.created_at ASC, ler.id ASC`) {
 		t.Fatalf("query does not order deterministically oldest first: %s", recorder.selectQuery)
+	}
+	for _, want := range []string{
+		"JOIN learning_turns AS lt", "JOIN learning_sessions AS ls", "JOIN learning_messages AS user_message",
+		"lt.session_id AS session_id", "user_message.content AS explanation",
+	} {
+		if !strings.Contains(recorder.selectQuery, want) {
+			t.Fatalf("query does not derive review field %q: %s", want, recorder.selectQuery)
+		}
 	}
 	if len(reviews) != 1 || reviews[0].ID != "review-1" {
 		t.Fatalf("reviews = %#v", reviews)
 	}
+	if reviews[0].TurnID != "turn-1" || reviews[0].SessionID != "session-1" || reviews[0].Explanation != "explanation" {
+		t.Fatalf("derived review = %#v", reviews[0])
+	}
 	if len(reviews[0].ClearPoints) != 1 || reviews[0].ClearPoints[0] != "clear" {
 		t.Fatalf("clear points = %#v", reviews[0].ClearPoints)
+	}
+}
+
+func TestReviewRepositoryFindByTurnUsesTurnIdentity(t *testing.T) {
+	createdAt := time.Date(2026, 7, 11, 9, 30, 0, 0, time.UTC)
+	recorder := &reviewQueryRecorder{rows: &reviewRows{values: [][]driver.Value{{
+		"review-1", "turn-1", "heard", `[]`, `[]`, `[]`, "follow up", "summary", false, true, createdAt,
+		"session-1", "document-1", "user-1", "explanation",
+	}}}}
+	repo, closeDB := newReviewRepositoryForTest(recorder)
+	defer closeDB()
+
+	review, err := repo.FindByTurn(context.Background(), "turn-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if review.ID != "review-1" || !strings.Contains(recorder.selectQuery, `WHERE (ler.turn_id = 'turn-1')`) {
+		t.Fatalf("review=%#v query=%s", review, recorder.selectQuery)
 	}
 }
 

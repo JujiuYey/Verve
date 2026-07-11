@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -16,6 +17,7 @@ import (
 
 	learning_db "verve/app/learning/models/db"
 	learning_payload "verve/app/learning/models/payload"
+	learning_repo "verve/app/learning/repository"
 	learning_service "verve/app/learning/service"
 	rag_db "verve/app/rag/models/db"
 	rag_payload "verve/app/rag/models/payload"
@@ -49,8 +51,15 @@ type messageStore interface {
 }
 
 type reviewStore interface {
-	Create(ctx context.Context, review *learning_db.LearningExplanationReview) error
 	FindBySession(ctx context.Context, sessionID string) ([]*learning_db.LearningExplanationReview, error)
+	FindByTurn(ctx context.Context, turnID string) (*learning_db.LearningExplanationReview, error)
+}
+
+type listenerTurnStore interface {
+	BeginListenerTurn(ctx context.Context, sessionID, requestID, explanation string) (*learning_repo.BeginTurnResult, error)
+	CompleteListenerTurn(ctx context.Context, sessionID, turnID, assistantContent string, review *learning_db.LearningExplanationReview) error
+	RetryFailedTurn(ctx context.Context, turnID string) error
+	FailTurn(ctx context.Context, turnID, errorCode, errorMessage string) error
 }
 
 type explanationMemoryStore interface {
@@ -61,6 +70,7 @@ type explanationMemoryStore interface {
 type SessionHandlerDependencies struct {
 	Sessions  sessionStore
 	Documents accessibleDocumentStore
+	Turns     listenerTurnStore
 	Messages  messageStore
 	Reviews   reviewStore
 	Reviewer  learning_service.FeynmanReviewer
@@ -80,7 +90,7 @@ func NewSessionHandler(db *database.DatabaseService, minio *storage.MinIOService
 		chunks:    db.RAGChunks,
 	}
 	return NewSessionHandlerWithDependencies(SessionHandlerDependencies{
-		Sessions: db.Sessions, Documents: source, Messages: db.Messages, Reviews: db.Reviews,
+		Sessions: db.Sessions, Documents: source, Turns: db.Turns, Messages: db.Messages, Reviews: db.Reviews,
 		Reviewer: learning_service.NewFeynmanReviewService(source),
 		Memory:   learning_service.NewMemoryService(db),
 	})
@@ -147,12 +157,46 @@ func (h *SessionHandler) Review(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return response.BadRequestCtx(c, err.Error())
 	}
+	req.RequestID = strings.TrimSpace(req.RequestID)
+	if req.RequestID == "" {
+		return response.BadRequestCtx(c, "request_id 不能为空")
+	}
 	req.Explanation = strings.TrimSpace(req.Explanation)
 	if req.Explanation == "" {
 		return response.BadRequestCtx(c, "explanation 不能为空")
 	}
+	if h.deps.Turns == nil {
+		return response.InternalServerCtx(c, "学习轮次存储未配置")
+	}
+	started, err := h.deps.Turns.BeginListenerTurn(c.Context(), session.ID, req.RequestID, req.Explanation)
+	if err != nil {
+		return response.InternalServerCtx(c, "创建学习轮次失败")
+	}
+	if started == nil || started.Turn == nil {
+		return response.InternalServerCtx(c, "创建学习轮次失败")
+	}
+	turn := started.Turn
+	if !started.Created {
+		switch turn.Status {
+		case learning_db.LearningTurnCompleted:
+			review, findErr := h.deps.Reviews.FindByTurn(c.Context(), turn.ID)
+			if findErr != nil {
+				return response.InternalServerCtx(c, "读取已完成审阅失败")
+			}
+			return response.SuccessCtx(c, reviewResultFromModel(review))
+		case learning_db.LearningTurnProcessing:
+			return c.Status(fiber.StatusConflict).JSON(response.FailWithCode(fiber.StatusConflict, "请求正在处理中"))
+		case learning_db.LearningTurnFailed:
+			if err := h.deps.Turns.RetryFailedTurn(c.Context(), turn.ID); err != nil {
+				return response.InternalServerCtx(c, "重试学习轮次失败")
+			}
+		default:
+			return response.InternalServerCtx(c, "学习轮次状态无效")
+		}
+	}
 	prior, err := h.deps.Reviews.FindBySession(c.Context(), session.ID)
 	if err != nil {
+		h.failTurn(c.Context(), turn.ID, "listener_context_failed", err)
 		return response.InternalServerCtx(c, "加载先前解释失败")
 	}
 	memoryItems := make([]*learning_db.LearningMemoryItem, 0)
@@ -169,15 +213,23 @@ func (h *SessionHandler) Review(c *fiber.Ctx) error {
 		PriorTurns: prior, MemoryItems: memoryItems,
 	})
 	if err != nil {
+		h.failTurn(c.Context(), turn.ID, "listener_failed", err)
 		log.Printf("Feynman review failed: session_id=%s user_id=%s document_id=%s err=%v", session.ID, userID, session.DocumentID, err)
 		return response.InternalServerCtx(c, "审阅解释失败,请重试")
 	}
 	if reviewResult == nil {
+		h.failTurn(c.Context(), turn.ID, "listener_empty_result", errors.New("reviewer returned no result"))
 		log.Printf("Feynman review returned no result: session_id=%s user_id=%s document_id=%s", session.ID, userID, session.DocumentID)
 		return response.InternalServerCtx(c, "审阅解释失败,请重试")
 	}
-	review := reviewModelFromResult(session, userID, req.Explanation, reviewResult)
-	if err := h.deps.Reviews.Create(c.Context(), review); err != nil {
+	review := reviewModelFromResult(reviewResult)
+	assistantContent, err := json.Marshal(reviewResult)
+	if err != nil {
+		h.failTurn(c.Context(), turn.ID, "listener_encode_failed", err)
+		return response.InternalServerCtx(c, "记录解释审阅失败")
+	}
+	if err := h.deps.Turns.CompleteListenerTurn(c.Context(), session.ID, turn.ID, string(assistantContent), review); err != nil {
+		h.failTurn(c.Context(), turn.ID, "listener_persist_failed", err)
 		return response.InternalServerCtx(c, "记录解释审阅失败")
 	}
 	if h.deps.Memory != nil {
@@ -186,6 +238,15 @@ func (h *SessionHandler) Review(c *fiber.Ctx) error {
 		}
 	}
 	return response.SuccessCtx(c, reviewResult)
+}
+
+func (h *SessionHandler) failTurn(ctx context.Context, turnID, errorCode string, cause error) {
+	if h.deps.Turns == nil || strings.TrimSpace(turnID) == "" || cause == nil {
+		return
+	}
+	if err := h.deps.Turns.FailTurn(ctx, turnID, errorCode, cause.Error()); err != nil {
+		log.Printf("mark learning turn failed: turn_id=%s code=%s err=%v", turnID, errorCode, err)
+	}
 }
 
 func (h *SessionHandler) Complete(c *fiber.Ctx) error {
@@ -248,13 +309,24 @@ func writeSessionLookupError(c *fiber.Ctx, err error) error {
 	return response.InternalServerCtx(c, "读取会话失败")
 }
 
-func reviewModelFromResult(session *learning_db.LearningSession, userID, explanation string, result *learning_service.FeynmanReview) *learning_db.LearningExplanationReview {
+func reviewModelFromResult(result *learning_service.FeynmanReview) *learning_db.LearningExplanationReview {
 	return &learning_db.LearningExplanationReview{
-		SessionID: session.ID, DocumentID: session.DocumentID, UserID: userID, Explanation: explanation,
 		HeardSummary: result.HeardSummary, ClearPoints: result.ClearPoints,
 		ConfusingPoints: result.ConfusingPoints, Misconceptions: result.Misconceptions,
 		FollowUpQuestion: result.FollowUpQuestion, ExplanationSummary: result.ExplanationSummary,
 		ReadyToWrapUp: result.ReadyToWrapUp, ContextSufficient: result.ContextSufficient,
+	}
+}
+
+func reviewResultFromModel(review *learning_db.LearningExplanationReview) *learning_service.FeynmanReview {
+	if review == nil {
+		return nil
+	}
+	return &learning_service.FeynmanReview{
+		HeardSummary: review.HeardSummary, ClearPoints: review.ClearPoints,
+		ConfusingPoints: review.ConfusingPoints, Misconceptions: review.Misconceptions,
+		FollowUpQuestion: review.FollowUpQuestion, ExplanationSummary: review.ExplanationSummary,
+		ReadyToWrapUp: review.ReadyToWrapUp, ContextSufficient: review.ContextSufficient,
 	}
 }
 
