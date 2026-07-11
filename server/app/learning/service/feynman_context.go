@@ -16,6 +16,8 @@ const (
 	FullDocumentCharacterLimit = 24000
 	FeynmanContextModeFull     = "full"
 	FeynmanContextModeRAG      = "rag"
+	// MinimumFeynmanEvidenceScore is a conservative cosine threshold for review evidence.
+	MinimumFeynmanEvidenceScore = 0.65
 
 	feynmanSearchLimit        = 6
 	feynmanNeighborRadius     = 1
@@ -98,8 +100,12 @@ func (b *FeynmanContextBuilder) Build(ctx context.Context, documentID, learnerEx
 	}
 	indexes := make([]int, 0, len(hits))
 	primaryIndexes := make(map[int]struct{}, len(hits))
+	qualifyingPrimaryIndexes := make(map[int]struct{}, len(hits))
 	for _, hit := range hits {
 		if hit.DocumentID == documentID && strings.TrimSpace(hit.Content) != "" {
+			if hit.Score >= MinimumFeynmanEvidenceScore {
+				qualifyingPrimaryIndexes[hit.ChunkIndex] = struct{}{}
+			}
 			if _, exists := primaryIndexes[hit.ChunkIndex]; exists {
 				continue
 			}
@@ -112,9 +118,9 @@ func (b *FeynmanContextBuilder) Build(ctx context.Context, documentID, learnerEx
 		return nil, fmt.Errorf("find Feynman evidence neighbors for %q: %w", documentID, err)
 	}
 	result.Evidence = mergeFeynmanEvidence(documentID, hits, neighbors)
-	result.ContextSufficient = len(primaryIndexes) >= minimumFeynmanPrimaryHits
+	result.ContextSufficient = len(qualifyingPrimaryIndexes) >= minimumFeynmanPrimaryHits
 	if !result.ContextSufficient {
-		result.ContextInsufficiencyReason = fmt.Sprintf("retrieval returned %d unique primary hit(s); at least %d are required", len(primaryIndexes), minimumFeynmanPrimaryHits)
+		result.ContextInsufficiencyReason = fmt.Sprintf("retrieval returned %d relevant primary hit(s); at least %d with score >= %.2f are required", len(qualifyingPrimaryIndexes), minimumFeynmanPrimaryHits, MinimumFeynmanEvidenceScore)
 	}
 	return result, nil
 }

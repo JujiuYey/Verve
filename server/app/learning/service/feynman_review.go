@@ -73,6 +73,10 @@ func parseFeynmanReviewOutput(text string, contextSufficient bool) (*FeynmanRevi
 			lastErr = errors.New("FeynmanReview requires one follow_up_question while ready_to_wrap_up is false")
 			continue
 		}
+		if review.ReadyToWrapUp && review.FollowUpQuestion != "" {
+			lastErr = errors.New("FeynmanReview follow_up_question must be blank while ready_to_wrap_up is true")
+			continue
+		}
 		review.ContextSufficient = contextSufficient
 		return &review, nil
 	}

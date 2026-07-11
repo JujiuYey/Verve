@@ -78,8 +78,8 @@ func TestFeynmanContextUsesDocumentScopedRAGWithoutTruncatingFullText(t *testing
 		document: &wiki_db.Document{ID: "doc-2", Filename: "并发.md"},
 		markdown: markdown,
 		searchResults: []rag_payload.SearchResult{
-			{ChunkID: "hit-3", DocumentID: "doc-2", ChunkIndex: 3, HeadingPath: "总览 > 进阶", Content: "命中三"},
-			{ChunkID: "hit-1", DocumentID: "doc-2", ChunkIndex: 1, HeadingPath: "总览 > 基础", Content: "命中一"},
+			{ChunkID: "hit-3", DocumentID: "doc-2", ChunkIndex: 3, Score: 0.91, HeadingPath: "总览 > 进阶", Content: "命中三"},
+			{ChunkID: "hit-1", DocumentID: "doc-2", ChunkIndex: 1, Score: 0.83, HeadingPath: "总览 > 基础", Content: "命中一"},
 		},
 		neighbors: []*rag_db.WikiChunk{
 			{ID: "neighbor-4", DocumentID: "doc-2", ChunkIndex: 4, HeadingPath: "总览 > 进阶 > 陷阱", Content: "相邻四"},
@@ -134,7 +134,7 @@ func TestFeynmanContextMarksInsufficientRAGEvidence(t *testing.T) {
 		document: &wiki_db.Document{ID: "doc-large", Filename: "large.md"},
 		markdown: strings.Repeat("x", FullDocumentCharacterLimit+1),
 		searchResults: []rag_payload.SearchResult{
-			{ChunkID: "only", DocumentID: "doc-large", ChunkIndex: 7, Content: "唯一证据"},
+			{ChunkID: "only", DocumentID: "doc-large", ChunkIndex: 7, Score: 0.9, Content: "唯一证据"},
 		},
 		neighbors: []*rag_db.WikiChunk{
 			{ID: "before", DocumentID: "doc-large", ChunkIndex: 6, Content: "前一个邻块"},
@@ -151,6 +151,39 @@ func TestFeynmanContextMarksInsufficientRAGEvidence(t *testing.T) {
 	}
 	if strings.TrimSpace(got.ContextInsufficiencyReason) == "" {
 		t.Fatalf("missing insufficiency reason")
+	}
+}
+
+func TestFeynmanContextRequiresTwoRelevantPrimaryHits(t *testing.T) {
+	tests := []struct {
+		name       string
+		scores     []float64
+		sufficient bool
+	}{
+		{name: "two low score hits", scores: []float64{MinimumFeynmanEvidenceScore - 0.01, 0.2}, sufficient: false},
+		{name: "one qualifying hit", scores: []float64{MinimumFeynmanEvidenceScore, MinimumFeynmanEvidenceScore - 0.01}, sufficient: false},
+		{name: "two qualifying hits", scores: []float64{MinimumFeynmanEvidenceScore, 0.95}, sufficient: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			source := &fakeFeynmanDocumentSource{
+				document: &wiki_db.Document{ID: "doc-scores", Filename: "scores.md"},
+				markdown: strings.Repeat("x", FullDocumentCharacterLimit+1),
+				searchResults: []rag_payload.SearchResult{
+					{ChunkID: "first", DocumentID: "doc-scores", ChunkIndex: 1, Score: tt.scores[0], Content: "第一条"},
+					{ChunkID: "second", DocumentID: "doc-scores", ChunkIndex: 2, Score: tt.scores[1], Content: "第二条"},
+				},
+			}
+
+			got, err := NewFeynmanContextBuilder(source).Build(context.Background(), "doc-scores", "解释")
+			if err != nil {
+				t.Fatalf("Build returned error: %v", err)
+			}
+			if got.ContextSufficient != tt.sufficient {
+				t.Fatalf("context sufficient = %t, want %t for scores %v", got.ContextSufficient, tt.sufficient, tt.scores)
+			}
+		})
 	}
 }
 

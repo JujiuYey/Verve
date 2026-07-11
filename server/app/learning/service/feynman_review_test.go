@@ -100,3 +100,11 @@ func TestParseFeynmanReviewOutputRequiresQuestionWhileNotReady(t *testing.T) {
 		t.Fatalf("non-wrap review without a question accepted: %#v", got)
 	}
 }
+
+func TestParseFeynmanReviewOutputRejectsQuestionWhenReady(t *testing.T) {
+	raw := `{"heard_summary":"我听到你的解释","clear_points":["已经清楚"],"confusing_points":[],"misconceptions":[],"follow_up_question":"还要再举一个例子吗？","explanation_summary":"解释可以收束","ready_to_wrap_up":true,"context_sufficient":true}`
+
+	if got, err := parseFeynmanReviewOutput(raw, true); err == nil {
+		t.Fatalf("ready review with a follow-up question accepted: %#v", got)
+	}
+}

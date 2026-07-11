@@ -1,19 +1,20 @@
 package prompts
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 )
 
 type FeynmanReviewerEvidence struct {
-	ChunkIndex  int
-	HeadingPath string
-	Content     string
+	ChunkIndex  int    `json:"chunk_index"`
+	HeadingPath string `json:"heading_path"`
+	Content     string `json:"content"`
 }
 
 type FeynmanReviewerTurn struct {
-	Explanation string
-	Review      string
+	Explanation string `json:"explanation"`
+	Review      string `json:"review"`
 }
 
 type FeynmanReviewerQueryInput struct {
@@ -40,21 +41,18 @@ func FeynmanReviewerPrompt(input Input) string {
 
 func FeynmanReviewerQueryPrompt(input FeynmanReviewerQueryInput) string {
 	var sb strings.Builder
-	sb.WriteString("<UNTRUSTED_SOURCE_METADATA>\n文档标题: ")
-	sb.WriteString(strings.TrimSpace(input.DocumentTitle))
-	sb.WriteString("\n\n## 完整标题大纲\n")
-	if len(input.Outline) == 0 {
-		sb.WriteString("- 暂无标题\n")
-	} else {
-		for _, heading := range input.Outline {
-			heading = strings.TrimSpace(heading)
-			if heading != "" {
-				sb.WriteString("- ")
-				sb.WriteString(heading)
-				sb.WriteByte('\n')
-			}
+	outline := make([]string, 0, len(input.Outline))
+	for _, heading := range input.Outline {
+		if heading = strings.TrimSpace(heading); heading != "" {
+			outline = append(outline, heading)
 		}
 	}
+	sb.WriteString("<UNTRUSTED_SOURCE_METADATA>\n")
+	appendFeynmanUntrustedJSON(&sb, struct {
+		DocumentTitle string   `json:"document_title"`
+		Outline       []string `json:"outline"`
+	}{DocumentTitle: strings.TrimSpace(input.DocumentTitle), Outline: outline})
+	sb.WriteByte('\n')
 	sb.WriteString("</UNTRUSTED_SOURCE_METADATA>\n")
 	sb.WriteString("\n上下文模式: ")
 	sb.WriteString(strings.TrimSpace(input.Mode))
@@ -67,41 +65,41 @@ func FeynmanReviewerQueryPrompt(input FeynmanReviewerQueryInput) string {
 
 	if input.Mode == "full" {
 		sb.WriteString("\n\n## 完整原文\n<UNTRUSTED_SOURCE_TEXT>\n")
-		sb.WriteString(input.FullText)
+		appendFeynmanUntrustedJSON(&sb, input.FullText)
 		sb.WriteString("\n</UNTRUSTED_SOURCE_TEXT>")
 	} else {
 		sb.WriteString("\n\n## RAG 证据\n<UNTRUSTED_RAG_EVIDENCE>\n")
-		if len(input.Evidence) == 0 {
-			sb.WriteString("- 未检索到相关证据\n")
-		} else {
-			for _, evidence := range input.Evidence {
-				sb.WriteString(fmt.Sprintf("[chunk %d] %s\n", evidence.ChunkIndex, strings.TrimSpace(evidence.HeadingPath)))
-				sb.WriteString(strings.TrimSpace(evidence.Content))
-				sb.WriteString("\n\n")
-			}
+		evidence := input.Evidence
+		if evidence == nil {
+			evidence = []FeynmanReviewerEvidence{}
 		}
+		appendFeynmanUntrustedJSON(&sb, evidence)
+		sb.WriteByte('\n')
 		sb.WriteString("</UNTRUSTED_RAG_EVIDENCE>")
 	}
 
 	sb.WriteString("\n\n## 先前解释与审阅\n<UNTRUSTED_PRIOR_TURNS>\n")
-	if len(input.PriorTurns) == 0 {
-		sb.WriteString("- 暂无先前轮次\n")
-	} else {
-		for i, turn := range input.PriorTurns {
-			sb.WriteString(fmt.Sprintf("### 第 %d 轮\n", i+1))
-			sb.WriteString("学习者解释: ")
-			sb.WriteString(strings.TrimSpace(turn.Explanation))
-			sb.WriteString("\n倾听者审阅: ")
-			sb.WriteString(strings.TrimSpace(turn.Review))
-			sb.WriteByte('\n')
-		}
+	priorTurns := input.PriorTurns
+	if priorTurns == nil {
+		priorTurns = []FeynmanReviewerTurn{}
 	}
+	appendFeynmanUntrustedJSON(&sb, priorTurns)
+	sb.WriteByte('\n')
 	sb.WriteString("</UNTRUSTED_PRIOR_TURNS>\n")
 
 	sb.WriteString("\n## 本轮新解释\n<UNTRUSTED_LEARNER_INPUT>\n")
-	sb.WriteString(strings.TrimSpace(input.NewExplanation))
+	appendFeynmanUntrustedJSON(&sb, strings.TrimSpace(input.NewExplanation))
 	sb.WriteString("\n</UNTRUSTED_LEARNER_INPUT>")
 	return sb.String()
+}
+
+func appendFeynmanUntrustedJSON(sb *strings.Builder, value any) {
+	data, err := json.MarshalIndent(value, "", "  ")
+	if err != nil {
+		sb.WriteString("null")
+		return
+	}
+	sb.Write(data)
 }
 
 const feynmanReviewerInstruction = `你是费曼学习循环中的倾听者。你要根据提供的原文或检索证据,认真听学习者如何解释,并给出帮助对方继续讲清楚的反馈。
