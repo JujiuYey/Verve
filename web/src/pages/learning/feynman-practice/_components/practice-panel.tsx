@@ -33,6 +33,7 @@ type PracticePanelProps = {
   isSubmitting: boolean;
   isCompleting: boolean;
   isCompleted: boolean;
+  hasDraft: boolean;
   completedSummary: string;
   onAnswerChange: (value: string) => void;
   onSubmit: () => void;
@@ -46,6 +47,7 @@ export function PracticePanel({
   isSubmitting,
   isCompleting,
   isCompleted,
+  hasDraft,
   completedSummary,
   onAnswerChange,
   onSubmit,
@@ -125,15 +127,22 @@ export function PracticePanel({
               />
 
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-xs text-muted-foreground">
-                  {turns.length > 0 ? `已经完成 ${turns.length} 轮解释` : "第一轮可以先讲整体脉络"}
-                </p>
+                <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                  <p>
+                    {turns.length > 0
+                      ? `已经完成 ${turns.length} 轮解释`
+                      : "第一轮可以先讲整体脉络"}
+                  </p>
+                  {turns.length > 0 && hasDraft ? (
+                    <p>先提交或清空当前解释，再结束本次练习。</p>
+                  ) : null}
+                </div>
                 <div className="flex flex-wrap gap-2">
                   {turns.length > 0 && !readyToWrapUp ? (
                     <Button
                       variant="outline"
                       onClick={onComplete}
-                      disabled={isCompleting || isSubmitting}
+                      disabled={hasDraft || isCompleting || isSubmitting}
                     >
                       {isCompleting ? (
                         <Spinner data-icon="inline-start" />
@@ -156,7 +165,10 @@ export function PracticePanel({
                     {isSubmitting ? "正在听你的解释" : turns.length > 0 ? "继续补充" : "提交解释"}
                   </Button>
                   {readyToWrapUp ? (
-                    <Button onClick={onComplete} disabled={isCompleting || isSubmitting}>
+                    <Button
+                      onClick={onComplete}
+                      disabled={hasDraft || isCompleting || isSubmitting}
+                    >
                       {isCompleting ? (
                         <Spinner data-icon="inline-start" />
                       ) : (

@@ -141,7 +141,7 @@ export function FeynmanWorkbenchPage() {
       return;
     }
 
-    setTurns(sessionDetail.reviews || []);
+    setTurns((current) => mergeReviewTurns(current, sessionDetail.reviews || []));
     setCompletedSummary(
       sessionDetail.session.status === "completed"
         ? sessionDetail.session.summary || "你的解释记录已经保存。"
@@ -190,7 +190,14 @@ export function FeynmanWorkbenchPage() {
 
   const finishPractice = async () => {
     const submittedIdentity = requestIdentity;
-    if (!sessionReady || turns.length === 0 || completingIdentity === submittedIdentity) return;
+    if (
+      !sessionReady ||
+      turns.length === 0 ||
+      answer.trim() ||
+      completingIdentity === submittedIdentity
+    ) {
+      return;
+    }
 
     setCompletingIdentity(submittedIdentity);
     try {
@@ -322,6 +329,7 @@ export function FeynmanWorkbenchPage() {
             isSubmitting={isReviewing}
             isCompleting={isCompleting}
             isCompleted={isCompleted}
+            hasDraft={answer.trim().length > 0}
             completedSummary={completedSummary}
             onAnswerChange={setAnswer}
             onSubmit={() => void submitExplanation()}
@@ -331,6 +339,30 @@ export function FeynmanWorkbenchPage() {
       </Tabs>
     </div>
   );
+}
+
+function mergeReviewTurns(
+  current: LearningExplanationReview[],
+  serverTurns: LearningExplanationReview[],
+) {
+  const remaining = [...current];
+  const merged = serverTurns.map((serverTurn) => {
+    for (let index = remaining.length - 1; index >= 0; index -= 1) {
+      const turn = remaining[index];
+      const isPersistedTurn = turn.id === serverTurn.id;
+      const isMatchingLocalTurn =
+        turn.id.startsWith("local-") &&
+        turn.session_id === serverTurn.session_id &&
+        turn.document_id === serverTurn.document_id &&
+        turn.explanation === serverTurn.explanation;
+      if (isPersistedTurn || isMatchingLocalTurn) {
+        remaining.splice(index, 1);
+      }
+    }
+    return serverTurn;
+  });
+
+  return [...merged, ...remaining.filter((turn) => turn.id.startsWith("local-"))];
 }
 
 function SessionProblem({
