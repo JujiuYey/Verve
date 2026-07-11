@@ -132,7 +132,8 @@ POST /api/learning/session/:id/turns
 {
   "request_id": "client-generated UUID",
   "agent_type": "listener | teacher | curator",
-  "content": "learner input"
+  "content": "learner input",
+  "replaces_change_request_id": "optional conflicted request ID"
 }
 ```
 
@@ -206,6 +207,8 @@ Add:
 
 `file_path` always points to the immutable object for `current_version`. `content_hash` is temporarily nullable only for legacy documents that have not yet been snapshotted.
 
+Every content write uses the same document-version service. This includes Curator apply and the existing `PUT /api/wiki/documents/:id/content` editor save path; the existing editor may not overwrite the current MinIO object in place or bypass revision and RAG job creation.
+
 ### wiki_document_change_requests
 
 Store:
@@ -215,6 +218,7 @@ Store:
 - idempotent request ID
 - base version
 - original instruction
+- optional replaced change-request ID for conflict regeneration
 - model change summary
 - complete proposed Markdown
 - backend-generated unified diff
@@ -238,6 +242,8 @@ Store immutable revision metadata:
 `(document_id, version)` is unique.
 
 New uploads create revision 1 immediately. Legacy documents are snapshotted lazily before their first Curator apply: the service reads the current object, writes it to an immutable revision-1 path, calculates its hash, inserts revision 1, and fills `wiki_documents.content_hash`.
+
+Deleting a Wiki document removes Qdrant vectors and every known revision object path before deleting PostgreSQL metadata. The background cleanup non-goal applies only to unreferenced objects left by failed cross-system writes.
 
 ## Curator Confirmation Flow
 
@@ -276,7 +282,7 @@ If MinIO succeeds but the transaction fails, the database never points to the ne
 
 Repeated apply for an already applied request returns the persisted revision result. Cancel is idempotent for an already cancelled request. Applied, cancelled, conflict, and failed requests cannot transition back to proposed.
 
-A conflict is never overwritten or mutated into a new proposal. The UI creates a new Curator turn with a new `request_id`, the same instruction, and a reference to the replaced request.
+A conflict is never overwritten or mutated into a new proposal. The UI creates a new Curator turn with a new `request_id`, the same instruction, and `replaces_change_request_id` referencing the conflicted request.
 
 ## Version-Aware RAG
 
@@ -289,7 +295,7 @@ Add `document_version` to:
 
 Vector point IDs include document ID, version, and chunk identity. Existing version-1 Qdrant payloads do not require an eager backfill because PostgreSQL performs the authoritative version check.
 
-Index jobs add `superseded` to their status set and are unique per `(document_id, document_version)`. A job records the immutable revision object path when created and never reloads `wiki_documents.file_path` while running.
+Index jobs add `superseded` to their status set and allow only one non-superseded row per `(document_id, document_version)`. A job records the immutable revision object path when created and never reloads `wiki_documents.file_path` while running. During migration, existing jobs become version 1 and all but the newest job per document become superseded.
 
 Publish sequence:
 
@@ -315,6 +321,13 @@ When the current version is not indexed:
 - Documents within the existing full-document character limit use current Markdown directly.
 - Larger documents return a typed `index_not_ready` context result.
 - The practice page shows that knowledge retrieval is still syncing and offers retry after the job fails.
+
+The existing document indexing endpoint retries the current version rather than creating a duplicate job, and a focused status endpoint supports the practice page:
+
+```text
+GET  /api/rag/wiki/documents/:id/index-status
+POST /api/rag/wiki/documents/:id/index
+```
 
 Legacy documents, chunks, and jobs are assigned version 1 during migration. Existing Qdrant points remain usable because their PostgreSQL chunk rows supply version 1; newly indexed points include `document_version` in both stores.
 
