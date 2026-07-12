@@ -6,8 +6,9 @@ Approved product decisions:
 
 - The learner explicitly selects `FeynmanListener`, `LearningTeacher`, or `WikiCurator` for every input.
 - The practice flow does not use a Supervisor or model-based router.
-- All three Agents share one chronological timeline and one input composer.
-- Agent selection uses a segmented control and affects only the next input.
+- The backend keeps one chronological timeline, while the practice page filters history into three Agent-specific top-level tabs.
+- The page has four top-level tabs: Reading article, Start explaining, Teaching supplement, and Revise document.
+- Each Agent tab fixes the target Agent and keeps its own local draft; there is no nested Agent selector.
 - WikiCurator proposals, diffs, confirmation, cancellation, conflicts, and failures render inline in the originating turn.
 - Wiki writes use proposal, user confirmation, and deterministic backend execution.
 - Wiki document versions and RAG index versions are bound.
@@ -24,7 +25,7 @@ Deliver a complete three-Agent practice experience in which a learner can:
 4. Reload the page and recover the same ordered turn history and artifacts.
 5. Trust that teaching and review use the current Wiki version and never silently use stale RAG evidence.
 
-The feature is complete only when all three Agent paths have real backend behavior and are available through the page selector. A schema-only, API-only, or UI-only phase is not the completed feature.
+The feature is complete only when all three Agent paths have real backend behavior and are available through their top-level practice tabs. A schema-only, API-only, or UI-only phase is not the completed feature.
 
 ## Non-Goals
 
@@ -47,17 +48,17 @@ The repository already contains:
 - Wiki documents stored in MinIO with metadata in PostgreSQL.
 - Markdown-aware chunks in PostgreSQL and vectors in Qdrant.
 - A per-document RAG indexing flow.
-- shadcn `ToggleGroup`, `Badge`, `Alert`, and `Button` components.
+- shadcn `Tabs`, `Badge`, `Alert`, and `Button` components.
 - `ai-elements` message, artifact, and confirmation components.
 
-Missing pieces are Wiki revisions, version-aware RAG, Teacher and Curator services, a unified Turn API, unified timeline responses, and the Agent selector UI.
+Missing pieces are Wiki revisions, version-aware RAG, Teacher and Curator services, a unified Turn API, unified timeline responses, and the four-tab practice UI.
 
 ## Architecture Decision
 
 Use one explicit Turn API rather than three unrelated submit APIs or a routing Agent:
 
 ```text
-shared composer
+Agent-specific top-level tab and shared composer component
   -> POST /api/learning/session/:id/turns
       -> listener service
       -> teacher service
@@ -333,24 +334,29 @@ Legacy documents, chunks, and jobs are assigned version 1 during migration. Exis
 
 ## Practice Page Experience
 
-The existing top-level `Reading article` and `Start explaining` tabs remain. Inside the practice view, add a segmented Agent selector:
+The practice page exposes four top-level tabs:
 
 ```text
-[ Listener ] [ Teacher ] [ Wiki editor ]
+[ Reading article ] [ Start explaining ] [ Teaching supplement ] [ Revise document ]
 ```
 
 Rules:
 
-- Listener is selected on initial load and after a full page reload.
-- Selection is local UI state and is not persisted on the session.
-- Switching affects only the next submitted turn.
-- One composer and one timeline serve all Agents.
-- While a request is processing, disable selector changes and duplicate submission.
+- Reading article renders the current source document without an Agent composer.
+- Start explaining fixes `agent_type=listener` and shows only Listener turns.
+- Teaching supplement fixes `agent_type=teacher` and shows only Teacher turns.
+- Revise document fixes `agent_type=curator` and shows only Curator turns and proposal actions.
+- The backend session timeline remains unified and chronological; filtering is presentation-only and does not create separate sessions.
+- Each Agent tab keeps an independent local draft so switching tasks does not carry input into another Agent.
+- While a request is processing, disable duplicate submission. The learner may still inspect another top-level tab.
 - Completing the session disables all new Agent turns.
-- Input placeholder and submit label reflect the selected Agent.
+- The completion action is available only in Start explaining after at least one Listener turn.
+- Current-version index synchronization and retry messaging appear in Teaching supplement, where grounded retrieval is required.
+- Each Agent tab count reflects only that Agent's turns.
 
 Timeline rendering:
 
+- Each Agent tab filters the unified timeline by `turn.agent_type` and preserves chronological order within that filtered history.
 - Every item displays Agent identity and turn status.
 - Listener artifact uses the current review presentation.
 - Teacher artifact displays the response, knowledge gaps, key points, examples, and evidence.
@@ -393,9 +399,9 @@ Required coverage:
 - Legacy revision snapshot, apply success, repeated apply, cancel, access denial, version conflict, MinIO failure, and transaction failure.
 - RAG job version pinning, superseded jobs, current-version chunk replacement, Qdrant payloads, and stale-result rejection.
 - Timeline assembly and artifact mapping.
-- Frontend timeline merge, Agent artifact mapping, and Curator state transitions.
+- Frontend timeline merge, Agent filtering, artifact mapping, independent drafts, and Curator state transitions.
 
-Per project policy, do not add tests for page layout, segmented-control composition, or ordinary route wiring. Do not use screenshots, browser automation, or visual self-check loops. The user performs visual acceptance in the running page.
+Per project policy, do not add tests for page layout, tab composition, or ordinary route wiring. Do not use screenshots, browser automation, or visual self-check loops. The user performs visual acceptance in the running page.
 
 ## Delivery Decomposition
 
@@ -409,9 +415,9 @@ Delivers Wiki revision persistence, legacy snapshot behavior, versioned indexing
 
 Delivers Agent constructors, prompts, services, artifact persistence, unified submission, completed replay, and timeline assembly. It depends on Plan 1 for Curator proposals and revision apply behavior.
 
-### Plan 3: Unified Timeline and Agent Selector UI
+### Plan 3: Unified Timeline and Agent Practice UI
 
-Delivers the shared composer, segmented Agent selection, three artifact renderers, inline Curator confirmation, conflict regeneration, and index synchronization states. It depends on Plans 1 and 2.
+Delivers the shared composer component, four top-level tabs, Agent-filtered histories, three artifact renderers, inline Curator confirmation, conflict regeneration, and index synchronization states. It depends on Plans 1 and 2.
 
 No plan may be described as the completed three-Agent feature by itself.
 
@@ -419,10 +425,10 @@ No plan may be described as the completed three-Agent feature by itself.
 
 The feature is complete when:
 
-- The practice page visibly offers all three Agent choices.
-- Each choice sends the next input to exactly the selected Agent.
-- Listener, Teacher, and Curator each persist the correct artifact and appear in one ordered timeline.
-- Refresh restores the same timeline and artifact states.
+- The practice page visibly offers Reading article, Start explaining, Teaching supplement, and Revise document as four top-level tabs.
+- Each Agent tab sends input to exactly its fixed Agent without a nested selector.
+- Listener, Teacher, and Curator each persist the correct artifact in one backend timeline and appear only in their corresponding filtered history.
+- Switching Agent tabs preserves independent drafts, and refresh restores the persisted timeline and artifact states.
 - Curator never writes before explicit confirmation.
 - Apply creates an immutable revision and a version-pinned RAG job.
 - Version conflicts cannot overwrite newer Markdown.
