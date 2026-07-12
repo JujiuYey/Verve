@@ -74,7 +74,7 @@ type fakeDocumentIndexer struct {
 	calls        *[]string
 }
 
-func (f *fakeDocumentIndexer) IndexDocument(ctx context.Context, documentID string) error {
+func (f *fakeDocumentIndexer) ProcessJob(ctx context.Context, jobID string) error {
 	return nil
 }
 func (f *fakeDocumentIndexer) DeleteDocumentVectors(ctx context.Context, documentID string) error {

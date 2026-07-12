@@ -2,18 +2,17 @@ package handlers
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"log"
 
 	"github.com/gofiber/fiber/v2"
 
-	"github.com/google/uuid"
-
+	rag_db "verve/app/rag/models/db"
 	rag_service "verve/app/rag/service"
 	wiki_db "verve/app/wiki/models/db"
 	wiki_payload "verve/app/wiki/models/payload"
 	wiki_repo "verve/app/wiki/repository"
+	wiki_service "verve/app/wiki/service"
 	"verve/common/response"
 	"verve/infrastructure/database"
 	"verve/infrastructure/storage"
@@ -38,8 +37,17 @@ type documentFileStore interface {
 }
 
 type documentIndexer interface {
-	IndexDocument(ctx context.Context, documentID string) error
+	ProcessJob(ctx context.Context, jobID string) error
 	DeleteDocumentVectors(ctx context.Context, documentID string) error
+}
+
+type documentVersionService interface {
+	CreateInitial(ctx context.Context, input wiki_service.InitialDocumentInput) (*wiki_db.Document, *rag_db.IndexJob, error)
+	SaveDirectEdit(ctx context.Context, userID, documentID, content string) (*wiki_db.DocumentRevision, *rag_db.IndexJob, error)
+}
+
+type revisionPathRepository interface {
+	ListRevisionObjectPaths(ctx context.Context, documentID string) ([]string, error)
 }
 
 // 文档处理器
@@ -47,6 +55,8 @@ type DocumentHandler struct {
 	documentRepository documentRepository
 	minioService       documentFileStore
 	indexer            documentIndexer
+	versions           documentVersionService
+	revisions          revisionPathRepository
 }
 
 // 创建文档处理器
@@ -55,15 +65,26 @@ func NewDocumentHandler(dbService *database.DatabaseService, minioService *stora
 		wiki_repo.NewDocumentRepository(dbService.GetDB()),
 		minioService,
 		indexer,
+		wiki_service.NewDocumentVersionService(dbService.Revisions, dbService.Versions, dbService.Documents, minioService, dbService.ChangeRequests),
+		dbService.Revisions,
 	)
 }
 
-func NewDocumentHandlerWithDependencies(repo documentRepository, minioService documentFileStore, indexer documentIndexer) *DocumentHandler {
-	return &DocumentHandler{
+func NewDocumentHandlerWithDependencies(repo documentRepository, minioService documentFileStore, indexer documentIndexer, dependencies ...any) *DocumentHandler {
+	handler := &DocumentHandler{
 		documentRepository: repo,
 		minioService:       minioService,
 		indexer:            indexer,
 	}
+	for _, dependency := range dependencies {
+		switch dependency := dependency.(type) {
+		case documentVersionService:
+			handler.versions = dependency
+		case revisionPathRepository:
+			handler.revisions = dependency
+		}
+	}
+	return handler
 }
 
 // 获取文档列表
@@ -137,9 +158,6 @@ func (h *DocumentHandler) Upload(c *fiber.Ctx) error {
 		return response.BadRequestCtx(c, "缺少文件夹ID")
 	}
 
-	// 生成唯一的文件路径：documents/{uuid}/{filename}
-	objectName := fmt.Sprintf("documents/%s/%s", uuid.New().String(), file.Filename)
-
 	// 打开文件
 	f, err := file.Open()
 	if err != nil {
@@ -148,29 +166,29 @@ func (h *DocumentHandler) Upload(c *fiber.Ctx) error {
 	}
 	defer f.Close()
 
-	// 1. 上传到 MinIO
-	log.Println("☁️  正在上传文件到 MinIO...")
+	if h.versions == nil {
+		return response.InternalServerCtx(c, "文档版本服务未初始化")
+	}
+	userID, _ := c.Locals("user_id").(string)
+	if userID == "" {
+		return response.UnauthorizedCtx(c, "未登录或登录已过期")
+	}
+	content, err := io.ReadAll(f)
+	if err != nil {
+		return response.InternalServerCtx(c, "读取上传文件失败")
+	}
 	contentType := file.Header.Get("Content-Type")
 	if contentType == "" {
-		contentType = "application/octet-stream"
+		contentType = "text/markdown"
 	}
-
-	err = h.minioService.UploadFile(c.Context(), objectName, f, file.Size, contentType)
+	doc, job, err := h.versions.CreateInitial(c.Context(), wiki_service.InitialDocumentInput{
+		UserID: userID, FolderID: folderID, Filename: file.Filename, Content: content, ContentType: contentType,
+	})
 	if err != nil {
-		log.Printf("❌ 上传到 MinIO 失败: %v", err)
-		return response.InternalServerCtx(c, "上传文件失败: "+err.Error())
-	}
-
-	// 2. 创建数据库记录（使用预生成的 UUID）
-	doc, err := h.documentRepository.Create(c.Context(), folderID, file.Filename, file.Size, objectName)
-	if err != nil {
-		log.Printf("❌ 创建文档记录失败: %v", err)
-		// 回滚：删除已上传的文件
-		h.minioService.DeleteFile(c.Context(), objectName)
-		return response.InternalServerCtx(c, "创建文档记录失败: "+err.Error())
+		return response.InternalServerCtx(c, "创建文档版本失败")
 	}
 	log.Printf("✅ 文档上传成功，ID: %s", doc.ID)
-	h.indexDocumentAsync(doc.ID)
+	h.processJobAsync(job.ID)
 
 	return response.SuccessCtx(c, doc)
 }
@@ -231,26 +249,20 @@ func (h *DocumentHandler) UpdateContent(c *fiber.Ctx) error {
 		return response.BadRequestCtx(c, "参数错误: "+err.Error())
 	}
 
-	// 获取文档记录
-	doc, err := h.documentRepository.FindOne(c.Context(), docID)
-	if err != nil {
-		return response.NotFoundCtx(c, "文档不存在")
+	if h.versions == nil {
+		return response.InternalServerCtx(c, "文档版本服务未初始化")
 	}
-
-	// 写入 MinIO
-	if err := h.minioService.PutFileContent(c.Context(), doc.FilePath, req.Content); err != nil {
-		log.Printf("❌ 写入文件内容失败: %v", err)
+	userID, _ := c.Locals("user_id").(string)
+	if userID == "" {
+		return response.UnauthorizedCtx(c, "未登录或登录已过期")
+	}
+	_, job, err := h.versions.SaveDirectEdit(c.Context(), userID, docID, req.Content)
+	if err != nil {
 		return response.InternalServerCtx(c, "保存文件内容失败")
 	}
 
-	// 更新文件大小
-	fileSize := int64(len(req.Content))
-	if err := h.documentRepository.UpdateFileSize(c.Context(), docID, fileSize); err != nil {
-		log.Printf("⚠️  更新文件大小失败: %v", err)
-	}
-
 	log.Printf("✅ 文档内容已更新: %s", docID)
-	h.indexDocumentAsync(docID)
+	h.processJobAsync(job.ID)
 	return response.SuccessMsgCtx(c, "文档内容已保存")
 }
 
@@ -270,8 +282,20 @@ func (h *DocumentHandler) Delete(c *fiber.Ctx) error {
 		}
 	}
 
-	if err := h.minioService.DeleteFile(c.Context(), doc.FilePath); err != nil {
-		return response.InternalServerCtx(c, "删除文档文件失败: "+err.Error())
+	paths := []string{doc.FilePath}
+	if h.revisions != nil {
+		revisionPaths, err := h.revisions.ListRevisionObjectPaths(c.Context(), docID)
+		if err != nil {
+			return response.InternalServerCtx(c, "获取文档修订失败")
+		}
+		if len(revisionPaths) > 0 {
+			paths = revisionPaths
+		}
+	}
+	for _, objectPath := range paths {
+		if err := h.minioService.DeleteFile(c.Context(), objectPath); err != nil {
+			return response.InternalServerCtx(c, "删除文档文件失败: "+err.Error())
+		}
 	}
 
 	if err := h.documentRepository.DeleteWithChunks(c.Context(), docID); err != nil {
@@ -281,13 +305,13 @@ func (h *DocumentHandler) Delete(c *fiber.Ctx) error {
 	return response.SuccessMsgCtx(c, "文档删除成功")
 }
 
-func (h *DocumentHandler) indexDocumentAsync(documentID string) {
+func (h *DocumentHandler) processJobAsync(jobID string) {
 	if h.indexer == nil {
 		return
 	}
 	go func() {
-		if err := h.indexer.IndexDocument(context.Background(), documentID); err != nil {
-			log.Printf("⚠️  文档索引失败: document_id=%s err=%v", documentID, err)
+		if err := h.indexer.ProcessJob(context.Background(), jobID); err != nil {
+			log.Printf("⚠️  文档索引失败: job_id=%s err=%v", jobID, err)
 		}
 	}()
 }

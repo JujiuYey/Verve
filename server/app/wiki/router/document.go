@@ -17,6 +17,7 @@ func SetupDocumentRoutes(
 	indexer *rag_service.Indexer,
 ) {
 	docHandler := wiki_handlers.NewDocumentHandler(dbService, minioService, indexer)
+	changeRequestHandler := wiki_handlers.NewChangeRequestHandler(dbService, minioService)
 
 	docs := router.Group("/wiki/documents")
 	{
@@ -36,5 +37,11 @@ func SetupDocumentRoutes(
 		docs.Get("/:id/content", docHandler.GetContent)
 		// 更新文档内容
 		docs.Put("/:id/content", docHandler.UpdateContent)
+	}
+
+	changeRequests := router.Group("/wiki/change-requests")
+	{
+		changeRequests.Post("/:id/apply", changeRequestHandler.Apply)
+		changeRequests.Post("/:id/cancel", changeRequestHandler.Cancel)
 	}
 }
