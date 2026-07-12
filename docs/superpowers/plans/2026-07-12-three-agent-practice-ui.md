@@ -1,6 +1,6 @@
 # Unified Timeline and Agent Selector UI Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Replace the Listener-only practice panel with one recoverable timeline, shared composer, explicit three-Agent selector, and inline Curator confirmation.
 
@@ -17,7 +17,7 @@
 - Modify: `web/src/api/wiki/document.ts`
 - Modify: `web/src/api/rag/wiki.ts`
 
-- [ ] **Step 1: Add exact discriminated-union types**
+- [x] **Step 1: Add exact discriminated-union types**
 
 ```ts
 export type LearningAgentType = "listener" | "teacher" | "curator";
@@ -33,17 +33,17 @@ export interface TimelineItem {
 }
 ```
 
-- [ ] **Step 2: Add hooks**
+- [x] **Step 2: Add hooks**
 
 Add `useSubmitTurn`, `useApplyWikiChangeRequest`, `useCancelWikiChangeRequest`, `useDocumentIndexStatus`, and `useRetryDocumentIndex`. Extend index status with `superseded` and `document_version`. `SessionDetail` includes `timeline` while keeping existing compatibility fields.
 
-- [ ] **Step 3: Run type checking**
+- [x] **Step 3: Run type checking**
 
 Run: `pnpm --dir web lint:type`
 
 Expected: PASS before page migration because the new fields are additive.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add web/src/api/learning/session.ts web/src/api/wiki/document.ts web/src/api/rag/wiki.ts
@@ -58,7 +58,7 @@ git commit -m "feat(web): add three-agent timeline contracts"
 - Create: `web/src/pages/learning/feynman-practice/_lib/timeline.ts`
 - Create: `web/src/pages/learning/feynman-practice/_lib/timeline.test.ts`
 
-- [ ] **Step 1: Write failing reconciliation tests**
+- [x] **Step 1: Write failing reconciliation tests**
 
 Cover server ordering, one local placeholder consumed per persisted request ID, stale server snapshots, artifact status replacement, and conflict regeneration input.
 
@@ -70,15 +70,15 @@ export function curatorRegenerationInput(item: TimelineItem): {
 };
 ```
 
-- [ ] **Step 2: Run tests and verify RED**
+- [x] **Step 2: Run tests and verify RED**
 
 Run: `pnpm --dir web exec vitest run src/pages/learning/feynman-practice/_lib/timeline.test.ts`
 
-- [ ] **Step 3: Implement pure functions and verify GREEN**
+- [x] **Step 3: Implement pure functions and verify GREEN**
 
 Run the same command and expect PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add web/src/pages/learning/feynman-practice/_lib
@@ -96,30 +96,30 @@ git commit -m "test(web): define agent timeline reconciliation"
 - Create: `web/src/pages/learning/feynman-practice/_components/curator-artifact.tsx`
 - Delete: `web/src/pages/learning/feynman-practice/_components/practice-panel.tsx`
 
-- [ ] **Step 1: Build `AgentSelector` from shadcn ToggleGroup**
+- [x] **Step 1: Build `AgentSelector` from shadcn ToggleGroup**
 
 Use `type="single"`, never allow an empty selection, include Ear, GraduationCap, and FilePen icons, and disable it during a request or completed session.
 
-- [ ] **Step 2: Build the shared composer**
+- [x] **Step 2: Build the shared composer**
 
 Reuse `FeynmanAnswerEditor`. Map selected Agent to explicit placeholder, submit label, and progress text. Preserve the existing end-session controls and Listener wrap-up guidance.
 
-- [ ] **Step 3: Build the timeline shell**
+- [x] **Step 3: Build the timeline shell**
 
 Use `ai-elements/Message` for user and assistant content, a Badge for Agent identity, and stable dimensions so status changes do not shift the composer.
 
-- [ ] **Step 4: Build artifact renderers**
+- [x] **Step 4: Build artifact renderers**
 
 Move current review presentation into `ListenerArtifact`. Render Teacher structured lists and evidence without nested cards. Render Curator diff inside `Artifact` and actions inside `Confirmation`; map proposed to approval-requested, applied to accepted, cancelled to rejected, and conflict/failed to Alert states.
 
-- [ ] **Step 5: Format and type-check components**
+- [x] **Step 5: Format and type-check components**
 
 ```bash
 pnpm --dir web exec oxfmt --write src/pages/learning/feynman-practice/_components
 pnpm --dir web lint:type
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add web/src/pages/learning/feynman-practice/_components
@@ -131,7 +131,7 @@ git commit -m "feat(web): add three-agent practice components"
 **Files:**
 - Modify: `web/src/pages/learning/feynman-practice/index.tsx`
 
-- [ ] **Step 1: Replace review-only local state**
+- [x] **Step 1: Replace review-only local state**
 
 Use:
 
@@ -142,30 +142,30 @@ const [timeline, setTimeline] = useState<TimelineItem[]>([]);
 
 Reset selected Agent to Listener only when route identity changes or the page reloads. Merge `sessionDetail.timeline` after each refetch.
 
-- [ ] **Step 2: Submit selected Agent turns**
+- [x] **Step 2: Submit selected Agent turns**
 
 Generate one request UUID per submit, add a local processing item, call `useSubmitTurn`, and replace it from the response. Disable selector and composer while the request identity is active.
 
-- [ ] **Step 3: Wire Curator apply, cancel, and regenerate**
+- [x] **Step 3: Wire Curator apply, cancel, and regenerate**
 
 Apply and cancel update the originating artifact from the API response and invalidate both session detail and Wiki document content. Conflict regeneration submits a new Curator turn with a new request UUID and the original instruction.
 
-- [ ] **Step 4: Preserve session completion semantics**
+- [x] **Step 4: Preserve session completion semantics**
 
 Count Listener artifacts for wrap-up messaging, but render all Agent turns. Do not let Teacher or Curator artifacts alone mark Listener understanding or mastery.
 
-- [ ] **Step 5: Show current-version index status**
+- [x] **Step 5: Show current-version index status**
 
 Display a compact Alert when the current version is pending/running or failed. A failed state calls `useRetryDocumentIndex`; pending/running states do not expose stale evidence or a redundant retry button.
 
-- [ ] **Step 6: Run type and logic checks**
+- [x] **Step 6: Run type and logic checks**
 
 ```bash
 pnpm --dir web exec vitest run src/pages/learning/feynman-practice/_lib/timeline.test.ts
 pnpm --dir web lint:type
 ```
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add web/src/pages/learning/feynman-practice/index.tsx
@@ -176,7 +176,7 @@ git commit -m "feat(web): wire explicit agent selection into practice"
 
 **Files:** all files from Plans 1-3
 
-- [ ] **Step 1: Run frontend verification**
+- [x] **Step 1: Run frontend verification**
 
 ```bash
 pnpm --dir web exec vitest run src/pages/learning/feynman-practice/_lib/timeline.test.ts
@@ -184,16 +184,16 @@ pnpm --dir web lint:type
 pnpm --dir web exec oxfmt --check src/api/learning/session.ts src/api/wiki/document.ts src/pages/learning/feynman-practice
 ```
 
-- [ ] **Step 2: Run backend verification**
+- [x] **Step 2: Run backend verification**
 
 Run: `cd server && go test -count=1 ./...`
 
-- [ ] **Step 3: Check the full diff**
+- [x] **Step 3: Check the full diff**
 
 Run: `git diff --check && git status --short`
 
 Expected: no formatting errors and only planned implementation files remain.
 
-- [ ] **Step 4: Start the application for user acceptance**
+- [x] **Step 4: Start the application for user acceptance**
 
 Start the existing backend and frontend development commands on available ports and report the Feynman practice route. Do not take screenshots or run browser automation; ask the user to inspect the selector, timeline, Teacher response, Curator diff, apply/cancel, and refresh behavior directly.
