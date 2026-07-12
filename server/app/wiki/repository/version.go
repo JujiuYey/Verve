@@ -80,6 +80,11 @@ func (r *VersionRepository) ApplyDirectEdit(ctx context.Context, input ApplyVers
 	return revision, job, nil
 }
 
+// FindAppliedChangeRequest 返回已应用申请对应的持久化修订和索引任务。
+func (r *VersionRepository) FindAppliedChangeRequest(ctx context.Context, changeRequestID string) (*wiki_db.DocumentRevision, *rag_db.IndexJob, error) {
+	return findAppliedVersion(ctx, r.db, changeRequestID)
+}
+
 func applyLockedVersion(ctx context.Context, tx bun.Tx, input ApplyVersionInput, request *wiki_db.DocumentChangeRequest) (*wiki_db.DocumentRevision, *rag_db.IndexJob, error) {
 	document := new(wiki_db.Document)
 	if err := tx.NewSelect().Model(document).Where("id = ?", input.DocumentID).For("UPDATE").Scan(ctx); err != nil {
@@ -149,13 +154,17 @@ func applyLockedVersion(ctx context.Context, tx bun.Tx, input ApplyVersionInput,
 	return revision, job, nil
 }
 
-func findAppliedVersion(ctx context.Context, tx bun.Tx, changeRequestID string) (*wiki_db.DocumentRevision, *rag_db.IndexJob, error) {
+type versionQuery interface {
+	NewSelect() *bun.SelectQuery
+}
+
+func findAppliedVersion(ctx context.Context, db versionQuery, changeRequestID string) (*wiki_db.DocumentRevision, *rag_db.IndexJob, error) {
 	revision := new(wiki_db.DocumentRevision)
-	if err := tx.NewSelect().Model(revision).Where("change_request_id = ?", changeRequestID).Scan(ctx); err != nil {
+	if err := db.NewSelect().Model(revision).Where("change_request_id = ?", changeRequestID).Scan(ctx); err != nil {
 		return nil, nil, fmt.Errorf("获取已应用文档修订失败: %w", err)
 	}
 	job := new(rag_db.IndexJob)
-	if err := tx.NewSelect().Model(job).
+	if err := db.NewSelect().Model(job).
 		Where("document_id = ?", revision.DocumentID).
 		Where("document_version = ?", revision.Version).
 		Scan(ctx); err != nil {
