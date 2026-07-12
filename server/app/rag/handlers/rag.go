@@ -55,18 +55,31 @@ func (h *RAGHandler) ListJobs(c *fiber.Ctx) error {
 	result := make([]rag_payload.IndexJobProgress, 0, len(jobs))
 	for _, job := range jobs {
 		result = append(result, rag_payload.IndexJobProgress{
-			ID:           job.ID,
-			DocumentID:   job.DocumentID,
-			RootFolderID: job.RootFolderID,
-			Status:       job.Status,
-			ErrorMessage: job.ErrorMessage,
-			ChunkCount:   job.ChunkCount,
-			CreatedAt:    job.CreatedAt.Format(time.RFC3339),
-			StartedAt:    formatOptionalTime(job.StartedAt),
-			FinishedAt:   formatOptionalTime(job.FinishedAt),
+			ID:              job.ID,
+			DocumentID:      job.DocumentID,
+			DocumentVersion: job.DocumentVersion,
+			RootFolderID:    job.RootFolderID,
+			Status:          job.Status,
+			ErrorMessage:    job.ErrorMessage,
+			ChunkCount:      job.ChunkCount,
+			CreatedAt:       job.CreatedAt.Format(time.RFC3339),
+			StartedAt:       formatOptionalTime(job.StartedAt),
+			FinishedAt:      formatOptionalTime(job.FinishedAt),
 		})
 	}
 	return response.SuccessCtx(c, result)
+}
+
+func (h *RAGHandler) DocumentIndexStatus(c *fiber.Ctx) error {
+	job, err := h.jobs.FindCurrentVersion(c.Context(), strings.TrimSpace(c.Params("id")))
+	if err != nil {
+		return response.NotFoundCtx(c, "文档索引任务不存在")
+	}
+	return response.SuccessCtx(c, rag_payload.IndexJobProgress{
+		ID: job.ID, DocumentID: job.DocumentID, DocumentVersion: job.DocumentVersion, RootFolderID: job.RootFolderID,
+		Status: job.Status, ErrorMessage: job.ErrorMessage, ChunkCount: job.ChunkCount,
+		CreatedAt: job.CreatedAt.Format(time.RFC3339), StartedAt: formatOptionalTime(job.StartedAt), FinishedAt: formatOptionalTime(job.FinishedAt),
+	})
 }
 
 func formatOptionalTime(value *time.Time) *string {

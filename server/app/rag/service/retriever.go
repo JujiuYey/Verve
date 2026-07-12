@@ -67,7 +67,11 @@ func (r *Retriever) search(ctx context.Context, query string, limit int, filter 
 	if len(embedding.Embeddings) == 0 {
 		return []rag_payload.SearchResult{}, nil
 	}
-	points, err := r.vectors.Search(ctx, vector.WikiChunkCollection, embedding.Embeddings[0], filter, limit)
+	candidateLimit := limit * 4
+	if candidateLimit > 48 {
+		candidateLimit = 48
+	}
+	points, err := r.vectors.Search(ctx, vector.WikiChunkCollection, embedding.Embeddings[0], filter, candidateLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -94,17 +98,21 @@ func (r *Retriever) search(ctx context.Context, query string, limit int, filter 
 			continue
 		}
 		results = append(results, rag_payload.SearchResult{
-			ChunkID:       chunk.ID,
-			Score:         point.Score,
-			RootFolderID:  chunk.RootFolderID,
-			FolderID:      chunk.FolderID,
-			DocumentID:    chunk.DocumentID,
-			DocumentTitle: chunk.DocumentTitle,
-			FolderPath:    chunk.FolderPath,
-			HeadingPath:   chunk.HeadingPath,
-			ChunkIndex:    chunk.ChunkIndex,
-			Content:       chunk.Content,
+			ChunkID:         chunk.ID,
+			Score:           point.Score,
+			RootFolderID:    chunk.RootFolderID,
+			FolderID:        chunk.FolderID,
+			DocumentID:      chunk.DocumentID,
+			DocumentVersion: chunk.DocumentVersion,
+			DocumentTitle:   chunk.DocumentTitle,
+			FolderPath:      chunk.FolderPath,
+			HeadingPath:     chunk.HeadingPath,
+			ChunkIndex:      chunk.ChunkIndex,
+			Content:         chunk.Content,
 		})
+		if len(results) == limit {
+			break
+		}
 	}
 	return results, nil
 }

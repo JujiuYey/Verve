@@ -25,10 +25,11 @@ const (
 )
 
 type FeynmanEvidence struct {
-	ChunkID     string `json:"chunk_id"`
-	ChunkIndex  int    `json:"chunk_index"`
-	HeadingPath string `json:"heading_path"`
-	Content     string `json:"content"`
+	ChunkID         string `json:"chunk_id"`
+	DocumentVersion int64  `json:"document_version"`
+	ChunkIndex      int    `json:"chunk_index"`
+	HeadingPath     string `json:"heading_path"`
+	Content         string `json:"content"`
 }
 
 type FeynmanDocumentContext struct {
@@ -275,12 +276,12 @@ func mergeFeynmanEvidence(documentID string, hits []rag_payload.SearchResult, ne
 	}
 	for _, hit := range hits {
 		if hit.DocumentID == documentID {
-			add(FeynmanEvidence{ChunkID: hit.ChunkID, ChunkIndex: hit.ChunkIndex, HeadingPath: hit.HeadingPath, Content: hit.Content})
+			add(FeynmanEvidence{ChunkID: hit.ChunkID, DocumentVersion: hit.DocumentVersion, ChunkIndex: hit.ChunkIndex, HeadingPath: hit.HeadingPath, Content: hit.Content})
 		}
 	}
 	for _, chunk := range neighbors {
 		if chunk != nil && chunk.DocumentID == documentID {
-			add(FeynmanEvidence{ChunkID: chunk.ID, ChunkIndex: chunk.ChunkIndex, HeadingPath: chunk.HeadingPath, Content: chunk.Content})
+			add(FeynmanEvidence{ChunkID: chunk.ID, DocumentVersion: chunk.DocumentVersion, ChunkIndex: chunk.ChunkIndex, HeadingPath: chunk.HeadingPath, Content: chunk.Content})
 		}
 	}
 	evidence := make([]FeynmanEvidence, 0, len(byIndex))

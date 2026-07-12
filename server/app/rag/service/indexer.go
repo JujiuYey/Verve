@@ -41,12 +41,13 @@ type chunkWriter interface {
 }
 
 type jobWriter interface {
-	CreatePending(ctx context.Context, documentID string) (*rag_db.IndexJob, error)
+	CreatePending(ctx context.Context, documentID string, version int64, objectPath string) (*rag_db.IndexJob, error)
 	FindOne(ctx context.Context, jobID string) (*rag_db.IndexJob, error)
 	MarkRunning(ctx context.Context, jobID string, rootFolderID string) error
 	MarkCompleted(ctx context.Context, jobID string, chunkCount int) error
 	MarkPendingRetry(ctx context.Context, jobID string, message string) error
 	MarkFailed(ctx context.Context, jobID string, message string) error
+	MarkSuperseded(ctx context.Context, jobID string) error
 }
 
 func NewIndexer(
@@ -81,7 +82,11 @@ func (s *Indexer) IndexDocument(ctx context.Context, documentID string) error {
 	if err := s.CheckReady(ctx); err != nil {
 		return err
 	}
-	job, err := s.jobs.CreatePending(ctx, documentID)
+	doc, err := s.docs.FindOne(ctx, documentID)
+	if err != nil {
+		return err
+	}
+	job, err := s.jobs.CreatePending(ctx, documentID, doc.CurrentVersion, doc.FilePath)
 	if err != nil {
 		return err
 	}
@@ -121,6 +126,9 @@ func (s *Indexer) processDocumentWithJob(ctx context.Context, job *rag_db.IndexJ
 	if err != nil {
 		return fail(err)
 	}
+	if doc.CurrentVersion != job.DocumentVersion {
+		return s.jobs.MarkSuperseded(ctx, job.ID)
+	}
 	scope, err := s.resolver.Resolve(ctx, doc.FolderID)
 	if err != nil {
 		return fail(err)
@@ -128,7 +136,7 @@ func (s *Indexer) processDocumentWithJob(ctx context.Context, job *rag_db.IndexJ
 	if err := s.jobs.MarkRunning(ctx, job.ID, scope.RootFolderID); err != nil {
 		return fail(err)
 	}
-	markdown, err := s.content.GetFileContent(ctx, doc.FilePath)
+	markdown, err := s.content.GetFileContent(ctx, job.ObjectPath)
 	if err != nil {
 		return fail(err)
 	}
@@ -161,36 +169,45 @@ func (s *Indexer) processDocumentWithJob(ctx context.Context, job *rag_db.IndexJ
 	points := make([]vector.Point, 0, len(markdownChunks))
 	records := make([]*rag_db.WikiChunk, 0, len(markdownChunks))
 	for i, chunk := range markdownChunks {
-		pointID := uuid.New().String()
+		pointID := uuid.NewMD5(uuid.NameSpaceOID, []byte(fmt.Sprintf("%s:%d:%d", doc.ID, job.DocumentVersion, i))).String()
 		points = append(points, vector.Point{
 			ID:     pointID,
 			Vector: embedded.Embeddings[i],
 			Payload: map[string]any{
-				"root_folder_id": scope.RootFolderID,
-				"folder_id":      doc.FolderID,
-				"document_id":    doc.ID,
-				"heading_path":   chunk.HeadingPath,
+				"root_folder_id":   scope.RootFolderID,
+				"folder_id":        doc.FolderID,
+				"document_id":      doc.ID,
+				"document_version": job.DocumentVersion,
+				"heading_path":     chunk.HeadingPath,
 			},
 		})
 		records = append(records, &rag_db.WikiChunk{
-			ID:             compactPointID(),
-			RootFolderID:   scope.RootFolderID,
-			FolderID:       doc.FolderID,
-			DocumentID:     doc.ID,
-			DocumentTitle:  doc.Filename,
-			FolderPath:     scope.FolderPath,
-			HeadingPath:    chunk.HeadingPath,
-			ChunkIndex:     i,
-			BlockType:      chunk.BlockType,
-			Content:        chunk.Content,
-			ContentHash:    chunk.ContentHash,
-			TokenCount:     chunk.TokenCount,
-			VectorPointID:  pointID,
-			EmbeddingModel: embedded.Model,
-			IndexedAt:      now,
-			CreatedAt:      now,
-			UpdatedAt:      now,
+			ID:              compactPointID(),
+			RootFolderID:    scope.RootFolderID,
+			FolderID:        doc.FolderID,
+			DocumentID:      doc.ID,
+			DocumentVersion: job.DocumentVersion,
+			DocumentTitle:   doc.Filename,
+			FolderPath:      scope.FolderPath,
+			HeadingPath:     chunk.HeadingPath,
+			ChunkIndex:      i,
+			BlockType:       chunk.BlockType,
+			Content:         chunk.Content,
+			ContentHash:     chunk.ContentHash,
+			TokenCount:      chunk.TokenCount,
+			VectorPointID:   pointID,
+			EmbeddingModel:  embedded.Model,
+			IndexedAt:       now,
+			CreatedAt:       now,
+			UpdatedAt:       now,
 		})
+	}
+	currentDocument, err := s.docs.FindOne(ctx, documentID)
+	if err != nil {
+		return fail(err)
+	}
+	if currentDocument.CurrentVersion != job.DocumentVersion {
+		return s.jobs.MarkSuperseded(ctx, job.ID)
 	}
 	if err := s.vectors.DeleteByDocument(ctx, vector.WikiChunkCollection, documentID); err != nil {
 		return fail(err)

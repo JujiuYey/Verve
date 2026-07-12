@@ -36,8 +36,11 @@ type DatabaseService struct {
 	Memories *learning_repo.MemoryRepository
 
 	// Wiki Repositories
-	Folders   wiki_repo.FolderRepository
-	Documents *wiki_repo.DocumentRepository
+	Folders        wiki_repo.FolderRepository
+	Documents      *wiki_repo.DocumentRepository
+	Revisions      *wiki_repo.RevisionRepository
+	ChangeRequests *wiki_repo.ChangeRequestRepository
+	Versions       *wiki_repo.VersionRepository
 
 	// RAG Repositories
 	RAGChunks *rag_repo.ChunkRepository
@@ -75,6 +78,8 @@ func NewDatabaseService(dsn string) (*DatabaseService, error) {
 	db.RegisterModel((*rag_db.IndexJob)(nil))
 	db.RegisterModel((*wiki_db.Folder)(nil))
 	db.RegisterModel((*wiki_db.Document)(nil))
+	db.RegisterModel((*wiki_db.DocumentRevision)(nil))
+	db.RegisterModel((*wiki_db.DocumentChangeRequest)(nil))
 
 	// 添加查询钩子（开发环境下打印 SQL）
 	db.AddQueryHook(bundebug.NewQueryHook(
@@ -106,8 +111,11 @@ func NewDatabaseService(dsn string) (*DatabaseService, error) {
 		Memories: learning_repo.NewMemoryRepository(db),
 
 		// Wiki Repositories
-		Folders:   wiki_repo.NewFolderRepository(db),
-		Documents: wiki_repo.NewDocumentRepository(db),
+		Folders:        wiki_repo.NewFolderRepository(db),
+		Documents:      wiki_repo.NewDocumentRepository(db),
+		Revisions:      wiki_repo.NewRevisionRepository(db),
+		ChangeRequests: wiki_repo.NewChangeRequestRepository(db),
+		Versions:       wiki_repo.NewVersionRepository(db),
 
 		// RAG Repositories
 		RAGChunks: rag_repo.NewChunkRepository(db),
