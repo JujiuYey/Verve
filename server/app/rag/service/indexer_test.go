@@ -30,8 +30,8 @@ func (f *fakeChunks) DeleteByDocument(ctx context.Context, documentID string) er
 
 type fakeJobs struct{}
 
-func (f fakeJobs) CreatePending(ctx context.Context, documentID string) (*rag_db.IndexJob, error) {
-	return &rag_db.IndexJob{ID: "job", DocumentID: documentID}, nil
+func (f fakeJobs) CreatePending(ctx context.Context, documentID string, version int64, objectPath string) (*rag_db.IndexJob, error) {
+	return &rag_db.IndexJob{ID: "job", DocumentID: documentID, DocumentVersion: version, ObjectPath: objectPath}, nil
 }
 func (f fakeJobs) FindOne(ctx context.Context, jobID string) (*rag_db.IndexJob, error) {
 	return &rag_db.IndexJob{ID: jobID, DocumentID: "doc", AttemptCount: 1, MaxAttempts: 3}, nil
@@ -44,12 +44,13 @@ func (f fakeJobs) MarkPendingRetry(ctx context.Context, jobID string, message st
 	return nil
 }
 func (f fakeJobs) MarkFailed(ctx context.Context, jobID string, message string) error { return nil }
+func (f fakeJobs) MarkSuperseded(ctx context.Context, jobID string) error             { return nil }
 
 type countingJobs struct {
 	created int
 }
 
-func (f *countingJobs) CreatePending(ctx context.Context, documentID string) (*rag_db.IndexJob, error) {
+func (f *countingJobs) CreatePending(ctx context.Context, documentID string, version int64, objectPath string) (*rag_db.IndexJob, error) {
 	f.created++
 	return &rag_db.IndexJob{ID: "job", DocumentID: documentID}, nil
 }
@@ -68,6 +69,7 @@ func (f *countingJobs) MarkPendingRetry(ctx context.Context, jobID string, messa
 func (f *countingJobs) MarkFailed(ctx context.Context, jobID string, message string) error {
 	return nil
 }
+func (f *countingJobs) MarkSuperseded(ctx context.Context, jobID string) error { return nil }
 
 type notReadyEmbedder struct{}
 

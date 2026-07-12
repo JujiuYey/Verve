@@ -127,7 +127,7 @@ func TestRetrieverPreservesVectorScoreOrder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if store.limit != 12 {
+	if store.limit != 48 {
 		t.Fatalf("limit = %d", store.limit)
 	}
 	wantFilter := map[string]any{

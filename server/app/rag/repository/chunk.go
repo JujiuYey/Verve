@@ -37,7 +37,9 @@ func (r *ChunkRepository) FindByPointIDs(ctx context.Context, pointIDs []string)
 	var chunks []*rag_db.WikiChunk
 	err := r.db.NewSelect().
 		Model(&chunks).
-		Where("vector_point_id IN (?)", bun.In(pointIDs)).
+		Join("JOIN wiki_documents AS d ON d.id = rwc.document_id").
+		Where("rwc.vector_point_id IN (?)", bun.In(pointIDs)).
+		Where("rwc.document_version = d.current_version").
 		Scan(ctx)
 	return chunks, err
 }

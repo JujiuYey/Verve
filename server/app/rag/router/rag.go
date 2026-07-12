@@ -18,6 +18,7 @@ func SetupRAGRoutes(
 	rag := router.Group("/rag/wiki")
 	{
 		rag.Post("/documents/:id/index", handler.IndexDocument)
+		rag.Get("/documents/:id/index-status", handler.DocumentIndexStatus)
 		rag.Delete("/documents/:id/index", handler.DeleteDocumentIndex)
 		rag.Get("/jobs", handler.ListJobs)
 	}

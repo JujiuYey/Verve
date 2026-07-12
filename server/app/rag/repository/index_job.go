@@ -19,15 +19,28 @@ func NewIndexJobRepository(db *bun.DB) *IndexJobRepository {
 	return &IndexJobRepository{db: db}
 }
 
-func (r *IndexJobRepository) CreatePending(ctx context.Context, documentID string) (*rag_db.IndexJob, error) {
+func (r *IndexJobRepository) CreatePending(ctx context.Context, documentID string, version int64, objectPath string) (*rag_db.IndexJob, error) {
 	job := &rag_db.IndexJob{
-		ID:          compactUUID(),
-		DocumentID:  documentID,
-		Status:      "pending",
-		MaxAttempts: 3,
+		ID:              compactUUID(),
+		DocumentID:      documentID,
+		DocumentVersion: version,
+		ObjectPath:      objectPath,
+		Status:          "pending",
+		MaxAttempts:     3,
 	}
 	_, err := r.db.NewInsert().Model(job).Exec(ctx)
 	return job, err
+}
+
+func (r *IndexJobRepository) FindCurrentVersion(ctx context.Context, documentID string) (*rag_db.IndexJob, error) {
+	job := new(rag_db.IndexJob)
+	err := r.db.NewSelect().Model(job).Where("document_id = ?", documentID).Where("status <> ?", "superseded").Order("document_version DESC").Limit(1).Scan(ctx)
+	return job, err
+}
+
+func (r *IndexJobRepository) MarkSuperseded(ctx context.Context, jobID string) error {
+	_, err := r.db.NewUpdate().Model((*rag_db.IndexJob)(nil)).Set("status = ?", "superseded").Set("updated_at = ?", time.Now()).Where("id = ?", jobID).Exec(ctx)
+	return err
 }
 
 func (r *IndexJobRepository) FindOne(ctx context.Context, jobID string) (*rag_db.IndexJob, error) {

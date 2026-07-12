@@ -15,13 +15,14 @@ type SearchResult struct {
 }
 
 type IndexJobProgress struct {
-	ID           string  `json:"id"`
-	DocumentID   string  `json:"document_id"`
-	RootFolderID *string `json:"root_folder_id"`
-	Status       string  `json:"status"`
-	ErrorMessage *string `json:"error_message"`
-	ChunkCount   int     `json:"chunk_count"`
-	CreatedAt    string  `json:"created_at"`
-	StartedAt    *string `json:"started_at"`
-	FinishedAt   *string `json:"finished_at"`
+	ID              string  `json:"id"`
+	DocumentID      string  `json:"document_id"`
+	DocumentVersion int64   `json:"document_version"`
+	RootFolderID    *string `json:"root_folder_id"`
+	Status          string  `json:"status"`
+	ErrorMessage    *string `json:"error_message"`
+	ChunkCount      int     `json:"chunk_count"`
+	CreatedAt       string  `json:"created_at"`
+	StartedAt       *string `json:"started_at"`
+	FinishedAt      *string `json:"finished_at"`
 }
