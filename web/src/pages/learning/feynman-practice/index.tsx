@@ -1,6 +1,12 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
-import { BookOpenIcon, CircleAlertIcon, MessageSquareTextIcon } from "lucide-react";
+import {
+  BookOpenIcon,
+  CircleAlertIcon,
+  FilePenIcon,
+  GraduationCapIcon,
+  MessageSquareTextIcon,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -36,9 +42,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AgentComposer } from "./_components/agent-composer";
 import { AgentTimeline } from "./_components/agent-timeline";
 import { SourcePanel } from "./_components/source-panel";
-import { curatorRegenerationInput, mergeTimeline } from "./_lib/timeline";
+import { curatorRegenerationInput, filterTimelineByAgent, mergeTimeline } from "./_lib/timeline";
 
 const routeApi = getRouteApi("/_layout/learn/feynman-practice/$documentId");
+
+type AgentDrafts = Record<LearningAgentType, string>;
+
+const emptyAgentDrafts = (): AgentDrafts => ({ listener: "", teacher: "", curator: "" });
 
 export function FeynmanWorkbenchPage() {
   const navigate = useNavigate();
@@ -53,7 +63,7 @@ export function FeynmanWorkbenchPage() {
   const currentRouteIdentityRef = useRef(routeIdentity);
   const previousRouteIdentityRef = useRef(routeIdentity);
   const currentRequestIdentityRef = useRef("");
-  const answerRef = useRef("");
+  const draftsRef = useRef<AgentDrafts>(emptyAgentDrafts());
 
   const [createAttempt, setCreateAttempt] = useState(0);
   const [createdSession, setCreatedSession] = useState<{
@@ -63,8 +73,7 @@ export function FeynmanWorkbenchPage() {
   const [creatingIdentity, setCreatingIdentity] = useState("");
   const [createFailureIdentity, setCreateFailureIdentity] = useState("");
   const [activeView, setActiveView] = useState("source");
-  const [answer, setAnswer] = useState("");
-  const [selectedAgent, setSelectedAgent] = useState<LearningAgentType>("listener");
+  const [drafts, setDrafts] = useState<AgentDrafts>(emptyAgentDrafts);
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   const [completedSummary, setCompletedSummary] = useState("");
   const [submittingRequestId, setSubmittingRequestId] = useState("");
@@ -78,7 +87,7 @@ export function FeynmanWorkbenchPage() {
   const requestIdentity = `${documentId}:${sessionId}`;
   currentRouteIdentityRef.current = routeIdentity;
   currentRequestIdentityRef.current = requestIdentity;
-  answerRef.current = answer;
+  draftsRef.current = drafts;
 
   const { data: document, isLoading: isDocumentLoading } = useQuery({
     queryKey: ["wiki-document", documentId],
@@ -101,8 +110,7 @@ export function FeynmanWorkbenchPage() {
     setCreatingIdentity("");
     setCreateFailureIdentity("");
     setActiveView("source");
-    setAnswer("");
-    setSelectedAgent("listener");
+    setDrafts(emptyAgentDrafts());
     setTimeline([]);
     setCompletedSummary("");
     setSubmittingRequestId("");
@@ -168,16 +176,15 @@ export function FeynmanWorkbenchPage() {
   }, [documentId, sessionDetail, sessionId]);
 
   const submitAgentTurn = async (
+    agentType: LearningAgentType,
     contentOverride?: string,
     replacesChangeRequestId?: string,
-    agentOverride?: LearningAgentType,
   ) => {
-    const submittedAnswer = contentOverride ?? answer;
+    const submittedAnswer = contentOverride ?? drafts[agentType];
     const content = submittedAnswer.trim();
     const submittedIdentity = requestIdentity;
     if (!sessionReady || !content || submittingRequestId) return;
     const requestId = crypto.randomUUID();
-    const agentType = agentOverride ?? selectedAgent;
     const createdAt = new Date().toISOString();
     const localItem = makeLocalTimelineItem(sessionId, requestId, agentType, content, createdAt);
     setSubmittingRequestId(requestId);
@@ -191,8 +198,8 @@ export function FeynmanWorkbenchPage() {
       });
       if (currentRequestIdentityRef.current !== submittedIdentity) return;
       setTimeline((current) => upsertTimelineItem(current, item));
-      if (contentOverride === undefined && answerRef.current === submittedAnswer) {
-        setAnswer("");
+      if (contentOverride === undefined && draftsRef.current[agentType] === submittedAnswer) {
+        setDrafts((current) => ({ ...current, [agentType]: "" }));
       }
       void queryClient.invalidateQueries({ queryKey: sessionKeys.detail(sessionId) });
     } catch (error) {
@@ -210,7 +217,7 @@ export function FeynmanWorkbenchPage() {
     if (
       !sessionReady ||
       listenerTurnCount === 0 ||
-      answer.trim() ||
+      drafts.listener.trim() ||
       completingIdentity === submittedIdentity
     ) {
       return;
@@ -274,7 +281,7 @@ export function FeynmanWorkbenchPage() {
 
   const regenerateCuratorChange = (item: TimelineItem) => {
     const input = curatorRegenerationInput(item);
-    void submitAgentTurn(input.content, input.replaces_change_request_id, "curator");
+    void submitAgentTurn("curator", input.content, input.replaces_change_request_id);
   };
 
   const refreshDocumentState = () => {
@@ -351,7 +358,12 @@ export function FeynmanWorkbenchPage() {
   const isSubmitting = Boolean(submittingRequestId);
   const isCompleting = completingIdentity === requestIdentity;
   const isCompleted = Boolean(completedSummary || sessionDetail.session.status === "completed");
-  const listenerTurnCount = timeline.filter(
+  const itemsByAgent: Record<LearningAgentType, TimelineItem[]> = {
+    listener: filterTimelineByAgent(timeline, "listener"),
+    teacher: filterTimelineByAgent(timeline, "teacher"),
+    curator: filterTimelineByAgent(timeline, "curator"),
+  };
+  const listenerTurnCount = itemsByAgent.listener.filter(
     (item) => item.artifact?.type === "explanation_review",
   ).length;
   const title = document?.filename?.replace(/\.md$/i, "") || "整篇费曼练习";
@@ -378,74 +390,88 @@ export function FeynmanWorkbenchPage() {
         onValueChange={setActiveView}
         className="min-h-0 flex-1 overflow-hidden"
       >
-        <TabsList>
+        <TabsList className="max-w-full justify-start overflow-x-auto">
           <TabsTrigger value="source">
             <BookOpenIcon />
             阅读文章
           </TabsTrigger>
-          <TabsTrigger value="explain">
+          <TabsTrigger value="listener">
             <MessageSquareTextIcon />
-            开始讲解{timeline.length > 0 ? ` (${timeline.length})` : ""}
+            开始讲解
+            {itemsByAgent.listener.length > 0 ? ` (${itemsByAgent.listener.length})` : ""}
+          </TabsTrigger>
+          <TabsTrigger value="teacher">
+            <GraduationCapIcon />
+            教学补充{itemsByAgent.teacher.length > 0 ? ` (${itemsByAgent.teacher.length})` : ""}
+          </TabsTrigger>
+          <TabsTrigger value="curator">
+            <FilePenIcon />
+            修订文档{itemsByAgent.curator.length > 0 ? ` (${itemsByAgent.curator.length})` : ""}
           </TabsTrigger>
         </TabsList>
         <TabsContent value="source" className="flex min-h-0 overflow-hidden">
           <SourcePanel documentId={documentId} />
         </TabsContent>
-        <TabsContent value="explain" className="flex min-h-0 overflow-hidden">
-          <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border bg-background">
-            {indexStatusQuery.data?.status === "pending" ||
-            indexStatusQuery.data?.status === "running" ? (
-              <Alert className="m-4 mb-0">
-                <CircleAlertIcon />
-                <AlertTitle>当前文档版本正在建立索引</AlertTitle>
-                <AlertDescription>Teacher 暂时不会使用旧版本证据。</AlertDescription>
-              </Alert>
-            ) : indexStatusQuery.data?.status === "failed" ? (
-              <Alert className="m-4 mb-0">
-                <CircleAlertIcon />
-                <AlertTitle>当前文档版本索引失败</AlertTitle>
-                <AlertDescription className="flex items-center justify-between gap-3">
-                  <span>{indexStatusQuery.data.error_message || "请重试索引。"}</span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() =>
-                      retryIndex.mutate(documentId, { onSuccess: refreshDocumentState })
-                    }
-                    disabled={retryIndex.isPending}
-                  >
-                    重试
-                  </Button>
-                </AlertDescription>
-              </Alert>
-            ) : null}
-            {isCompleted ? (
-              <Alert className="m-4 mb-0">
-                <AlertTitle>本次练习已结束</AlertTitle>
-                <AlertDescription>{completedSummary || "你的解释记录已经保存。"}</AlertDescription>
-              </Alert>
-            ) : null}
-            <AgentTimeline
-              items={timeline}
-              busyChangeRequestId={busyChangeRequestId}
-              onApply={(item) => void applyCuratorChange(item)}
-              onCancel={(item) => void cancelCuratorChange(item)}
-              onRegenerate={regenerateCuratorChange}
-            />
-            <AgentComposer
-              selectedAgent={selectedAgent}
-              value={answer}
-              disabled={!sessionReady || isCompleting || isCompleted}
-              isSubmitting={isSubmitting}
-              canComplete={!isCompleted && listenerTurnCount > 0}
-              isCompleting={isCompleting}
-              onAgentChange={setSelectedAgent}
-              onChange={setAnswer}
-              onSubmit={() => void submitAgentTurn()}
-              onComplete={() => void finishPractice()}
-            />
-          </section>
-        </TabsContent>
+        {(["listener", "teacher", "curator"] as const).map((agentType) => (
+          <TabsContent key={agentType} value={agentType} className="flex min-h-0 overflow-hidden">
+            <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border bg-background">
+              {agentType === "teacher" &&
+              (indexStatusQuery.data?.status === "pending" ||
+                indexStatusQuery.data?.status === "running") ? (
+                <Alert className="m-4 mb-0">
+                  <CircleAlertIcon />
+                  <AlertTitle>当前文档版本正在建立索引</AlertTitle>
+                  <AlertDescription>教学补充暂时不会使用旧版本证据。</AlertDescription>
+                </Alert>
+              ) : agentType === "teacher" && indexStatusQuery.data?.status === "failed" ? (
+                <Alert className="m-4 mb-0">
+                  <CircleAlertIcon />
+                  <AlertTitle>当前文档版本索引失败</AlertTitle>
+                  <AlertDescription className="flex items-center justify-between gap-3">
+                    <span>{indexStatusQuery.data.error_message || "请重试索引。"}</span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        retryIndex.mutate(documentId, { onSuccess: refreshDocumentState })
+                      }
+                      disabled={retryIndex.isPending}
+                    >
+                      重试
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              ) : null}
+              {isCompleted ? (
+                <Alert className="m-4 mb-0">
+                  <AlertTitle>本次练习已结束</AlertTitle>
+                  <AlertDescription>
+                    {completedSummary || "你的解释记录已经保存。"}
+                  </AlertDescription>
+                </Alert>
+              ) : null}
+              <AgentTimeline
+                agentType={agentType}
+                items={itemsByAgent[agentType]}
+                busyChangeRequestId={busyChangeRequestId}
+                onApply={(item) => void applyCuratorChange(item)}
+                onCancel={(item) => void cancelCuratorChange(item)}
+                onRegenerate={regenerateCuratorChange}
+              />
+              <AgentComposer
+                agentType={agentType}
+                value={drafts[agentType]}
+                disabled={!sessionReady || isCompleting || isCompleted}
+                isSubmitting={isSubmitting}
+                canComplete={agentType === "listener" && !isCompleted && listenerTurnCount > 0}
+                isCompleting={isCompleting}
+                onChange={(value) => setDrafts((current) => ({ ...current, [agentType]: value }))}
+                onSubmit={() => void submitAgentTurn(agentType)}
+                onComplete={() => void finishPractice()}
+              />
+            </section>
+          </TabsContent>
+        ))}
       </Tabs>
     </div>
   );

@@ -25,19 +25,37 @@ const agentMeta: Record<LearningAgentType, { label: string; icon: typeof EarIcon
   curator: { label: "修订", icon: FilePenIcon },
 };
 
+const emptyCopy: Record<LearningAgentType, { title: string; description: string }> = {
+  listener: {
+    title: "开始第一次讲解",
+    description: "用自己的话解释文章，倾听者会指出已经讲清楚和仍需澄清的部分。",
+  },
+  teacher: {
+    title: "提出需要补充的问题",
+    description: "写下卡住你的概念或关系，老师会结合当前文档进行讲解。",
+  },
+  curator: {
+    title: "提出文档修订目标",
+    description: "说明希望补充、纠正或重写的内容，再确认生成的修订建议。",
+  },
+};
+
 export function AgentTimeline({
+  agentType,
   items,
   busyChangeRequestId,
   onApply,
   onCancel,
   onRegenerate,
 }: {
+  agentType: LearningAgentType;
   items: TimelineItem[];
   busyChangeRequestId: string;
   onApply: (item: TimelineItem) => void;
   onCancel: (item: TimelineItem) => void;
   onRegenerate: (item: TimelineItem) => void;
 }) {
+  const empty = emptyCopy[agentType];
   return (
     <ScrollArea className="min-h-0 flex-1">
       <div className="flex flex-col gap-5 p-4">
@@ -59,10 +77,8 @@ export function AgentTimeline({
               <EmptyMedia variant="icon">
                 <MessageSquareTextIcon />
               </EmptyMedia>
-              <EmptyTitle>从当前问题开始</EmptyTitle>
-              <EmptyDescription>
-                选择倾听、讲解或修订，然后写下这一轮要处理的内容。
-              </EmptyDescription>
+              <EmptyTitle>{empty.title}</EmptyTitle>
+              <EmptyDescription>{empty.description}</EmptyDescription>
             </EmptyHeader>
           </Empty>
         )}

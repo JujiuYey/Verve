@@ -1,16 +1,21 @@
 import { describe, expect, it } from "vitest";
 
-import type { TimelineItem, WikiDocumentChangeRequest } from "@/api/learning";
+import type { LearningAgentType, TimelineItem, WikiDocumentChangeRequest } from "@/api/learning";
 
-import { curatorRegenerationInput, mergeTimeline } from "./timeline";
+import { curatorRegenerationInput, filterTimelineByAgent, mergeTimeline } from "./timeline";
 
-function item(id: string, requestId: string, status = "completed"): TimelineItem {
+function item(
+  id: string,
+  requestId: string,
+  status = "completed",
+  agentType: LearningAgentType = "listener",
+): TimelineItem {
   return {
     turn: {
       id,
       session_id: "session-1",
       request_id: requestId,
-      agent_type: "listener",
+      agent_type: agentType,
       status: status as "processing" | "completed" | "failed",
       started_at: "2026-07-12T00:00:00Z",
       created_at: "2026-07-12T00:00:00Z",
@@ -66,12 +71,18 @@ describe("mergeTimeline", () => {
 
   it("keeps newer local artifact status when a server snapshot is stale", () => {
     const merged = mergeTimeline([curator("applied")], [curator("proposed")]);
-    expect((merged[0].artifact?.data as WikiDocumentChangeRequest).status).toBe("applied");
+    expect(merged[0].artifact).toMatchObject({
+      type: "wiki_change_request",
+      data: { status: "applied" },
+    });
   });
 
   it("replaces an artifact when the server status is newer", () => {
     const merged = mergeTimeline([curator("proposed")], [curator("cancelled")]);
-    expect((merged[0].artifact?.data as WikiDocumentChangeRequest).status).toBe("cancelled");
+    expect(merged[0].artifact).toMatchObject({
+      type: "wiki_change_request",
+      data: { status: "cancelled" },
+    });
   });
 });
 
@@ -80,4 +91,17 @@ it("builds curator regeneration input from the original instruction", () => {
     content: "补充关闭规则",
     replaces_change_request_id: "change-1",
   });
+});
+
+it("filters timeline items by agent without changing order", () => {
+  const timeline = [
+    item("listener-1", "request-1", "completed", "listener"),
+    item("teacher-1", "request-2", "completed", "teacher"),
+    item("listener-2", "request-3", "completed", "listener"),
+  ];
+
+  expect(filterTimelineByAgent(timeline, "listener").map((entry) => entry.turn.id)).toEqual([
+    "listener-1",
+    "listener-2",
+  ]);
 });

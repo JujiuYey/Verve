@@ -4,7 +4,6 @@ import type { LearningAgentType } from "@/api/learning";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 
-import { AgentSelector } from "./agent-selector";
 import { FeynmanAnswerEditor } from "./feynman-answer-editor";
 
 const copy: Record<LearningAgentType, { placeholder: string; submit: string; progress: string }> = {
@@ -26,38 +25,31 @@ const copy: Record<LearningAgentType, { placeholder: string; submit: string; pro
 };
 
 export function AgentComposer({
-  selectedAgent,
+  agentType,
   value,
   disabled,
   isSubmitting,
   canComplete,
   isCompleting,
-  onAgentChange,
   onChange,
   onSubmit,
   onComplete,
 }: {
-  selectedAgent: LearningAgentType;
+  agentType: LearningAgentType;
   value: string;
   disabled: boolean;
   isSubmitting: boolean;
   canComplete: boolean;
   isCompleting: boolean;
-  onAgentChange: (agent: LearningAgentType) => void;
   onChange: (value: string) => void;
   onSubmit: () => void;
   onComplete: () => void;
 }) {
-  const labels = copy[selectedAgent];
+  const labels = copy[agentType];
   return (
     <div className="flex shrink-0 flex-col gap-3 border-t bg-background p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <AgentSelector
-          value={selectedAgent}
-          disabled={disabled || isSubmitting}
-          onChange={onAgentChange}
-        />
-        {canComplete ? (
+      {canComplete ? (
+        <div className="flex justify-end">
           <Button
             variant="outline"
             size="sm"
@@ -71,8 +63,8 @@ export function AgentComposer({
             )}
             结束本次练习
           </Button>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
       <FeynmanAnswerEditor
         value={value}
         onChange={onChange}

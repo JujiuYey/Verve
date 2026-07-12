@@ -1,4 +1,9 @@
-import type { SubmitTurnRequest, TimelineItem, WikiDocumentChangeRequest } from "@/api/learning";
+import type {
+  LearningAgentType,
+  SubmitTurnRequest,
+  TimelineItem,
+  WikiDocumentChangeRequest,
+} from "@/api/learning";
 
 const terminalStatusRank: Record<WikiDocumentChangeRequest["status"], number> = {
   proposed: 0,
@@ -20,6 +25,13 @@ export function mergeTimeline(current: TimelineItem[], server: TimelineItem[]): 
     return preserveNewerArtifact(currentItem, serverItem);
   });
   return [...merged, ...remaining.filter((item) => item.turn.id.startsWith("local-"))];
+}
+
+export function filterTimelineByAgent(
+  timeline: TimelineItem[],
+  agentType: LearningAgentType,
+): TimelineItem[] {
+  return timeline.filter((item) => item.turn.agent_type === agentType);
 }
 
 function preserveNewerArtifact(current: TimelineItem, server: TimelineItem): TimelineItem {
