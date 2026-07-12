@@ -17,7 +17,7 @@ func SetupDocumentRoutes(
 	indexer *rag_service.Indexer,
 ) {
 	docHandler := wiki_handlers.NewDocumentHandler(dbService, minioService, indexer)
-	changeRequestHandler := wiki_handlers.NewChangeRequestHandler(dbService, minioService)
+	changeRequestHandler := wiki_handlers.NewChangeRequestHandler(dbService, minioService, indexer)
 
 	docs := router.Group("/wiki/documents")
 	{

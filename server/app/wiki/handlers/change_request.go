@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"errors"
+	"log"
 
 	"github.com/gofiber/fiber/v2"
 
@@ -20,19 +21,33 @@ type changeRequestVersionService interface {
 	CancelChangeRequest(ctx context.Context, userID, requestID string) error
 }
 
+type changeRequestFinder interface {
+	FindChangeRequest(ctx context.Context, requestID string) (*wiki_db.DocumentChangeRequest, error)
+}
+
+type indexJobProcessor interface {
+	ProcessJob(ctx context.Context, jobID string) error
+}
+
 // ChangeRequestHandler 处理文档修改申请的确认与取消。
 type ChangeRequestHandler struct {
 	versions changeRequestVersionService
-	requests *wiki_repo.ChangeRequestRepository
+	requests changeRequestFinder
+	indexer  indexJobProcessor
 }
 
-func NewChangeRequestHandler(dbService *database.DatabaseService, minio *storage.MinIOService) *ChangeRequestHandler {
-	return &ChangeRequestHandler{
-		versions: wiki_service.NewDocumentVersionService(
+func NewChangeRequestHandler(dbService *database.DatabaseService, minio *storage.MinIOService, indexer indexJobProcessor) *ChangeRequestHandler {
+	return NewChangeRequestHandlerWithDependencies(
+		wiki_service.NewDocumentVersionService(
 			dbService.Revisions, dbService.Versions, dbService.Documents, minio, dbService.ChangeRequests,
 		),
-		requests: dbService.ChangeRequests,
-	}
+		dbService.ChangeRequests,
+		indexer,
+	)
+}
+
+func NewChangeRequestHandlerWithDependencies(versions changeRequestVersionService, requests changeRequestFinder, indexer indexJobProcessor) *ChangeRequestHandler {
+	return &ChangeRequestHandler{versions: versions, requests: requests, indexer: indexer}
 }
 
 func (h *ChangeRequestHandler) Apply(c *fiber.Ctx) error {
@@ -45,6 +60,7 @@ func (h *ChangeRequestHandler) Apply(c *fiber.Ctx) error {
 	if err != nil {
 		return h.writeError(c, err)
 	}
+	h.processJobAsync(job)
 	return response.SuccessCtx(c, fiber.Map{"change_request": request, "revision": revision, "index_job": job})
 }
 
@@ -69,6 +85,17 @@ func (h *ChangeRequestHandler) apply(ctx context.Context, userID, requestID stri
 		return nil, nil, nil, err
 	}
 	return request, revision, job, nil
+}
+
+func (h *ChangeRequestHandler) processJobAsync(job *rag_db.IndexJob) {
+	if h.indexer == nil || job == nil || job.Status != "pending" {
+		return
+	}
+	go func() {
+		if err := h.indexer.ProcessJob(context.Background(), job.ID); err != nil {
+			log.Printf("⚠️  文档修订索引失败: job_id=%s err=%v", job.ID, err)
+		}
+	}()
 }
 
 func (h *ChangeRequestHandler) writeError(c *fiber.Ctx, err error) error {
