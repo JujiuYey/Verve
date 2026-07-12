@@ -1,12 +1,10 @@
-import type { ModelType } from "@/api";
-
 export const CUSTOM_VENDOR_ID = "custom";
 
 export interface ProviderModel {
   id: string;
   name: string;
   group: string;
-  type: ModelType;
+  type: ModelTypeId;
   enabled: boolean;
 }
 

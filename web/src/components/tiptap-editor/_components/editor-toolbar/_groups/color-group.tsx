@@ -1,6 +1,6 @@
 import { Highlighter, Type } from "lucide-react";
 
-import { HIGHLIGHT_COLORS, TEXT_COLORS } from "@/pages/wiki/tiptap-editor/_shared/const";
+import { HIGHLIGHT_COLORS, TEXT_COLORS } from "@/components/tiptap-editor/_shared/const";
 
 import { useToolbarContext } from "../_context/toolbar-context";
 import { ColorPickerPopover } from "../_primitives/color-picker-popover";

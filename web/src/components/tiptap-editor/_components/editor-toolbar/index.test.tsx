@@ -1,6 +1,10 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("../../_shared/export-docx", () => ({
+  exportToDocx: vi.fn(),
+}));
+
 import { EditorToolbar } from "./index";
 
 function createEditorStub() {

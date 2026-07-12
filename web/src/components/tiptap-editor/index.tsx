@@ -1,5 +1,4 @@
 import "./editor.css";
-import { getRouteApi } from "@tanstack/react-router";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import Color from "@tiptap/extension-color";
 import Highlight from "@tiptap/extension-highlight";
@@ -28,7 +27,6 @@ import { EditorToolbar } from "./_components/editor-toolbar";
 import { type EditorPageSetup, useEditorPageSetup } from "./_hooks/use-editor-page-setup";
 
 type SaveStatus = "saved" | "saving" | "unsaved";
-const routeApi = getRouteApi("/_layout/wiki/tiptap-editor");
 
 const lowlight = createLowlight(common);
 
@@ -119,9 +117,7 @@ function TiptapEditor({
   return <EditorContent editor={editor} />;
 }
 
-export function CanvasTiptapPage() {
-  const { docId } = routeApi.useSearch();
-
+export function CanvasTiptapPage({ docId }: { docId?: string }) {
   const [content, setContent] = useState("");
   const [docTitle, setDocTitle] = useState("文档");
   const [catalogOpen, setCatalogOpen] = useState(true);

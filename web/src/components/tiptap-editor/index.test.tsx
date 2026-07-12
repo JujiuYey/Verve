@@ -1,27 +1,14 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const {
-  editorCatalogSpy,
-  editorFooterSpy,
-  editorToolbarSpy,
-  mockGetContent,
-  mockUpdateContent,
-  mockUseSearch,
-} = vi.hoisted(() => ({
-  mockUseSearch: vi.fn(),
-  mockGetContent: vi.fn(),
-  mockUpdateContent: vi.fn(),
-  editorToolbarSpy: vi.fn(),
-  editorCatalogSpy: vi.fn(),
-  editorFooterSpy: vi.fn(),
-}));
-
-vi.mock("@tanstack/react-router", () => ({
-  getRouteApi: () => ({
-    useSearch: mockUseSearch,
-  }),
-}));
+const { editorCatalogSpy, editorFooterSpy, editorToolbarSpy, mockGetContent, mockUpdateContent } =
+  vi.hoisted(() => ({
+    mockGetContent: vi.fn(),
+    mockUpdateContent: vi.fn(),
+    editorToolbarSpy: vi.fn(),
+    editorCatalogSpy: vi.fn(),
+    editorFooterSpy: vi.fn(),
+  }));
 
 vi.mock("@/api/wiki/document", () => ({
   documentApi: {
@@ -88,7 +75,6 @@ import { CanvasTiptapPage } from "./index";
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockUseSearch.mockReturnValue({ docId: "doc-1" });
   mockGetContent.mockResolvedValue({
     content: "initial markdown content",
     filename: "demo.md",
@@ -102,7 +88,7 @@ afterEach(() => {
 
 describe("CanvasTiptapPage", () => {
   it("loads markdown content from docId and wires editor, catalog, footer, and save flow together", async () => {
-    render(<CanvasTiptapPage />);
+    render(<CanvasTiptapPage docId="doc-1" />);
 
     await waitFor(() => {
       expect(mockGetContent).toHaveBeenCalledWith("doc-1");
@@ -125,7 +111,7 @@ describe("CanvasTiptapPage", () => {
   it("debounces auto-save after content changes", async () => {
     vi.useFakeTimers();
 
-    render(<CanvasTiptapPage />);
+    render(<CanvasTiptapPage docId="doc-1" />);
 
     await act(async () => {
       await Promise.resolve();
