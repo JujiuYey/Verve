@@ -1,6 +1,6 @@
 # Four-Tab Practice Navigation Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Promote Listener, Teacher, and Curator into three dedicated top-level practice tabs alongside Reading article, with filtered histories and independent drafts.
 
@@ -16,7 +16,7 @@
 - Modify: `web/src/pages/learning/feynman-practice/_lib/timeline.ts`
 - Modify: `web/src/pages/learning/feynman-practice/_lib/timeline.test.ts`
 
-- [ ] **Step 1: Write the failing filter test**
+- [x] **Step 1: Write the failing filter test**
 
 Update the test helper to accept an Agent and add a test that preserves chronological input order while returning only the requested Agent:
 
@@ -45,7 +45,7 @@ it("filters timeline items by agent without changing order", () => {
 });
 ```
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 Run:
 
@@ -55,7 +55,7 @@ pnpm --dir web exec vitest run src/pages/learning/feynman-practice/_lib/timeline
 
 Expected: FAIL because `filterTimelineByAgent` is not exported.
 
-- [ ] **Step 3: Implement the minimal filter**
+- [x] **Step 3: Implement the minimal filter**
 
 Add:
 
@@ -70,7 +70,7 @@ export function filterTimelineByAgent(
 
 Import `LearningAgentType` with the existing timeline API types.
 
-- [ ] **Step 4: Run the focused test and verify GREEN**
+- [x] **Step 4: Run the focused test and verify GREEN**
 
 Run the same Vitest command. Expected: all timeline tests pass.
 
@@ -80,13 +80,13 @@ Run the same Vitest command. Expected: all timeline tests pass.
 - Modify: `web/src/pages/learning/feynman-practice/_components/agent-composer.tsx`
 - Delete: `web/src/pages/learning/feynman-practice/_components/agent-selector.tsx`
 
-- [ ] **Step 1: Remove nested Agent selection**
+- [x] **Step 1: Remove nested Agent selection**
 
 Rename the `selectedAgent` prop to `agentType`, remove `onAgentChange`, remove the `AgentSelector` import and render, and resolve labels from `copy[agentType]`.
 
 Keep the completion button in the existing top action row when `canComplete` is true. The page passes `canComplete=false` for Teacher and Curator.
 
-- [ ] **Step 2: Delete the unused selector component**
+- [x] **Step 2: Delete the unused selector component**
 
 Delete `agent-selector.tsx` and verify no `AgentSelector` imports remain:
 
@@ -101,7 +101,7 @@ Expected: no matches.
 **Files:**
 - Modify: `web/src/pages/learning/feynman-practice/index.tsx`
 
-- [ ] **Step 1: Define tab-to-Agent mapping and independent drafts**
+- [x] **Step 1: Define tab-to-Agent mapping and independent drafts**
 
 Add Teacher and Curator lucide icons. Replace `answer` and `selectedAgent` with:
 
@@ -120,7 +120,7 @@ const answer = activeAgent ? drafts[activeAgent] : "";
 
 Reset drafts with `setDrafts(emptyDrafts())` only when route identity changes. Keep `answerRef` synchronized with the active draft for request identity protection.
 
-- [ ] **Step 2: Submit with the fixed tab Agent**
+- [x] **Step 2: Submit with the fixed tab Agent**
 
 Require an Agent from either `agentOverride` or `activeAgent`. On a normal successful submission, clear only that Agent's draft when it still equals the submitted value:
 
@@ -132,7 +132,7 @@ setDrafts((current) =>
 
 Keep Curator regeneration using its explicit `agentOverride` and content override.
 
-- [ ] **Step 3: Render the four triggers**
+- [x] **Step 3: Render the four triggers**
 
 Use the existing `TabsList` and render:
 
@@ -145,13 +145,13 @@ Use the existing `TabsList` and render:
 
 Compute each list with `filterTimelineByAgent`.
 
-- [ ] **Step 4: Render one fixed Agent workspace per tab**
+- [x] **Step 4: Render one fixed Agent workspace per tab**
 
 Extract a page-local `AgentWorkspace` only if needed to avoid repeating the section, timeline, and composer markup. Each workspace receives its filtered items, fixed `agentType`, draft, and completion availability.
 
 Show index pending/failed alerts only in the Teacher tab. Show the completed-session alert in all three Agent tabs. Keep Curator apply, cancel, and regenerate callbacks attached to its filtered items.
 
-- [ ] **Step 5: Format and type-check**
+- [x] **Step 5: Format and type-check**
 
 Run:
 
@@ -171,7 +171,7 @@ Expected: both commands exit successfully.
 **Files:**
 - Verify only; no new frontend layout tests.
 
-- [ ] **Step 1: Run focused logic tests**
+- [x] **Step 1: Run focused logic tests**
 
 ```bash
 pnpm --dir web exec vitest run src/pages/learning/feynman-practice/_lib/timeline.test.ts
@@ -179,7 +179,7 @@ pnpm --dir web exec vitest run src/pages/learning/feynman-practice/_lib/timeline
 
 Expected: all tests pass.
 
-- [ ] **Step 2: Run repository checks**
+- [x] **Step 2: Run repository checks**
 
 ```bash
 pnpm --dir web lint:type
@@ -188,6 +188,6 @@ git diff --check
 
 Expected: both commands exit successfully.
 
-- [ ] **Step 3: Hand off visual acceptance**
+- [x] **Step 3: Hand off visual acceptance**
 
 Keep the existing frontend dev server running and report `http://127.0.0.1:5201/`. Per project policy, do not run screenshots or browser automation; ask the user to inspect the four tabs, filtered histories, independent drafts, and fixed Agent submissions directly.
