@@ -361,6 +361,7 @@ export function WikiIndexPage() {
               [document.id]: {
                 id: `local-${document.id}`,
                 document_id: document.id,
+                document_version: document.current_version,
                 status: "pending",
                 chunk_count: 0,
                 created_at: new Date().toISOString(),

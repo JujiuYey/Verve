@@ -1,7 +1,10 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 
+import type { WikiDocumentChangeRequest } from "@/api/wiki/document";
 import { useAuthStore } from "@/stores/auth";
 import { request } from "@/utils/request";
+
+export type { WikiDocumentChangeRequest } from "@/api/wiki/document";
 
 const BASE = "/api/learning";
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -12,6 +15,42 @@ export interface LearningMessage {
   turn_id: string;
   role: string;
   content: string;
+  created_at: string;
+}
+
+export type LearningAgentType = "listener" | "teacher" | "curator";
+
+export interface LearningTurn {
+  id: string;
+  session_id: string;
+  request_id: string;
+  agent_type: LearningAgentType;
+  status: "processing" | "completed" | "failed";
+  error_code?: string;
+  error_message?: string;
+  started_at: string;
+  completed_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LearningTeachingEvidence {
+  chunk_id: string;
+  document_version: number;
+  chunk_index: number;
+  heading_path: string;
+  content: string;
+}
+
+export interface LearningTeachingIntervention {
+  id: string;
+  turn_id: string;
+  question_summary: string;
+  knowledge_gaps: string[];
+  explanation_summary: string;
+  key_points: string[];
+  examples: string[];
+  evidence: LearningTeachingEvidence[];
   created_at: string;
 }
 
@@ -52,6 +91,26 @@ export interface SessionDetail {
   session: LearningSession;
   messages: LearningMessage[];
   reviews: LearningExplanationReview[];
+  timeline: TimelineItem[];
+}
+
+export type TurnArtifact =
+  | { type: "explanation_review"; data: LearningExplanationReview }
+  | { type: "teaching_intervention"; data: LearningTeachingIntervention }
+  | { type: "wiki_change_request"; data: WikiDocumentChangeRequest };
+
+export interface TimelineItem {
+  turn: LearningTurn;
+  user_message: LearningMessage;
+  assistant_message?: LearningMessage;
+  artifact?: TurnArtifact;
+}
+
+export interface SubmitTurnRequest {
+  request_id: string;
+  agent_type: LearningAgentType;
+  content: string;
+  replaces_change_request_id?: string;
 }
 
 export interface CreateSessionRequest {
@@ -100,6 +159,9 @@ const api = {
     request.post<FeynmanReview>(`${BASE}/session/${id}/review`, data),
 
   complete: (id: string) => request.post<CompleteResult>(`${BASE}/session/${id}/complete`),
+
+  submitTurn: (id: string, data: SubmitTurnRequest) =>
+    request.post<TimelineItem>(`${BASE}/session/${id}/turns`, data),
 };
 
 export const sessionKeys = {
@@ -124,6 +186,12 @@ export function useCreateSession() {
 export function useReviewExplanation(sessionId: string) {
   return useMutation({
     mutationFn: (data: ReviewExplanationRequest) => api.review(sessionId, data),
+  });
+}
+
+export function useSubmitTurn(sessionId: string) {
+  return useMutation({
+    mutationFn: (data: SubmitTurnRequest) => api.submitTurn(sessionId, data),
   });
 }
 

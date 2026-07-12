@@ -69,6 +69,11 @@ const indexStatusMeta: Record<
     className: "border-destructive/30 bg-destructive/10 text-destructive",
     icon: IconAlertCircle,
   },
+  superseded: {
+    label: "版本已过期",
+    className: "border-border text-muted-foreground",
+    icon: IconClock,
+  },
 };
 
 export function DocumentCard({

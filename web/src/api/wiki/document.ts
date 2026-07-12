@@ -1,3 +1,6 @@
+import { useMutation } from "@tanstack/react-query";
+
+import type { IndexJobProgress } from "@/api/rag/wiki";
 import { request } from "@/utils/request";
 
 // 文档接口类型定义
@@ -9,6 +12,8 @@ export interface Document {
   folder_id: string;
   file_path: string;
   sort_order: number;
+  current_version: number;
+  content_hash?: string;
   created_at: string;
   updated_at: string;
 }
@@ -48,7 +53,46 @@ export interface UpdateContentPayload {
   content: string;
 }
 
+export type WikiChangeRequestStatus = "proposed" | "applied" | "failed" | "cancelled" | "conflict";
+
+export interface WikiDocumentChangeRequest {
+  id: string;
+  document_id: string;
+  requested_by: string;
+  source_type: string;
+  source_id: string;
+  request_id: string;
+  replaces_change_request_id?: string;
+  base_version: number;
+  instruction: string;
+  change_summary: string;
+  proposed_content: string;
+  proposed_diff: string;
+  status: WikiChangeRequestStatus;
+  error_message?: string;
+  applied_version?: number;
+  created_at: string;
+  updated_at: string;
+  applied_at?: string;
+}
+
+export interface WikiDocumentRevision {
+  id: string;
+  document_id: string;
+  version: number;
+  change_request_id?: string;
+  change_summary: string;
+  created_at: string;
+}
+
+export interface ApplyWikiChangeRequestResult {
+  change_request: WikiDocumentChangeRequest;
+  revision: WikiDocumentRevision;
+  index_job: IndexJobProgress;
+}
+
 const RESOURCE_PATH = "/api/wiki/documents";
+const CHANGE_REQUEST_PATH = "/api/wiki/change-requests";
 
 // 文档相关 API
 export const documentApi = {
@@ -91,3 +135,16 @@ export const documentApi = {
   updateContent: (id: string, data: UpdateContentPayload) =>
     request.put<{ message: string }>(`${RESOURCE_PATH}/${id}/content`, data),
 };
+
+export function useApplyWikiChangeRequest() {
+  return useMutation({
+    mutationFn: (id: string) =>
+      request.post<ApplyWikiChangeRequestResult>(`${CHANGE_REQUEST_PATH}/${id}/apply`),
+  });
+}
+
+export function useCancelWikiChangeRequest() {
+  return useMutation({
+    mutationFn: (id: string) => request.post<void>(`${CHANGE_REQUEST_PATH}/${id}/cancel`),
+  });
+}

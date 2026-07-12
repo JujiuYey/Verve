@@ -8,11 +8,19 @@ import {
   sessionKeys,
   useCompleteSession,
   useCreateSession,
-  useReviewExplanation,
   useSessionDetail,
-  type LearningExplanationReview,
+  useSubmitTurn,
+  type LearningAgentType,
+  type TimelineItem,
+  type WikiDocumentChangeRequest,
 } from "@/api/learning";
-import { documentApi } from "@/api/wiki/document";
+import { ragWikiKeys, useDocumentIndexStatus, useRetryDocumentIndex } from "@/api/rag/wiki";
+import {
+  documentApi,
+  useApplyWikiChangeRequest,
+  useCancelWikiChangeRequest,
+} from "@/api/wiki/document";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Empty,
@@ -25,9 +33,10 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-import { PracticePanel } from "./_components/practice-panel";
+import { AgentComposer } from "./_components/agent-composer";
+import { AgentTimeline } from "./_components/agent-timeline";
 import { SourcePanel } from "./_components/source-panel";
-import { mergeReviewTurns } from "./_lib/review-turns";
+import { curatorRegenerationInput, mergeTimeline } from "./_lib/timeline";
 
 const routeApi = getRouteApi("/_layout/learn/feynman-practice/$documentId");
 
@@ -55,10 +64,12 @@ export function FeynmanWorkbenchPage() {
   const [createFailureIdentity, setCreateFailureIdentity] = useState("");
   const [activeView, setActiveView] = useState("source");
   const [answer, setAnswer] = useState("");
-  const [turns, setTurns] = useState<LearningExplanationReview[]>([]);
+  const [selectedAgent, setSelectedAgent] = useState<LearningAgentType>("listener");
+  const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   const [completedSummary, setCompletedSummary] = useState("");
-  const [reviewingIdentity, setReviewingIdentity] = useState("");
+  const [submittingRequestId, setSubmittingRequestId] = useState("");
   const [completingIdentity, setCompletingIdentity] = useState("");
+  const [busyChangeRequestId, setBusyChangeRequestId] = useState("");
 
   const createdSessionId = createdSession?.routeIdentity === routeIdentity ? createdSession.id : "";
   const sessionId = requestedSessionId || createdSessionId;
@@ -76,8 +87,12 @@ export function FeynmanWorkbenchPage() {
   });
   const sessionDetailQuery = useSessionDetail(sessionId);
   const sessionDetail = sessionDetailQuery.data;
-  const reviewExplanation = useReviewExplanation(sessionId);
+  const submitTurn = useSubmitTurn(sessionId);
   const completeSession = useCompleteSession(sessionId);
+  const applyChangeRequest = useApplyWikiChangeRequest();
+  const cancelChangeRequest = useCancelWikiChangeRequest();
+  const indexStatusQuery = useDocumentIndexStatus(documentId);
+  const retryIndex = useRetryDocumentIndex();
 
   useEffect(() => {
     if (previousRouteIdentityRef.current === routeIdentity) return;
@@ -87,10 +102,12 @@ export function FeynmanWorkbenchPage() {
     setCreateFailureIdentity("");
     setActiveView("source");
     setAnswer("");
-    setTurns([]);
+    setSelectedAgent("listener");
+    setTimeline([]);
     setCompletedSummary("");
-    setReviewingIdentity("");
+    setSubmittingRequestId("");
     setCompletingIdentity("");
+    setBusyChangeRequestId("");
     creatingRouteRef.current = "";
   }, [routeIdentity]);
 
@@ -142,7 +159,7 @@ export function FeynmanWorkbenchPage() {
       return;
     }
 
-    setTurns((current) => mergeReviewTurns(current, sessionDetail.reviews || []));
+    setTimeline((current) => mergeTimeline(current, sessionDetail.timeline || []));
     setCompletedSummary(
       sessionDetail.session.status === "completed"
         ? sessionDetail.session.summary || "你的解释记录已经保存。"
@@ -150,46 +167,41 @@ export function FeynmanWorkbenchPage() {
     );
   }, [documentId, sessionDetail, sessionId]);
 
-  const submitExplanation = async () => {
-    const submittedAnswer = answer;
-    const explanation = submittedAnswer.trim();
+  const submitAgentTurn = async (
+    contentOverride?: string,
+    replacesChangeRequestId?: string,
+    agentOverride?: LearningAgentType,
+  ) => {
+    const submittedAnswer = contentOverride ?? answer;
+    const content = submittedAnswer.trim();
     const submittedIdentity = requestIdentity;
-    if (!sessionReady || !explanation || reviewingIdentity === submittedIdentity) return;
-
-    setReviewingIdentity(submittedIdentity);
+    if (!sessionReady || !content || submittingRequestId) return;
+    const requestId = crypto.randomUUID();
+    const agentType = agentOverride ?? selectedAgent;
+    const createdAt = new Date().toISOString();
+    const localItem = makeLocalTimelineItem(sessionId, requestId, agentType, content, createdAt);
+    setSubmittingRequestId(requestId);
+    setTimeline((current) => [...current, localItem]);
     try {
-      const review = await reviewExplanation.mutateAsync({
-        request_id: crypto.randomUUID(),
-        explanation,
+      const item = await submitTurn.mutateAsync({
+        request_id: requestId,
+        agent_type: agentType,
+        content,
+        replaces_change_request_id: replacesChangeRequestId,
       });
       if (currentRequestIdentityRef.current !== submittedIdentity) return;
-
-      const createdAt = new Date().toISOString();
-      setTurns((current) => [
-        ...current,
-        {
-          ...review,
-          id: `local-${createdAt}-${current.length}`,
-          turn_id: "",
-          session_id: sessionId,
-          document_id: documentId,
-          user_id: "",
-          explanation,
-          created_at: createdAt,
-        },
-      ]);
-      if (answerRef.current === submittedAnswer) {
+      setTimeline((current) => upsertTimelineItem(current, item));
+      if (contentOverride === undefined && answerRef.current === submittedAnswer) {
         setAnswer("");
       }
       void queryClient.invalidateQueries({ queryKey: sessionKeys.detail(sessionId) });
     } catch (error) {
       if (currentRequestIdentityRef.current === submittedIdentity) {
-        toast.error(error instanceof Error ? error.message : "审阅解释失败，请重试");
+        setTimeline((current) => current.filter((item) => item.turn.request_id !== requestId));
+        toast.error(error instanceof Error ? error.message : "处理学习轮次失败，请重试");
       }
     } finally {
-      if (currentRequestIdentityRef.current === submittedIdentity) {
-        setReviewingIdentity("");
-      }
+      setSubmittingRequestId((current) => (current === requestId ? "" : current));
     }
   };
 
@@ -197,7 +209,7 @@ export function FeynmanWorkbenchPage() {
     const submittedIdentity = requestIdentity;
     if (
       !sessionReady ||
-      turns.length === 0 ||
+      listenerTurnCount === 0 ||
       answer.trim() ||
       completingIdentity === submittedIdentity
     ) {
@@ -220,6 +232,56 @@ export function FeynmanWorkbenchPage() {
         setCompletingIdentity("");
       }
     }
+  };
+
+  const applyCuratorChange = async (item: TimelineItem) => {
+    if (item.artifact?.type !== "wiki_change_request") return;
+    const id = item.artifact.data.id;
+    setBusyChangeRequestId(id);
+    try {
+      const result = await applyChangeRequest.mutateAsync(id);
+      setTimeline((current) => replaceChangeRequest(current, result.change_request));
+      void refreshDocumentState();
+      toast.success("Wiki 修订已应用");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "应用修订失败");
+      void sessionDetailQuery.refetch();
+    } finally {
+      setBusyChangeRequestId("");
+    }
+  };
+
+  const cancelCuratorChange = async (item: TimelineItem) => {
+    if (item.artifact?.type !== "wiki_change_request") return;
+    const request = item.artifact.data;
+    setBusyChangeRequestId(request.id);
+    try {
+      await cancelChangeRequest.mutateAsync(request.id);
+      setTimeline((current) =>
+        replaceChangeRequest(current, {
+          ...request,
+          status: "cancelled",
+          updated_at: new Date().toISOString(),
+        }),
+      );
+      toast.success("修订建议已取消");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "取消修订失败");
+    } finally {
+      setBusyChangeRequestId("");
+    }
+  };
+
+  const regenerateCuratorChange = (item: TimelineItem) => {
+    const input = curatorRegenerationInput(item);
+    void submitAgentTurn(input.content, input.replaces_change_request_id, "curator");
+  };
+
+  const refreshDocumentState = () => {
+    void queryClient.invalidateQueries({ queryKey: ["wiki-document", documentId] });
+    void queryClient.invalidateQueries({ queryKey: ["wiki-document-content", documentId] });
+    void queryClient.invalidateQueries({ queryKey: ragWikiKeys.documentStatus(documentId) });
+    void queryClient.invalidateQueries({ queryKey: sessionKeys.detail(sessionId) });
   };
 
   const retryCreateSession = () => {
@@ -286,9 +348,12 @@ export function FeynmanWorkbenchPage() {
   }
 
   const sessionReady = sessionDetail.session.id === sessionId;
-  const isReviewing = reviewingIdentity === requestIdentity;
+  const isSubmitting = Boolean(submittingRequestId);
   const isCompleting = completingIdentity === requestIdentity;
   const isCompleted = Boolean(completedSummary || sessionDetail.session.status === "completed");
+  const listenerTurnCount = timeline.filter(
+    (item) => item.artifact?.type === "explanation_review",
+  ).length;
   const title = document?.filename?.replace(/\.md$/i, "") || "整篇费曼练习";
 
   return (
@@ -320,29 +385,120 @@ export function FeynmanWorkbenchPage() {
           </TabsTrigger>
           <TabsTrigger value="explain">
             <MessageSquareTextIcon />
-            开始讲解{turns.length > 0 ? ` (${turns.length})` : ""}
+            开始讲解{timeline.length > 0 ? ` (${timeline.length})` : ""}
           </TabsTrigger>
         </TabsList>
         <TabsContent value="source" className="flex min-h-0 overflow-hidden">
           <SourcePanel documentId={documentId} />
         </TabsContent>
         <TabsContent value="explain" className="flex min-h-0 overflow-hidden">
-          <PracticePanel
-            answer={answer}
-            turns={turns}
-            disabled={!sessionReady || isReviewing || isCompleting || isCompleted}
-            isSubmitting={isReviewing}
-            isCompleting={isCompleting}
-            isCompleted={isCompleted}
-            hasDraft={answer.trim().length > 0}
-            completedSummary={completedSummary}
-            onAnswerChange={setAnswer}
-            onSubmit={() => void submitExplanation()}
-            onComplete={() => void finishPractice()}
-          />
+          <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border bg-background">
+            {indexStatusQuery.data?.status === "pending" ||
+            indexStatusQuery.data?.status === "running" ? (
+              <Alert className="m-4 mb-0">
+                <CircleAlertIcon />
+                <AlertTitle>当前文档版本正在建立索引</AlertTitle>
+                <AlertDescription>Teacher 暂时不会使用旧版本证据。</AlertDescription>
+              </Alert>
+            ) : indexStatusQuery.data?.status === "failed" ? (
+              <Alert className="m-4 mb-0">
+                <CircleAlertIcon />
+                <AlertTitle>当前文档版本索引失败</AlertTitle>
+                <AlertDescription className="flex items-center justify-between gap-3">
+                  <span>{indexStatusQuery.data.error_message || "请重试索引。"}</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      retryIndex.mutate(documentId, { onSuccess: refreshDocumentState })
+                    }
+                    disabled={retryIndex.isPending}
+                  >
+                    重试
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            ) : null}
+            {isCompleted ? (
+              <Alert className="m-4 mb-0">
+                <AlertTitle>本次练习已结束</AlertTitle>
+                <AlertDescription>{completedSummary || "你的解释记录已经保存。"}</AlertDescription>
+              </Alert>
+            ) : null}
+            <AgentTimeline
+              items={timeline}
+              busyChangeRequestId={busyChangeRequestId}
+              onApply={(item) => void applyCuratorChange(item)}
+              onCancel={(item) => void cancelCuratorChange(item)}
+              onRegenerate={regenerateCuratorChange}
+            />
+            <AgentComposer
+              selectedAgent={selectedAgent}
+              value={answer}
+              disabled={!sessionReady || isCompleting || isCompleted}
+              isSubmitting={isSubmitting}
+              canComplete={!isCompleted && listenerTurnCount > 0}
+              isCompleting={isCompleting}
+              onAgentChange={setSelectedAgent}
+              onChange={setAnswer}
+              onSubmit={() => void submitAgentTurn()}
+              onComplete={() => void finishPractice()}
+            />
+          </section>
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+function makeLocalTimelineItem(
+  sessionId: string,
+  requestId: string,
+  agentType: LearningAgentType,
+  content: string,
+  createdAt: string,
+): TimelineItem {
+  const turnId = `local-${requestId}`;
+  return {
+    turn: {
+      id: turnId,
+      session_id: sessionId,
+      request_id: requestId,
+      agent_type: agentType,
+      status: "processing",
+      started_at: createdAt,
+      created_at: createdAt,
+      updated_at: createdAt,
+    },
+    user_message: {
+      id: `${turnId}-user`,
+      session_id: sessionId,
+      turn_id: turnId,
+      role: "user",
+      content,
+      created_at: createdAt,
+    },
+  };
+}
+
+function upsertTimelineItem(current: TimelineItem[], item: TimelineItem) {
+  const index = current.findIndex(
+    (entry) => entry.turn.id === item.turn.id || entry.turn.request_id === item.turn.request_id,
+  );
+  if (index < 0) return [...current, item];
+  const next = [...current];
+  next[index] = item;
+  return next;
+}
+
+function replaceChangeRequest(
+  current: TimelineItem[],
+  request: WikiDocumentChangeRequest,
+): TimelineItem[] {
+  return current.map((item) =>
+    item.artifact?.type === "wiki_change_request" && item.artifact.data.id === request.id
+      ? { ...item, artifact: { type: "wiki_change_request", data: request } }
+      : item,
   );
 }
 
