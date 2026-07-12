@@ -23,6 +23,7 @@ type FeynmanAnswerEditorProps = {
   onChange: (value: string) => void;
   placeholder?: string;
   disabled?: boolean;
+  compact?: boolean;
 };
 
 export function FeynmanAnswerEditor({
@@ -30,6 +31,7 @@ export function FeynmanAnswerEditor({
   onChange,
   placeholder = "把你的解释写在这里。可以插入代码块，也可以直接写卡住的地方。",
   disabled = false,
+  compact = false,
 }: FeynmanAnswerEditorProps) {
   const editor = useEditor({
     extensions: [
@@ -66,7 +68,8 @@ export function FeynmanAnswerEditor({
   return (
     <div
       className={cn(
-        "feynman-answer-editor flex h-96 min-h-96 shrink-0 flex-col overflow-hidden rounded-md border bg-background",
+        "feynman-answer-editor flex shrink-0 flex-col overflow-hidden rounded-md border bg-background",
+        compact ? "h-56 min-h-56" : "h-96 min-h-96",
         disabled && "cursor-not-allowed opacity-60",
       )}
     >

@@ -47,7 +47,7 @@ export function AgentComposer({
 }) {
   const labels = copy[agentType];
   return (
-    <div className="flex shrink-0 flex-col gap-3 border-t bg-background p-4">
+    <div className="flex shrink-0 flex-col gap-3 bg-background pt-3">
       {canComplete ? (
         <div className="flex justify-end">
           <Button
@@ -70,6 +70,7 @@ export function AgentComposer({
         onChange={onChange}
         disabled={disabled || isSubmitting}
         placeholder={labels.placeholder}
+        compact={agentType !== "listener"}
       />
       <div className="flex justify-end">
         <Button onClick={onSubmit} disabled={disabled || isSubmitting || !value.trim()}>

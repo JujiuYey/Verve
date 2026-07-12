@@ -58,7 +58,7 @@ export function AgentTimeline({
   const empty = emptyCopy[agentType];
   return (
     <ScrollArea className="min-h-0 flex-1">
-      <div className="flex flex-col gap-5 p-4">
+      <div className="flex flex-col gap-5 py-4">
         {items.length ? (
           items.map((item, index) => (
             <TimelineTurn

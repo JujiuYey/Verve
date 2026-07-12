@@ -390,7 +390,7 @@ export function FeynmanWorkbenchPage() {
         onValueChange={setActiveView}
         className="min-h-0 flex-1 overflow-hidden"
       >
-        <TabsList className="max-w-full justify-start overflow-x-auto">
+        <TabsList className="h-auto max-w-full flex-wrap justify-start">
           <TabsTrigger value="source">
             <BookOpenIcon />
             阅读文章
@@ -414,17 +414,17 @@ export function FeynmanWorkbenchPage() {
         </TabsContent>
         {(["listener", "teacher", "curator"] as const).map((agentType) => (
           <TabsContent key={agentType} value={agentType} className="flex min-h-0 overflow-hidden">
-            <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border bg-background">
+            <section className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
               {agentType === "teacher" &&
               (indexStatusQuery.data?.status === "pending" ||
                 indexStatusQuery.data?.status === "running") ? (
-                <Alert className="m-4 mb-0">
+                <Alert className="mt-4">
                   <CircleAlertIcon />
                   <AlertTitle>当前文档版本正在建立索引</AlertTitle>
                   <AlertDescription>教学补充暂时不会使用旧版本证据。</AlertDescription>
                 </Alert>
               ) : agentType === "teacher" && indexStatusQuery.data?.status === "failed" ? (
-                <Alert className="m-4 mb-0">
+                <Alert className="mt-4">
                   <CircleAlertIcon />
                   <AlertTitle>当前文档版本索引失败</AlertTitle>
                   <AlertDescription className="flex items-center justify-between gap-3">
@@ -443,7 +443,7 @@ export function FeynmanWorkbenchPage() {
                 </Alert>
               ) : null}
               {isCompleted ? (
-                <Alert className="m-4 mb-0">
+                <Alert className="mt-4">
                   <AlertTitle>本次练习已结束</AlertTitle>
                   <AlertDescription>
                     {completedSummary || "你的解释记录已经保存。"}
