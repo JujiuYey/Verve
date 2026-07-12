@@ -143,6 +143,53 @@ func (s *MemoryService) RecordExplanationReview(ctx context.Context, userID stri
 	return nil
 }
 
+func (s *MemoryService) RecordTeachingIntervention(ctx context.Context, userID string, session *learning_db.LearningSession, intervention *learning_db.LearningTeachingIntervention) error {
+	if session == nil || intervention == nil {
+		return errors.New("learning session and teaching intervention are required")
+	}
+	if s == nil || s.repository == nil || s.documents == nil || s.folders == nil {
+		return errors.New("memory service is not configured")
+	}
+	if strings.TrimSpace(userID) == "" || session.UserID != userID {
+		return errors.New("learning session user does not match memory user")
+	}
+	document, err := s.documents.FindOne(ctx, session.DocumentID)
+	if err != nil {
+		return err
+	}
+	folder, err := s.folders.FindOne(ctx, document.FolderID)
+	if err != nil {
+		return err
+	}
+	if len(FilterCoachFoldersForUser([]*wiki_db.Folder{folder}, userID)) == 0 {
+		return sql.ErrNoRows
+	}
+	folderID := document.FolderID
+	documentID := session.DocumentID
+	sessionID := session.ID
+	sourceID := intervention.ID
+	event := &learning_db.LearningMemoryEvent{
+		UserID: userID, FolderID: &folderID, DocumentID: &documentID, SessionID: &sessionID,
+		SourceType: "teaching_intervention", SourceID: &sourceID, EventType: "teaching_intervention",
+		Content: firstNonBlank(intervention.ExplanationSummary, intervention.QuestionSummary),
+		Evidence: map[string]interface{}{
+			"knowledge_gaps": intervention.KnowledgeGaps, "key_points": intervention.KeyPoints,
+			"examples": intervention.Examples, "evidence": intervention.Evidence,
+		},
+	}
+	if err := s.repository.CreateEvent(ctx, event); err != nil {
+		return err
+	}
+	for _, gap := range intervention.KnowledgeGaps {
+		if gap = strings.TrimSpace(gap); gap != "" {
+			if err := s.repository.CreateItem(ctx, buildExplanationMemoryItem(userID, folderID, documentID, event.ID, "knowledge_gap", gap)); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func validateExplanationMemoryScope(userID string, session *learning_db.LearningSession, review *learning_db.LearningExplanationReview) error {
 	if strings.TrimSpace(userID) == "" || strings.TrimSpace(session.DocumentID) == "" {
 		return errors.New("memory user and document scope are required")

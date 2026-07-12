@@ -29,11 +29,13 @@ type DatabaseService struct {
 	ModelConfigs system_repo.ModelConfigRepository
 
 	// Learning Repositories
-	Sessions *learning_repo.SessionRepository
-	Turns    *learning_repo.TurnRepository
-	Messages *learning_repo.MessageRepository
-	Reviews  *learning_repo.ReviewRepository
-	Memories *learning_repo.MemoryRepository
+	Sessions      *learning_repo.SessionRepository
+	Turns         *learning_repo.TurnRepository
+	Messages      *learning_repo.MessageRepository
+	Reviews       *learning_repo.ReviewRepository
+	Interventions *learning_repo.InterventionRepository
+	Timeline      *learning_repo.TimelineRepository
+	Memories      *learning_repo.MemoryRepository
 
 	// Wiki Repositories
 	Folders        wiki_repo.FolderRepository
@@ -104,11 +106,13 @@ func NewDatabaseService(dsn string) (*DatabaseService, error) {
 		ModelConfigs: system_repo.NewModelConfigRepository(db),
 
 		// Learning Repositories
-		Sessions: learning_repo.NewSessionRepository(db),
-		Turns:    learning_repo.NewTurnRepository(db),
-		Messages: learning_repo.NewMessageRepository(db),
-		Reviews:  learning_repo.NewReviewRepository(db),
-		Memories: learning_repo.NewMemoryRepository(db),
+		Sessions:      learning_repo.NewSessionRepository(db),
+		Turns:         learning_repo.NewTurnRepository(db),
+		Messages:      learning_repo.NewMessageRepository(db),
+		Reviews:       learning_repo.NewReviewRepository(db),
+		Interventions: learning_repo.NewInterventionRepository(db),
+		Timeline:      learning_repo.NewTimelineRepository(db),
+		Memories:      learning_repo.NewMemoryRepository(db),
 
 		// Wiki Repositories
 		Folders:        wiki_repo.NewFolderRepository(db),

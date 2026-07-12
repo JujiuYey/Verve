@@ -23,6 +23,7 @@ import (
 	rag_payload "verve/app/rag/models/payload"
 	rag_service "verve/app/rag/service"
 	wiki_db "verve/app/wiki/models/db"
+	wiki_repo "verve/app/wiki/repository"
 	"verve/common/response"
 	"verve/infrastructure/database"
 	"verve/infrastructure/storage"
@@ -67,14 +68,24 @@ type explanationMemoryStore interface {
 	RecordExplanationReview(ctx context.Context, userID string, session *learning_db.LearningSession, review *learning_db.LearningExplanationReview) error
 }
 
+type turnSubmitter interface {
+	Submit(context.Context, string, string, learning_service.TurnRequest) (*learning_payload.TimelineItem, error)
+}
+
+type timelineStore interface {
+	FindBySession(context.Context, string) ([]*learning_payload.TimelineItem, error)
+}
+
 type SessionHandlerDependencies struct {
-	Sessions  sessionStore
-	Documents accessibleDocumentStore
-	Turns     listenerTurnStore
-	Messages  messageStore
-	Reviews   reviewStore
-	Reviewer  learning_service.FeynmanReviewer
-	Memory    explanationMemoryStore
+	Sessions    sessionStore
+	Documents   accessibleDocumentStore
+	Turns       listenerTurnStore
+	Messages    messageStore
+	Reviews     reviewStore
+	Reviewer    learning_service.FeynmanReviewer
+	Memory      explanationMemoryStore
+	TurnService turnSubmitter
+	Timeline    timelineStore
 }
 
 type SessionHandler struct {
@@ -89,10 +100,16 @@ func NewSessionHandler(db *database.DatabaseService, minio *storage.MinIOService
 		retriever: retriever,
 		chunks:    db.RAGChunks,
 	}
+	memory := learning_service.NewMemoryService(db)
+	reviewer := learning_service.NewFeynmanReviewService(source)
+	turnService := learning_service.NewTurnService(db.Sessions, db.Turns, db.Timeline, map[string]learning_service.AgentProcessor{
+		learning_db.LearningAgentListener: learning_service.NewListenerProcessor(reviewer, db.Reviews, memory),
+		learning_db.LearningAgentTeacher:  learning_service.NewTeacherProcessor(learning_service.NewTeacherService(source), db.Reviews, memory),
+		learning_db.LearningAgentCurator:  learning_service.NewCuratorProcessor(learning_service.NewCuratorService(source, db.ChangeRequests)),
+	}, memory)
 	return NewSessionHandlerWithDependencies(SessionHandlerDependencies{
 		Sessions: db.Sessions, Documents: source, Turns: db.Turns, Messages: db.Messages, Reviews: db.Reviews,
-		Reviewer: learning_service.NewFeynmanReviewService(source),
-		Memory:   learning_service.NewMemoryService(db),
+		Reviewer: reviewer, Memory: memory, TurnService: turnService, Timeline: db.Timeline,
 	})
 }
 
@@ -141,7 +158,30 @@ func (h *SessionHandler) FindOne(c *fiber.Ctx) error {
 	if err != nil {
 		return response.InternalServerCtx(c, "加载解释记录失败")
 	}
-	return response.SuccessCtx(c, fiber.Map{"session": session, "messages": messages, "reviews": reviews})
+	timeline := make([]*learning_payload.TimelineItem, 0)
+	if h.deps.Timeline != nil {
+		timeline, err = h.deps.Timeline.FindBySession(c.Context(), session.ID)
+		if err != nil {
+			return response.InternalServerCtx(c, "加载学习时间线失败")
+		}
+	}
+	return response.SuccessCtx(c, fiber.Map{"session": session, "messages": messages, "reviews": reviews, "timeline": timeline})
+}
+
+func (h *SessionHandler) SubmitTurn(c *fiber.Ctx) error {
+	userID, _ := c.Locals("user_id").(string)
+	if h.deps.TurnService == nil {
+		return response.InternalServerCtx(c, "学习轮次服务未配置")
+	}
+	var request learning_service.TurnRequest
+	if err := c.BodyParser(&request); err != nil {
+		return response.BadRequestCtx(c, err.Error())
+	}
+	item, err := h.deps.TurnService.Submit(c.Context(), userID, c.Params("id"), request)
+	if err != nil {
+		return writeTurnError(c, err)
+	}
+	return response.SuccessCtx(c, item)
 }
 
 func (h *SessionHandler) Review(c *fiber.Ctx) error {
@@ -164,6 +204,22 @@ func (h *SessionHandler) Review(c *fiber.Ctx) error {
 	req.Explanation = strings.TrimSpace(req.Explanation)
 	if req.Explanation == "" {
 		return response.BadRequestCtx(c, "explanation 不能为空")
+	}
+	if h.deps.TurnService != nil {
+		item, submitErr := h.deps.TurnService.Submit(c.Context(), userID, session.ID, learning_service.TurnRequest{
+			RequestID: req.RequestID, AgentType: learning_db.LearningAgentListener, Content: req.Explanation,
+		})
+		if submitErr != nil {
+			return writeTurnError(c, submitErr)
+		}
+		if item == nil || item.Artifact == nil || item.Artifact.Type != learning_payload.ArtifactExplanationReview {
+			return response.InternalServerCtx(c, "读取解释审阅失败")
+		}
+		review, ok := item.Artifact.Data.(*learning_db.LearningExplanationReview)
+		if !ok {
+			return response.InternalServerCtx(c, "解释审阅格式无效")
+		}
+		return response.SuccessCtx(c, reviewResultFromModel(review))
 	}
 	if h.deps.Turns == nil {
 		return response.InternalServerCtx(c, "学习轮次存储未配置")
@@ -307,6 +363,31 @@ func writeSessionLookupError(c *fiber.Ctx, err error) error {
 		return response.NotFoundCtx(c, "会话不存在")
 	}
 	return response.InternalServerCtx(c, "读取会话失败")
+}
+
+func writeTurnError(c *fiber.Ctx, err error) error {
+	switch {
+	case errors.Is(err, learning_service.ErrTurnProcessing):
+		return c.Status(fiber.StatusConflict).JSON(response.FailWithCode(fiber.StatusConflict, "turn_processing"))
+	case errors.Is(err, learning_repo.ErrTurnRequestConflict):
+		return c.Status(fiber.StatusConflict).JSON(response.FailWithCode(fiber.StatusConflict, "request_conflict"))
+	case errors.Is(err, learning_service.ErrIndexNotReady):
+		return c.Status(fiber.StatusConflict).JSON(response.FailWithCode(fiber.StatusConflict, "index_not_ready"))
+	case errors.Is(err, learning_service.ErrTurnSessionForbidden):
+		return response.ForbiddenCtx(c, "无权访问")
+	case errors.Is(err, learning_service.ErrTurnSessionCompleted):
+		return c.Status(fiber.StatusConflict).JSON(response.FailWithCode(fiber.StatusConflict, "session_completed"))
+	case errors.Is(err, learning_service.ErrUnsupportedAgent):
+		return response.BadRequestCtx(c, "agent_type 无效")
+	case errors.Is(err, learning_service.ErrInvalidTurnRequest):
+		return response.BadRequestCtx(c, "request_id 和 content 不能为空")
+	case errors.Is(err, wiki_repo.ErrChangeRequestForbidden):
+		return response.ForbiddenCtx(c, "无权替代该文档变更申请")
+	case errors.Is(err, sql.ErrNoRows):
+		return response.NotFoundCtx(c, "会话不存在")
+	default:
+		return response.InternalServerCtx(c, "处理学习轮次失败")
+	}
 }
 
 func reviewModelFromResult(result *learning_service.FeynmanReview) *learning_db.LearningExplanationReview {

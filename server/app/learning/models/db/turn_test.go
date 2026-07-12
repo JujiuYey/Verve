@@ -37,3 +37,15 @@ func TestLearningTeachingInterventionBelongsToOneTurn(t *testing.T) {
 		}
 	}
 }
+
+func TestLearningTeachingInterventionUsesTypedEvidenceList(t *testing.T) {
+	modelType := reflect.TypeOf(LearningTeachingIntervention{})
+	field, ok := modelType.FieldByName("Evidence")
+	if !ok {
+		t.Fatal("LearningTeachingIntervention.Evidence is missing")
+	}
+	want := reflect.TypeOf([]LearningTeachingEvidence{})
+	if field.Type != want {
+		t.Fatalf("Evidence type = %v, want %v", field.Type, want)
+	}
+}

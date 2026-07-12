@@ -116,7 +116,7 @@ CREATE TABLE learning_teaching_interventions (
     explanation_summary TEXT NOT NULL,
     key_points JSONB NOT NULL DEFAULT '[]'::jsonb,
     examples JSONB NOT NULL DEFAULT '[]'::jsonb,
-    evidence JSONB NOT NULL DEFAULT '{}'::jsonb,
+    evidence JSONB NOT NULL DEFAULT '[]'::jsonb,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uq_learning_teaching_interventions_turn UNIQUE (turn_id)
 );

@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -39,6 +40,7 @@ func (r *VersionRepository) ApplyChangeRequest(ctx context.Context, input ApplyV
 
 	var revision *wiki_db.DocumentRevision
 	var job *rag_db.IndexJob
+	conflicted := false
 	err := r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		request := new(wiki_db.DocumentChangeRequest)
 		if err := tx.NewSelect().Model(request).Where("id = ?", *input.ChangeRequestID).For("UPDATE").Scan(ctx); err != nil {
@@ -53,17 +55,35 @@ func (r *VersionRepository) ApplyChangeRequest(ctx context.Context, input ApplyV
 			return ErrChangeRequestNotProposed
 		}
 		if request.DocumentID != input.DocumentID || request.BaseVersion != input.ExpectedVersion {
-			return ErrVersionConflict
+			if _, err := tx.NewUpdate().Model((*wiki_db.DocumentChangeRequest)(nil)).
+				Set("status = ?", wiki_db.ChangeRequestStatusConflict).
+				Set("updated_at = ?", time.Now()).
+				Where("id = ?", request.ID).
+				Exec(ctx); err != nil {
+				return fmt.Errorf("标记文档变更冲突失败: %w", err)
+			}
+			return captureVersionConflict(ErrVersionConflict, &conflicted)
 		}
 
 		var err error
 		revision, job, err = applyLockedVersion(ctx, tx, input, request)
-		return err
+		return captureVersionConflict(err, &conflicted)
 	})
 	if err != nil {
 		return nil, nil, err
 	}
+	if conflicted {
+		return nil, nil, ErrVersionConflict
+	}
 	return revision, job, nil
+}
+
+func captureVersionConflict(err error, conflicted *bool) error {
+	if errors.Is(err, ErrVersionConflict) {
+		*conflicted = true
+		return nil
+	}
+	return err
 }
 
 func (r *VersionRepository) ApplyDirectEdit(ctx context.Context, input ApplyVersionInput) (*wiki_db.DocumentRevision, *rag_db.IndexJob, error) {

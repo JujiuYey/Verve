@@ -23,6 +23,7 @@ func SetupLearningRoutes(router fiber.Router, dbService *database.DatabaseServic
 			session.Post("/", sessionHandler.Create)
 			session.Get("/:id", sessionHandler.FindOne)
 			session.Post("/:id/review", sessionHandler.Review)
+			session.Post("/:id/turns", sessionHandler.SubmitTurn)
 			session.Post("/:id/complete", sessionHandler.Complete) // 结束本节
 		}
 

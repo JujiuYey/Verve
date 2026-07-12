@@ -52,6 +52,20 @@ func TestVersionRepositoryExposesConflictAndChangeRequestErrors(t *testing.T) {
 	}
 }
 
+func TestCaptureVersionConflictAllowsTransactionToCommit(t *testing.T) {
+	conflicted := false
+	if err := captureVersionConflict(ErrVersionConflict, &conflicted); err != nil {
+		t.Fatalf("transaction callback error = %v", err)
+	}
+	if !conflicted {
+		t.Fatal("version conflict was not captured for return after commit")
+	}
+	other := errors.New("database unavailable")
+	if err := captureVersionConflict(other, &conflicted); !errors.Is(err, other) {
+		t.Fatalf("non-conflict error = %v", err)
+	}
+}
+
 func TestVersionRepositoryContracts(t *testing.T) {
 	t.Parallel()
 

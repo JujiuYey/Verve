@@ -28,6 +28,30 @@ func NewFeynmanReviewerAgent(ctx context.Context) (adk.Agent, error) {
 	return a, nil
 }
 
+// NewLearningTeacherAgent answers learning questions from grounded Wiki evidence.
+func NewLearningTeacherAgent(ctx context.Context) (adk.Agent, error) {
+	chatModel, err := NewStructuredChatModel(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
+		Name: "LearningTeacher", Description: "根据当前 Wiki 证据回答学习问题",
+		Instruction: prompts.LearningTeacherPrompt(prompts.Input{}), Model: chatModel,
+	})
+}
+
+// NewWikiCuratorAgent proposes complete Markdown changes without write tools.
+func NewWikiCuratorAgent(ctx context.Context) (adk.Agent, error) {
+	chatModel, err := NewStructuredChatModel(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
+		Name: "WikiCurator", Description: "根据用户要求提出完整 Wiki Markdown 修改建议",
+		Instruction: prompts.WikiCuratorPrompt(prompts.Input{}), Model: chatModel,
+	})
+}
+
 // NewCoachAgent 学习调度 agent
 func NewCoachAgent(ctx context.Context, tools []tool.BaseTool) (adk.Agent, error) {
 	chatModel, err := NewChatModel(ctx)

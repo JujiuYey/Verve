@@ -21,6 +21,7 @@ type turnQueryRecorder struct {
 	turnInsertAffected int64
 	statusAffected     int64
 	rows               driver.Rows
+	rowQueue           []driver.Rows
 	commits            int
 	rollbacks          int
 }
@@ -55,6 +56,11 @@ func (c turnQueryConn) ExecContext(_ context.Context, query string, _ []driver.N
 }
 func (c turnQueryConn) QueryContext(_ context.Context, query string, _ []driver.NamedValue) (driver.Rows, error) {
 	c.recorder.selectQuery = query
+	if len(c.recorder.rowQueue) > 0 {
+		rows := c.recorder.rowQueue[0]
+		c.recorder.rowQueue = c.recorder.rowQueue[1:]
+		return rows, nil
+	}
 	return c.recorder.rows, nil
 }
 
@@ -66,6 +72,22 @@ func (t turnQueryTx) Rollback() error { t.recorder.rollbacks++; return nil }
 type learningTurnRows struct {
 	values [][]driver.Value
 	index  int
+}
+
+type learningMessageContentRows struct {
+	value string
+	done  bool
+}
+
+func (r *learningMessageContentRows) Columns() []string { return []string{"content"} }
+func (r *learningMessageContentRows) Close() error      { return nil }
+func (r *learningMessageContentRows) Next(dest []driver.Value) error {
+	if r.done {
+		return io.EOF
+	}
+	r.done = true
+	dest[0] = r.value
+	return nil
 }
 
 func (r *learningTurnRows) Columns() []string {
@@ -117,14 +139,59 @@ func TestTurnRepositoryBeginListenerTurnCreatesTurnAndUserMessageAtomically(t *t
 	}
 }
 
+func TestTurnRepositoryBeginTurnPersistsSelectedAgent(t *testing.T) {
+	recorder := &turnQueryRecorder{turnInsertAffected: 1}
+	repo, closeDB := newTurnRepositoryForTest(recorder)
+	defer closeDB()
+
+	result, err := repo.BeginTurn(context.Background(), BeginTurnInput{
+		SessionID: "session-1", RequestID: "request-1", AgentType: learning_db.LearningAgentTeacher, Content: "请解释 channel",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Created || result.Turn.AgentType != learning_db.LearningAgentTeacher {
+		t.Fatalf("result = %#v", result)
+	}
+	if !strings.Contains(recorder.execQueries[0], `'teacher'`) || !strings.Contains(recorder.execQueries[1], `'请解释 channel'`) {
+		t.Fatalf("queries = %#v", recorder.execQueries)
+	}
+}
+
+func TestTurnRepositoryBeginTurnRejectsIdempotencyPayloadMismatch(t *testing.T) {
+	now := time.Now()
+	recorder := &turnQueryRecorder{
+		turnInsertAffected: 0,
+		rowQueue: []driver.Rows{
+			&learningTurnRows{values: [][]driver.Value{{
+				"turn-existing", "session-1", "request-1", "listener", "completed", nil, nil,
+				now, now, now, now,
+			}}},
+			&learningMessageContentRows{value: "原始解释"},
+		},
+	}
+	repo, closeDB := newTurnRepositoryForTest(recorder)
+	defer closeDB()
+
+	_, err := repo.BeginTurn(context.Background(), BeginTurnInput{
+		SessionID: "session-1", RequestID: "request-1", AgentType: learning_db.LearningAgentTeacher, Content: "不同问题",
+	})
+	if err != ErrTurnRequestConflict {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestTurnRepositoryBeginListenerTurnReturnsExistingWithoutDuplicateMessage(t *testing.T) {
 	now := time.Now()
 	recorder := &turnQueryRecorder{
 		turnInsertAffected: 0,
-		rows: &learningTurnRows{values: [][]driver.Value{{
-			"turn-existing", "session-1", "request-1", "listener", "completed", nil, nil,
-			now, now, now, now,
-		}}},
+		rowQueue: []driver.Rows{
+			&learningTurnRows{values: [][]driver.Value{{
+				"turn-existing", "session-1", "request-1", "listener", "completed", nil, nil,
+				now, now, now, now,
+			}}},
+			&learningMessageContentRows{value: "值有具体类型"},
+		},
 	}
 	repo, closeDB := newTurnRepositoryForTest(recorder)
 	defer closeDB()
@@ -138,9 +205,6 @@ func TestTurnRepositoryBeginListenerTurnReturnsExistingWithoutDuplicateMessage(t
 	}
 	if len(recorder.execQueries) != 1 {
 		t.Fatalf("duplicate request executed extra writes: %#v", recorder.execQueries)
-	}
-	if !strings.Contains(recorder.selectQuery, `session_id = 'session-1'`) || !strings.Contains(recorder.selectQuery, `request_id = 'request-1'`) {
-		t.Fatalf("existing turn query = %s", recorder.selectQuery)
 	}
 }
 
@@ -200,5 +264,26 @@ func TestTurnRepositoryRetryFailedTurnReturnsItToProcessing(t *testing.T) {
 		if !strings.Contains(query, want) {
 			t.Fatalf("retry update missing %q: %s", want, query)
 		}
+	}
+}
+
+func TestTurnRepositoryCompleteTeacherTurnWritesMessageAndIntervention(t *testing.T) {
+	recorder := &turnQueryRecorder{statusAffected: 1}
+	repo, closeDB := newTurnRepositoryForTest(recorder)
+	defer closeDB()
+	intervention := &learning_db.LearningTeachingIntervention{
+		QuestionSummary: "channel 阻塞", ExplanationSummary: "讲解同步点",
+		KnowledgeGaps: []string{}, KeyPoints: []string{"发送接收配对"}, Examples: []string{},
+		Evidence: []learning_db.LearningTeachingEvidence{{ChunkID: "chunk-1", DocumentVersion: 2}},
+	}
+
+	if err := repo.CompleteTeacherTurn(context.Background(), "session-1", "turn-1", "先看同步点。", intervention); err != nil {
+		t.Fatal(err)
+	}
+	if intervention.TurnID != "turn-1" || len(intervention.ID) != 32 {
+		t.Fatalf("intervention = %#v", intervention)
+	}
+	if len(recorder.execQueries) != 3 || !strings.Contains(recorder.execQueries[2], `learning_teaching_interventions`) {
+		t.Fatalf("queries = %#v", recorder.execQueries)
 	}
 }

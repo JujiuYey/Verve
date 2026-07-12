@@ -36,9 +36,29 @@ func (r *ChangeRequestRepository) CreateProposal(ctx context.Context, request *w
 	if request.Status == "" {
 		request.Status = wiki_db.ChangeRequestStatusProposed
 	}
-	_, err := r.db.NewInsert().Model(request).Exec(ctx)
+	result, err := r.db.NewInsert().Model(request).
+		On("CONFLICT (document_id, request_id) DO NOTHING").
+		Returning("").
+		Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("创建文档变更申请失败: %w", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("读取文档变更申请写入结果失败: %w", err)
+	}
+	if affected == 0 {
+		existing := new(wiki_db.DocumentChangeRequest)
+		if err := r.db.NewSelect().Model(existing).
+			Where("document_id = ?", request.DocumentID).
+			Where("request_id = ?", request.RequestID).
+			Scan(ctx); err != nil {
+			return fmt.Errorf("读取已有文档变更申请失败: %w", err)
+		}
+		if existing.SourceType != request.SourceType || existing.SourceID != request.SourceID || existing.Instruction != request.Instruction {
+			return ErrVersionConflict
+		}
+		*request = *existing
 	}
 	return nil
 }

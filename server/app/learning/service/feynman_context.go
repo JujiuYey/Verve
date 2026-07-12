@@ -34,6 +34,7 @@ type FeynmanEvidence struct {
 
 type FeynmanDocumentContext struct {
 	DocumentID                 string            `json:"document_id"`
+	DocumentVersion            int64             `json:"document_version"`
 	Title                      string            `json:"title"`
 	Outline                    []string          `json:"outline"`
 	Evidence                   []FeynmanEvidence `json:"evidence"`
@@ -77,10 +78,11 @@ func (b *FeynmanContextBuilder) Build(ctx context.Context, userID, documentID, l
 	}
 
 	result := &FeynmanDocumentContext{
-		DocumentID: doc.ID,
-		Title:      doc.Filename,
-		Outline:    markdownHeadingPaths(markdown),
-		Evidence:   []FeynmanEvidence{},
+		DocumentID:      doc.ID,
+		DocumentVersion: doc.CurrentVersion,
+		Title:           doc.Filename,
+		Outline:         markdownHeadingPaths(markdown),
+		Evidence:        []FeynmanEvidence{},
 	}
 	if utf8.RuneCountInString(markdown) <= FullDocumentCharacterLimit {
 		result.Mode = FeynmanContextModeFull

@@ -14,6 +14,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 
 	learning_db "verve/app/learning/models/db"
+	learning_payload "verve/app/learning/models/payload"
 	learning_repo "verve/app/learning/repository"
 	learning_service "verve/app/learning/service"
 	rag_db "verve/app/rag/models/db"
@@ -107,6 +108,80 @@ type fakeListenerTurnStore struct {
 	failedTurnID    string
 	failureCode     string
 	events          *[]string
+}
+
+type fakeTurnSubmitter struct {
+	request learning_service.TurnRequest
+	item    *learning_payload.TimelineItem
+	err     error
+}
+
+func (f *fakeTurnSubmitter) Submit(_ context.Context, _, _ string, request learning_service.TurnRequest) (*learning_payload.TimelineItem, error) {
+	f.request = request
+	return f.item, f.err
+}
+
+type fakeTimelineStore struct {
+	items []*learning_payload.TimelineItem
+}
+
+func (f fakeTimelineStore) FindBySession(context.Context, string) ([]*learning_payload.TimelineItem, error) {
+	return f.items, nil
+}
+
+func TestSessionSubmitTurnReturnsUnifiedTimelineItem(t *testing.T) {
+	submitter := &fakeTurnSubmitter{item: &learning_payload.TimelineItem{Turn: &learning_db.LearningTurn{ID: "turn-1", AgentType: "teacher", Status: "completed"}}}
+	handler := NewSessionHandlerWithDependencies(SessionHandlerDependencies{TurnService: submitter})
+	app := sessionTestApp(handler)
+	req := httptest.NewRequest("POST", "/session/session-1/turns", strings.NewReader(`{"request_id":"request-1","agent_type":"teacher","content":"解释 channel"}`))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != fiber.StatusOK || submitter.request.AgentType != "teacher" || submitter.request.Content != "解释 channel" {
+		t.Fatalf("status/request = %d/%#v", resp.StatusCode, submitter.request)
+	}
+}
+
+func TestSessionSubmitTurnMapsRecoverableConflicts(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		err  error
+	}{
+		{name: "processing", err: learning_service.ErrTurnProcessing},
+		{name: "payload", err: learning_repo.ErrTurnRequestConflict},
+		{name: "index", err: learning_service.ErrIndexNotReady},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			handler := NewSessionHandlerWithDependencies(SessionHandlerDependencies{TurnService: &fakeTurnSubmitter{err: test.err}})
+			app := sessionTestApp(handler)
+			req := httptest.NewRequest("POST", "/session/session-1/turns", strings.NewReader(`{"request_id":"request-1","agent_type":"teacher","content":"解释"}`))
+			req.Header.Set("Content-Type", "application/json")
+			resp, err := app.Test(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if resp.StatusCode != fiber.StatusConflict {
+				t.Fatalf("status = %d", resp.StatusCode)
+			}
+		})
+	}
+}
+
+func TestSessionSubmitTurnRejectsInvalidRequest(t *testing.T) {
+	handler := NewSessionHandlerWithDependencies(SessionHandlerDependencies{TurnService: &fakeTurnSubmitter{err: learning_service.ErrInvalidTurnRequest}})
+	app := sessionTestApp(handler)
+	req := httptest.NewRequest("POST", "/session/session-1/turns", strings.NewReader(`{"agent_type":"teacher","content":""}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != fiber.StatusBadRequest {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
 }
 
 func (f *fakeListenerTurnStore) BeginListenerTurn(_ context.Context, sessionID, requestID, input string) (*learning_repo.BeginTurnResult, error) {
@@ -752,6 +827,7 @@ func sessionTestApp(handler *SessionHandler) *fiber.App {
 	app.Post("/session", handler.Create)
 	app.Get("/session/:id", handler.FindOne)
 	app.Post("/session/:id/review", handler.Review)
+	app.Post("/session/:id/turns", handler.SubmitTurn)
 	app.Post("/session/:id/complete", handler.Complete)
 	return app
 }
