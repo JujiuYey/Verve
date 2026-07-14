@@ -1,8 +1,8 @@
 # Verve
 
-面向个人/小团队的自部署 AI 知识库与学习助理。基于 RAG 检索增强生成,内建三
-类学习陪练 Agent(Coach 调度、Tutor 教学、Curator 文档修订),单租户运行,
-无用户体系。
+面向个人使用的开源 AI 知识库与学习助理。基于 RAG 检索增强生成,内建三
+类学习陪练 Agent(Coach 调度、Tutor 教学、Curator 文档修订),本地直接
+运行,无需用户体系。
 
 ## ✨ 功能特性
 
@@ -39,11 +39,15 @@ verve/
 │   ├── repository/              # 数据访问层
 │   ├── router/                  # 路由定义 + 统一中间件
 │   └── utils/                   # 通用工具
-├── web/                         # Vue 3 前端 (TanStack Router + shadcn-vue)
+├── web/                         # React 19 前端 (Vite + TanStack Router + shadcn/ui)
 │   └── src/
 │       ├── api/                 # 接口封装 (按模块)
-│       ├── components/          # 通用组件
+│       ├── app/                 # 应用入口 (dashboard 等)
+│       ├── components/          # 通用组件 (含 sag-ui / ui / ai-elements)
+│       ├── constants/           # 常量
+│       ├── hooks/               # 自定义 Hooks
 │       ├── layout/              # 布局
+│       ├── lib/                 # 通用工具库
 │       ├── pages/               # 页面 (按模块)
 │       ├── routes/              # 路由 (TanStack file-based)
 │       ├── stores/              # 应用状态
@@ -70,13 +74,13 @@ verve/
 
 | 技术 | 用途 |
 |------|------|
-| **Vue 3** | 前端框架 |
+| **React 19** | 前端框架 |
 | **TypeScript** | 类型安全 |
 | **Vite** | 构建工具 |
 | **TanStack Router** | 文件路由 |
 | **TanStack Query** | 服务端状态 |
-| **shadcn-vue** | UI 组件 |
-| **TailwindCSS** | 样式 |
+| **shadcn/ui** (new-york) | UI 组件 |
+| **TailwindCSS v4** | 样式 |
 
 ## 🚀 快速开始
 
@@ -147,7 +151,7 @@ VITE_API_BASE_URL=http://localhost:8080/api
 
 ## 📡 API 速查
 
-后端路由全部开放(单租户本机或可信网络使用)。
+后端路由全部开放(本地直接使用,默认只监听本机)。
 
 | 方法 | 路径 | 用途 |
 |------|------|------|
