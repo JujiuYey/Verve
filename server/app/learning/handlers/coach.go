@@ -54,7 +54,7 @@ func (h *CoachHandler) Chat(c *fiber.Ctx) error {
 	}
 
 	tools := learning_tools.NewCoachTools(h.db, h.retriever)
-	agent, err := llm.NewCoachAgent(c.Context(), tools)
+	agent, err := llm.NewCoachAgent(c.Context(), h.db.ModelConfigs, tools)
 	if err != nil {
 		return response.InternalServerCtx(c, "学习 agent 初始化失败: "+err.Error())
 	}

@@ -48,10 +48,21 @@ type FeynmanReviewRequest struct {
 
 type FeynmanReviewService struct {
 	contextBuilder *FeynmanContextBuilder
+	run            agentTextRunner
 }
 
-func NewFeynmanReviewService(source FeynmanDocumentSource) *FeynmanReviewService {
-	return &FeynmanReviewService{contextBuilder: NewFeynmanContextBuilder(source)}
+func NewFeynmanReviewService(source FeynmanDocumentSource, resolver llm.AgentModelResolver) *FeynmanReviewService {
+	return newFeynmanReviewService(source, makeFeynmanReviewerRunner(resolver))
+}
+
+func newFeynmanReviewService(source FeynmanDocumentSource, run agentTextRunner) *FeynmanReviewService {
+	return &FeynmanReviewService{contextBuilder: NewFeynmanContextBuilder(source), run: run}
+}
+
+func makeFeynmanReviewerRunner(resolver llm.AgentModelResolver) agentTextRunner {
+	return func(ctx context.Context, query string) (string, error) {
+		return runFeynmanReviewer(ctx, resolver, query)
+	}
 }
 
 func (s *FeynmanReviewService) Review(ctx context.Context, request FeynmanReviewRequest) (*FeynmanReview, error) {
@@ -67,18 +78,21 @@ func (s *FeynmanReviewService) Review(ctx context.Context, request FeynmanReview
 		return nil, err
 	}
 
-	agent, err := llm.NewFeynmanReviewerAgent(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("initialize Feynman reviewer: %w", err)
-	}
 	request.Explanation = explanation
 	query := prompts.FeynmanReviewerQueryPrompt(feynmanReviewerQueryInput(documentContext, request))
-	runner := adk.NewRunner(ctx, adk.RunnerConfig{Agent: agent})
-	text, err := collectText(runner.Query(ctx, query))
+	text, err := s.run(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("run Feynman reviewer: %w", err)
 	}
 	return parseFeynmanReviewOutput(text, documentContext.ContextSufficient)
+}
+
+func runFeynmanReviewer(ctx context.Context, resolver llm.AgentModelResolver, query string) (string, error) {
+	agent, err := llm.NewFeynmanReviewerAgent(ctx, resolver)
+	if err != nil {
+		return "", err
+	}
+	return collectText(adk.NewRunner(ctx, adk.RunnerConfig{Agent: agent}).Query(ctx, query))
 }
 
 func feynmanReviewerQueryInput(documentContext *FeynmanDocumentContext, request FeynmanReviewRequest) prompts.FeynmanReviewerQueryInput {

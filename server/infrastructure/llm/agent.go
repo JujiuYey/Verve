@@ -10,9 +10,19 @@ import (
 	"github.com/cloudwego/eino/compose"
 )
 
+// agent_key / scene_key 映射,与前端 Agent 配置页对齐。
+const (
+	AgentKeyCoach           = "coach"
+	AgentKeyLearningTeacher = "learning_teacher"
+	AgentKeyFeynmanReviewer = "feynman_reviewer"
+	AgentKeyWikiCurator     = "wiki_curator"
+
+	SceneKeyDefault = "default"
+)
+
 // NewFeynmanReviewerAgent listens to a learner explanation and returns structured feedback.
-func NewFeynmanReviewerAgent(ctx context.Context) (adk.Agent, error) {
-	chatModel, err := NewStructuredChatModel(ctx)
+func NewFeynmanReviewerAgent(ctx context.Context, resolver AgentModelResolver) (adk.Agent, error) {
+	chatModel, err := NewStructuredChatModel(ctx, resolver, AgentKeyFeynmanReviewer, SceneKeyDefault)
 	if err != nil {
 		return nil, err
 	}
@@ -29,8 +39,8 @@ func NewFeynmanReviewerAgent(ctx context.Context) (adk.Agent, error) {
 }
 
 // NewLearningTeacherAgent answers learning questions from grounded Wiki evidence.
-func NewLearningTeacherAgent(ctx context.Context) (adk.Agent, error) {
-	chatModel, err := NewStructuredChatModel(ctx)
+func NewLearningTeacherAgent(ctx context.Context, resolver AgentModelResolver) (adk.Agent, error) {
+	chatModel, err := NewStructuredChatModel(ctx, resolver, AgentKeyLearningTeacher, SceneKeyDefault)
 	if err != nil {
 		return nil, err
 	}
@@ -41,8 +51,8 @@ func NewLearningTeacherAgent(ctx context.Context) (adk.Agent, error) {
 }
 
 // NewWikiCuratorAgent proposes complete Markdown changes without write tools.
-func NewWikiCuratorAgent(ctx context.Context) (adk.Agent, error) {
-	chatModel, err := NewStructuredChatModel(ctx)
+func NewWikiCuratorAgent(ctx context.Context, resolver AgentModelResolver) (adk.Agent, error) {
+	chatModel, err := NewStructuredChatModel(ctx, resolver, AgentKeyWikiCurator, SceneKeyDefault)
 	if err != nil {
 		return nil, err
 	}
@@ -53,8 +63,8 @@ func NewWikiCuratorAgent(ctx context.Context) (adk.Agent, error) {
 }
 
 // NewCoachAgent 学习调度 agent
-func NewCoachAgent(ctx context.Context, tools []tool.BaseTool) (adk.Agent, error) {
-	chatModel, err := NewChatModel(ctx)
+func NewCoachAgent(ctx context.Context, resolver AgentModelResolver, tools []tool.BaseTool) (adk.Agent, error) {
+	chatModel, err := NewChatModel(ctx, resolver, AgentKeyCoach, SceneKeyDefault)
 	if err != nil {
 		return nil, err
 	}

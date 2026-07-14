@@ -43,12 +43,18 @@ type CuratorService struct {
 	run    agentTextRunner
 }
 
-func NewCuratorService(source FeynmanDocumentSource, writer changeRequestWriter) *CuratorService {
-	return newCuratorService(source, writer, runWikiCurator)
+func NewCuratorService(source FeynmanDocumentSource, writer changeRequestWriter, resolver llm.AgentModelResolver) *CuratorService {
+	return newCuratorService(source, writer, makeWikiCuratorRunner(resolver))
 }
 
 func newCuratorService(source FeynmanDocumentSource, writer changeRequestWriter, run agentTextRunner) *CuratorService {
 	return &CuratorService{source: source, writer: writer, run: run}
+}
+
+func makeWikiCuratorRunner(resolver llm.AgentModelResolver) agentTextRunner {
+	return func(ctx context.Context, query string) (string, error) {
+		return runWikiCurator(ctx, resolver, query)
+	}
 }
 
 func (s *CuratorService) Propose(ctx context.Context, request CuratorRequest) (*wiki_db.DocumentChangeRequest, error) {
@@ -101,8 +107,8 @@ func (s *CuratorService) Propose(ctx context.Context, request CuratorRequest) (*
 	return proposal, nil
 }
 
-func runWikiCurator(ctx context.Context, query string) (string, error) {
-	agent, err := llm.NewWikiCuratorAgent(ctx)
+func runWikiCurator(ctx context.Context, resolver llm.AgentModelResolver, query string) (string, error) {
+	agent, err := llm.NewWikiCuratorAgent(ctx, resolver)
 	if err != nil {
 		return "", err
 	}

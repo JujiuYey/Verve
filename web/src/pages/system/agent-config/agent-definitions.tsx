@@ -1,4 +1,10 @@
-import { IconRoute, IconStack2 } from "@tabler/icons-react";
+import {
+  IconChecks,
+  IconChalkboardTeacher,
+  IconEdit,
+  IconRoute,
+  IconStack2,
+} from "@tabler/icons-react";
 import type { ComponentType, SVGProps } from "react";
 
 export type SceneDefinition = {
@@ -39,6 +45,54 @@ export const AGENTS: AgentDefinition[] = [
         name: "默认模型",
         required: true,
         description: "用于对话、工具调用决策和下一步动作规划。",
+      },
+    ],
+  },
+  {
+    key: "learning_teacher",
+    name: "Feynman 教师",
+    shortName: "教师",
+    description: "基于 Wiki 证据以费曼方式解释知识点的对话 Agent。",
+    runtime: "LearningTeacher",
+    icon: IconChalkboardTeacher,
+    scenes: [
+      {
+        key: "default",
+        name: "默认模型",
+        required: true,
+        description: "用于生成费曼式讲解与教学追问。",
+      },
+    ],
+  },
+  {
+    key: "feynman_reviewer",
+    name: "Feynman 复盘",
+    shortName: "复盘",
+    description: "倾听学习者解释并返回结构化复盘意见。",
+    runtime: "FeynmanReviewer",
+    icon: IconChecks,
+    scenes: [
+      {
+        key: "default",
+        name: "默认模型",
+        required: true,
+        description: "用于结构化分析学习者解释并给出复盘意见。",
+      },
+    ],
+  },
+  {
+    key: "wiki_curator",
+    name: "Wiki 编辑",
+    shortName: "编辑",
+    description: "根据用户指令提出完整的 Wiki Markdown 修改建议。",
+    runtime: "WikiCurator",
+    icon: IconEdit,
+    scenes: [
+      {
+        key: "default",
+        name: "默认模型",
+        required: true,
+        description: "用于生成 Wiki Markdown 修改提案。",
       },
     ],
   },

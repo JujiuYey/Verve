@@ -99,11 +99,11 @@ func NewSessionHandler(db *database.DatabaseService, minio *storage.MinIOService
 		chunks:    db.RAGChunks,
 	}
 	memory := learning_service.NewMemoryService(db)
-	reviewer := learning_service.NewFeynmanReviewService(source)
+	reviewer := learning_service.NewFeynmanReviewService(source, db.ModelConfigs)
 	turnService := learning_service.NewTurnService(db.Sessions, db.Turns, db.Timeline, map[string]learning_service.AgentProcessor{
 		learning_db.LearningAgentListener: learning_service.NewListenerProcessor(reviewer, db.Reviews, memory),
-		learning_db.LearningAgentTeacher:  learning_service.NewTeacherProcessor(learning_service.NewTeacherService(source), db.Reviews, memory),
-		learning_db.LearningAgentCurator:  learning_service.NewCuratorProcessor(learning_service.NewCuratorService(source, db.ChangeRequests)),
+		learning_db.LearningAgentTeacher:  learning_service.NewTeacherProcessor(learning_service.NewTeacherService(source, db.ModelConfigs), db.Reviews, memory),
+		learning_db.LearningAgentCurator:  learning_service.NewCuratorProcessor(learning_service.NewCuratorService(source, db.ChangeRequests, db.ModelConfigs)),
 	}, memory)
 	return NewSessionHandlerWithDependencies(SessionHandlerDependencies{
 		Sessions: db.Sessions, Documents: source, Turns: db.Turns, Messages: db.Messages, Reviews: db.Reviews,

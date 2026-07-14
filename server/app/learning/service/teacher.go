@@ -40,12 +40,18 @@ type TeacherService struct {
 	run            agentTextRunner
 }
 
-func NewTeacherService(source FeynmanDocumentSource) *TeacherService {
-	return newTeacherService(source, runLearningTeacher)
+func NewTeacherService(source FeynmanDocumentSource, resolver llm.AgentModelResolver) *TeacherService {
+	return newTeacherService(source, makeLearningTeacherRunner(resolver))
 }
 
 func newTeacherService(source FeynmanDocumentSource, run agentTextRunner) *TeacherService {
 	return &TeacherService{contextBuilder: NewFeynmanContextBuilder(source), run: run}
+}
+
+func makeLearningTeacherRunner(resolver llm.AgentModelResolver) agentTextRunner {
+	return func(ctx context.Context, query string) (string, error) {
+		return runLearningTeacher(ctx, resolver, query)
+	}
 }
 
 func (s *TeacherService) Teach(ctx context.Context, request TeachingRequest) (*TeachingResult, error) {
@@ -88,8 +94,8 @@ func (s *TeacherService) Teach(ctx context.Context, request TeachingRequest) (*T
 	return result, nil
 }
 
-func runLearningTeacher(ctx context.Context, query string) (string, error) {
-	agent, err := llm.NewLearningTeacherAgent(ctx)
+func runLearningTeacher(ctx context.Context, resolver llm.AgentModelResolver, query string) (string, error) {
+	agent, err := llm.NewLearningTeacherAgent(ctx, resolver)
 	if err != nil {
 		return "", err
 	}
