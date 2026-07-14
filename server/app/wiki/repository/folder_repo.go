@@ -43,8 +43,6 @@ func (r *folderRepository) FindOne(ctx context.Context, id string) (*wiki_db.Fol
 	err := r.db.NewSelect().
 		Model(folder).
 		Where("f.id = ?", id).
-		Relation("CreatedByUser").
-		Relation("UpdatedByUser").
 		Scan(ctx)
 	if err != nil {
 		return nil, err
@@ -57,19 +55,13 @@ func (r *folderRepository) FindOne(ctx context.Context, id string) (*wiki_db.Fol
 func (r *folderRepository) List(ctx context.Context, filters map[string]interface{}) ([]*wiki_db.Folder, error) {
 	var folders []*wiki_db.Folder
 
-	query := r.db.NewSelect().
-		Model(&folders).
-		Relation("CreatedByUser").
-		Relation("UpdatedByUser")
+	query := r.db.NewSelect().Model(&folders)
 
 	if parentID, ok := filters["parent_id"].(string); ok && parentID != "" {
 		query = query.Where("parent_id = ?", parentID)
 	}
 	if _, ok := filters["root"]; ok {
 		query = query.Where("parent_id IS NULL")
-	}
-	if userID, ok := filters["user_id"].(string); ok && userID != "" {
-		query = query.Where("user_id = ?", userID)
 	}
 
 	query = query.Order("sort_order ASC", "created_at ASC")
@@ -88,8 +80,6 @@ func (r *folderRepository) GetAll(ctx context.Context) ([]*wiki_db.Folder, error
 
 	query := r.db.NewSelect().
 		Model(&folders).
-		Relation("CreatedByUser").
-		Relation("UpdatedByUser").
 		Order("sort_order ASC", "created_at ASC")
 
 	err := query.Scan(ctx)
@@ -104,19 +94,13 @@ func (r *folderRepository) GetAll(ctx context.Context) ([]*wiki_db.Folder, error
 func (r *folderRepository) Page(ctx context.Context, offset, limit int, filters map[string]interface{}) ([]*wiki_db.Folder, int, error) {
 	var folders []*wiki_db.Folder
 
-	query := r.db.NewSelect().
-		Model(&folders).
-		Relation("CreatedByUser").
-		Relation("UpdatedByUser")
+	query := r.db.NewSelect().Model(&folders)
 
 	if parentID, ok := filters["parent_id"].(string); ok && parentID != "" {
 		query = query.Where("parent_id = ?", parentID)
 	}
 	if _, ok := filters["root"]; ok {
 		query = query.Where("parent_id IS NULL")
-	}
-	if userID, ok := filters["user_id"].(string); ok && userID != "" {
-		query = query.Where("user_id = ?", userID)
 	}
 
 	query = query.Order("sort_order ASC", "created_at ASC")

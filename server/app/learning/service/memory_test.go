@@ -14,13 +14,12 @@ type fakeMemoryWriter struct {
 	event          *learning_db.LearningMemoryEvent
 	items          []*learning_db.LearningMemoryItem
 	readItems      []*learning_db.LearningMemoryItem
-	readUserID     string
 	readDocumentID string
 	readFolderIDs  []string
+	readFolderID   string
 }
 
-func (f *fakeMemoryWriter) FindItemsByDocument(_ context.Context, userID, documentID string, _ int) ([]*learning_db.LearningMemoryItem, error) {
-	f.readUserID = userID
+func (f *fakeMemoryWriter) FindItemsByDocument(_ context.Context, documentID string, _ int) ([]*learning_db.LearningMemoryItem, error) {
 	f.readDocumentID = documentID
 	return f.readItems, nil
 }
@@ -36,13 +35,11 @@ func (f *fakeMemoryWriter) CreateItem(_ context.Context, item *learning_db.Learn
 	return nil
 }
 
-func (f *fakeMemoryWriter) FindItemsByUser(_ context.Context, userID, _ string, _ int) ([]*learning_db.LearningMemoryItem, error) {
-	f.readUserID = userID
+func (f *fakeMemoryWriter) FindItemsByUser(_ context.Context, _ string, _ int) ([]*learning_db.LearningMemoryItem, error) {
 	return f.items, nil
 }
 
-func (f *fakeMemoryWriter) FindItemsByFolders(_ context.Context, userID string, folderIDs []string, _ int) ([]*learning_db.LearningMemoryItem, error) {
-	f.readUserID = userID
+func (f *fakeMemoryWriter) FindItemsByFolders(_ context.Context, folderIDs []string, _ int) ([]*learning_db.LearningMemoryItem, error) {
 	f.readFolderIDs = append([]string(nil), folderIDs...)
 	allowed := make(map[string]bool, len(folderIDs))
 	for _, folderID := range folderIDs {
@@ -97,14 +94,15 @@ func TestRecordExplanationReviewStoresEvidenceAndMisconceptionsWithoutMastery(t 
 	service := newMemoryService(writer, documents, folders)
 	session := &learning_db.LearningSession{ID: "session-1", DocumentID: "doc-1"}
 	review := &learning_db.LearningExplanationReview{
-		ID: "review-1", SessionID: "session-1", DocumentID: "doc-1", UserID: "user-1",
-		Explanation: "值有类型,类型约束操作", HeardSummary: "解释了值与类型",
-		ClearPoints:      []string{"值有具体类型", "类型决定可用操作"},
-		Misconceptions:   []string{"把动态类型说成变量声明类型"},
-		FollowUpQuestion: "接口值的动态类型是什么？", ExplanationSummary: "值和类型存在约束关系",
+		ID: "review-1",
+		HeardSummary:        "解释了值与类型",
+		ClearPoints:         []string{"值有具体类型", "类型决定可用操作"},
+		Misconceptions:      []string{"把动态类型说成变量声明类型"},
+		FollowUpQuestion:    "接口值的动态类型是什么？",
+		ExplanationSummary:  "值和类型存在约束关系",
 	}
 
-	if err := service.RecordExplanationReview(context.Background(), "user-1", session, review); err != nil {
+	if err := service.RecordExplanationReview(context.Background(), session, review); err != nil {
 		t.Fatal(err)
 	}
 	if writer.event == nil || writer.event.SourceType != "explanation_review" || writer.event.EventType != "explanation_review" || writer.event.DocumentID == nil || *writer.event.DocumentID != "doc-1" {
@@ -141,64 +139,63 @@ func TestRecordExplanationReviewStoresEvidenceAndMisconceptionsWithoutMastery(t 
 
 func TestRecordExplanationReviewValidatesInputs(t *testing.T) {
 	service := newMemoryService(nil, nil, nil)
-	if err := service.RecordExplanationReview(context.Background(), "user-1", &learning_db.LearningSession{}, &learning_db.LearningExplanationReview{}); err == nil || !strings.Contains(err.Error(), "repository") {
+	if err := service.RecordExplanationReview(context.Background(), &learning_db.LearningSession{}, &learning_db.LearningExplanationReview{}); err == nil || !strings.Contains(err.Error(), "repository") {
 		t.Fatalf("missing repository error = %v", err)
 	}
 	service = newMemoryService(&fakeMemoryWriter{}, fakeMemoryDocuments{}, fakeMemoryFolders{})
-	if err := service.RecordExplanationReview(context.Background(), "user-1", nil, &learning_db.LearningExplanationReview{}); err == nil || !strings.Contains(err.Error(), "session") {
+	if err := service.RecordExplanationReview(context.Background(), nil, &learning_db.LearningExplanationReview{}); err == nil || !strings.Contains(err.Error(), "session") {
 		t.Fatalf("missing session error = %v", err)
 	}
-	if err := service.RecordExplanationReview(context.Background(), "user-1", &learning_db.LearningSession{}, nil); err == nil || !strings.Contains(err.Error(), "review") {
+	if err := service.RecordExplanationReview(context.Background(), &learning_db.LearningSession{}, nil); err == nil || !strings.Contains(err.Error(), "review") {
 		t.Fatalf("missing review error = %v", err)
 	}
 }
 
-func TestMemoryServiceFindDocumentItemsForwardsUserAndDocumentScope(t *testing.T) {
+func TestMemoryServiceFindDocumentItemsForwardsDocumentScope(t *testing.T) {
 	writer := &fakeMemoryWriter{readItems: []*learning_db.LearningMemoryItem{{ID: "memory-1"}}}
 	service := newMemoryService(writer, nil, nil)
-	items, err := service.FindDocumentItems(context.Background(), "user-1", "doc-1", 20)
+	items, err := service.FindDocumentItems(context.Background(), "doc-1", 20)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if writer.readUserID != "user-1" || writer.readDocumentID != "doc-1" {
-		t.Fatalf("scope = user:%q document:%q", writer.readUserID, writer.readDocumentID)
+	if writer.readDocumentID != "doc-1" {
+		t.Fatalf("scope = document:%q", writer.readDocumentID)
 	}
 	if len(items) != 1 || items[0].ID != "memory-1" {
 		t.Fatalf("items = %#v", items)
 	}
 }
 
-func TestMemoryServiceReturnsChildReviewMemoryForAuthorizedRootAndExcludesPrivateDescendants(t *testing.T) {
-	userID := "user-1"
-	otherUserID := "user-2"
+func TestMemoryServiceReturnsChildReviewMemoryForRootTreeAndIgnoresUnrelatedFolders(t *testing.T) {
 	rootID := "root"
+	childID := "child"
 	writer := &fakeMemoryWriter{}
 	documents := fakeMemoryDocuments{documents: map[string]*wiki_db.Document{
-		"doc-child": {ID: "doc-child", FolderID: "child"},
+		"doc-child": {ID: "doc-child", FolderID: childID},
 	}}
 	folders := fakeMemoryFolders{
 		folders: []*wiki_db.Folder{
 			{ID: rootID},
-			{ID: "child", ParentID: &rootID, UserID: &userID},
-			{ID: "private-child", ParentID: &rootID, UserID: &otherUserID},
+			{ID: childID, ParentID: &rootID},
+			{ID: "unrelated"},
 		},
-		descendantIDs: []string{rootID, "child", "private-child"},
+		descendantIDs: []string{rootID, childID},
 	}
 	service := newMemoryService(writer, documents, folders)
-	session := &learning_db.LearningSession{ID: "session-1", UserID: userID, DocumentID: "doc-child"}
+	session := &learning_db.LearningSession{ID: "session-1", DocumentID: "doc-child"}
 	review := &learning_db.LearningExplanationReview{
-		ID: "review-1", SessionID: session.ID, UserID: userID, DocumentID: session.DocumentID,
+		ID:          "review-1",
 		ClearPoints: []string{"能解释子文档概念"},
 	}
-	if err := service.RecordExplanationReview(context.Background(), userID, session, review); err != nil {
+	if err := service.RecordExplanationReview(context.Background(), session, review); err != nil {
 		t.Fatal(err)
 	}
-	privateFolderID := "private-child"
+	unrelatedFolderID := "unrelated"
 	writer.items = append(writer.items, &learning_db.LearningMemoryItem{
-		ID: "private-memory", UserID: userID, FolderID: &privateFolderID, Statement: "不应泄露",
+		ID: "unrelated-memory", FolderID: &unrelatedFolderID, Statement: "不应被根目录召回",
 	})
 
-	items, err := service.FindCoachItems(context.Background(), userID, rootID, 20)
+	items, err := service.FindCoachItems(context.Background(), rootID, 20)
 	if err != nil {
 		t.Fatal(err)
 	}

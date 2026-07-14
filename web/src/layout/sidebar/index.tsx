@@ -6,7 +6,6 @@ import { Logo } from "./logo";
 import { NavSystem } from "./nav-system";
 import { SideToggle } from "./side-toggle";
 import { ThemeToggle } from "./theme-toggle";
-import { User } from "./user";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { state, toggleSidebar } = useSidebar();
@@ -26,7 +25,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SideToggle toggleSidebar={toggleSidebar} />
           </SidebarMenu>
         )}
-        <User />
       </SidebarFooter>
     </Sidebar>
   );

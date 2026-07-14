@@ -55,7 +55,6 @@ func (r *reviewRows) Columns() []string {
 		"id", "turn_id", "heard_summary",
 		"clear_points", "confusing_points", "misconceptions", "follow_up_question",
 		"explanation_summary", "ready_to_wrap_up", "context_sufficient", "created_at",
-		"session_id", "document_id", "user_id", "explanation",
 	}
 }
 func (r *reviewRows) Close() error { return nil }
@@ -78,7 +77,6 @@ func TestReviewRepositoryFindBySessionOrdersOldestFirst(t *testing.T) {
 	createdAt := time.Date(2026, 7, 11, 9, 30, 0, 0, time.UTC)
 	recorder := &reviewQueryRecorder{rows: &reviewRows{values: [][]driver.Value{{
 		"review-1", "turn-1", "heard", `["clear"]`, `[]`, `[]`, "follow up", "summary", false, true, createdAt,
-		"session-1", "document-1", "user-1", "explanation",
 	}}}}
 	repo, closeDB := newReviewRepositoryForTest(recorder)
 	defer closeDB()
@@ -87,24 +85,19 @@ func TestReviewRepositoryFindBySessionOrdersOldestFirst(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(recorder.selectQuery, `WHERE (lt.session_id = 'session-1')`) {
+	if !strings.Contains(recorder.selectQuery, `JOIN learning_turns AS lt`) {
+		t.Fatalf("query does not join turns: %s", recorder.selectQuery)
+	}
+	if !strings.Contains(recorder.selectQuery, `lt.session_id = 'session-1'`) {
 		t.Fatalf("query does not filter session: %s", recorder.selectQuery)
 	}
 	if !strings.Contains(recorder.selectQuery, `ORDER BY ler.created_at ASC, ler.id ASC`) {
 		t.Fatalf("query does not order deterministically oldest first: %s", recorder.selectQuery)
 	}
-	for _, want := range []string{
-		"JOIN learning_turns AS lt", "JOIN learning_sessions AS ls", "JOIN learning_messages AS user_message",
-		"lt.session_id AS session_id", "user_message.content AS explanation",
-	} {
-		if !strings.Contains(recorder.selectQuery, want) {
-			t.Fatalf("query does not derive review field %q: %s", want, recorder.selectQuery)
-		}
-	}
 	if len(reviews) != 1 || reviews[0].ID != "review-1" {
 		t.Fatalf("reviews = %#v", reviews)
 	}
-	if reviews[0].TurnID != "turn-1" || reviews[0].SessionID != "session-1" || reviews[0].Explanation != "explanation" {
+	if reviews[0].TurnID != "turn-1" {
 		t.Fatalf("derived review = %#v", reviews[0])
 	}
 	if len(reviews[0].ClearPoints) != 1 || reviews[0].ClearPoints[0] != "clear" {
@@ -116,7 +109,6 @@ func TestReviewRepositoryFindByTurnUsesTurnIdentity(t *testing.T) {
 	createdAt := time.Date(2026, 7, 11, 9, 30, 0, 0, time.UTC)
 	recorder := &reviewQueryRecorder{rows: &reviewRows{values: [][]driver.Value{{
 		"review-1", "turn-1", "heard", `[]`, `[]`, `[]`, "follow up", "summary", false, true, createdAt,
-		"session-1", "document-1", "user-1", "explanation",
 	}}}}
 	repo, closeDB := newReviewRepositoryForTest(recorder)
 	defer closeDB()

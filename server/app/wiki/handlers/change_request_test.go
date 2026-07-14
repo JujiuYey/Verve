@@ -16,11 +16,11 @@ type fakeChangeRequestVersionService struct {
 	job *rag_db.IndexJob
 }
 
-func (f *fakeChangeRequestVersionService) ApplyChangeRequest(context.Context, string, string) (*wiki_db.DocumentRevision, *rag_db.IndexJob, error) {
+func (f *fakeChangeRequestVersionService) ApplyChangeRequest(context.Context, string) (*wiki_db.DocumentRevision, *rag_db.IndexJob, error) {
 	return &wiki_db.DocumentRevision{ID: "revision-1"}, f.job, nil
 }
 
-func (f *fakeChangeRequestVersionService) CancelChangeRequest(context.Context, string, string) error {
+func (f *fakeChangeRequestVersionService) CancelChangeRequest(context.Context, string) error {
 	return nil
 }
 
@@ -48,7 +48,6 @@ func TestChangeRequestApplyStartsCreatedIndexJob(t *testing.T) {
 	)
 	app := fiber.New()
 	app.Post("/change-requests/:id/apply", func(c *fiber.Ctx) error {
-		c.Locals("user_id", "user-1")
 		return handler.Apply(c)
 	})
 

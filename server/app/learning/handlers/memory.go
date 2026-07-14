@@ -38,7 +38,6 @@ type memoryItem struct {
 
 // 学习记忆读取(全局或按文件夹)
 func (h *MemoryHandler) Get(c *fiber.Ctx) error {
-	userID, _ := c.Locals("user_id").(string)
 	folderID := c.Query("folder_id")
 
 	if h.db == nil || h.db.Memories == nil {
@@ -53,7 +52,7 @@ func (h *MemoryHandler) Get(c *fiber.Ctx) error {
 		Items:      []memoryItem{},
 	}
 
-	summary, err := h.db.Memories.FindSummaryByFolder(c.Context(), userID, folderID)
+	summary, err := h.db.Memories.FindSummaryByFolder(c.Context(), folderID)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return response.InternalServerCtx(c, "获取学习记忆摘要失败")
 	}
@@ -64,7 +63,7 @@ func (h *MemoryHandler) Get(c *fiber.Ctx) error {
 		}
 	}
 
-	items, err := h.db.Memories.FindItemsByUser(c.Context(), userID, folderID, 50)
+	items, err := h.db.Memories.FindItemsByUser(c.Context(), folderID, 50)
 	if err != nil {
 		return response.InternalServerCtx(c, "获取学习记忆条目失败")
 	}

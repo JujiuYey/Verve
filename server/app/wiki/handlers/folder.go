@@ -4,7 +4,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/uptrace/bun"
 
-	system_repo "verve/app/system/repository"
 	wiki_db "verve/app/wiki/models/db"
 	wiki_repo "verve/app/wiki/repository"
 	"verve/infrastructure/database"
@@ -19,7 +18,6 @@ type FolderTreeNode struct {
 	Name        string            `json:"name"`
 	Description *string           `json:"description,omitempty"`
 	ParentID    *string           `json:"parent_id,omitempty"`
-	UserID      *string           `json:"user_id,omitempty"`
 	SortOrder   int               `json:"sort_order"`
 	CreatedAt   string            `json:"created_at"`
 	UpdatedAt   string            `json:"updated_at"`
@@ -29,18 +27,16 @@ type FolderTreeNode struct {
 
 // 文件夹处理器
 type FolderHandler struct {
-	repo     wiki_repo.FolderRepository
-	userRepo *system_repo.UserRepository
-	db       *bun.DB
+	repo wiki_repo.FolderRepository
+	db   *bun.DB
 }
 
 // 创建文件夹处理器
 func NewFolderHandler(dbService *database.DatabaseService) *FolderHandler {
 	db := dbService.GetDB()
 	return &FolderHandler{
-		repo:     wiki_repo.NewFolderRepository(db),
-		userRepo: system_repo.NewUserRepository(db),
-		db:       db,
+		repo: wiki_repo.NewFolderRepository(db),
+		db:   db,
 	}
 }
 
@@ -115,7 +111,6 @@ func (h *FolderHandler) buildTree(folders []*wiki_db.Folder) []*FolderTreeNode {
 			Name:        f.Name,
 			Description: f.Description,
 			ParentID:    f.ParentID,
-			UserID:      f.UserID,
 			SortOrder:   f.SortOrder,
 			CreatedAt:   f.CreatedAt.Format("2006-01-02 15:04:05"),
 			UpdatedAt:   f.UpdatedAt.Format("2006-01-02 15:04:05"),
@@ -171,20 +166,11 @@ func (h *FolderHandler) Create(c *fiber.Ctx) error {
 		return response.BadRequestCtx(c, err.Error())
 	}
 
-	userID := c.Locals("user_id")
-	if userID == nil {
-		return response.UnauthorizedCtx(c, "未登录或登录已过期")
-	}
-	userIDStr := userID.(string)
-
 	folder := &wiki_db.Folder{
 		Name:        req.Name,
 		Description: req.Description,
 		ParentID:    req.ParentID,
-		UserID:      &userIDStr,
 		SortOrder:   req.SortOrder,
-		CreatedBy:   &userIDStr,
-		UpdatedBy:   &userIDStr,
 	}
 
 	if err := h.repo.Create(c.Context(), folder); err != nil {
@@ -213,19 +199,12 @@ func (h *FolderHandler) Update(c *fiber.Ctx) error {
 		return response.NotFoundCtx(c, "文件夹不存在")
 	}
 
-	userID := c.Locals("user_id")
-	if userID == nil {
-		return response.UnauthorizedCtx(c, "未登录或登录已过期")
-	}
-	userIDStr := userID.(string)
-
 	folder.Name = req.Name
 	folder.Description = req.Description
 	folder.ParentID = req.ParentID
 	if req.SortOrder != nil {
 		folder.SortOrder = *req.SortOrder
 	}
-	folder.UpdatedBy = &userIDStr
 
 	if err := h.repo.Update(c.Context(), folder); err != nil {
 		return response.InternalServerCtx(c, "更新文件夹失败: "+err.Error())

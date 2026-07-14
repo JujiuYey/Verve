@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"strings"
 
@@ -17,9 +16,9 @@ type memoryWriter interface {
 }
 
 type memoryReader interface {
-	FindItemsByDocument(ctx context.Context, userID, documentID string, limit int) ([]*learning_db.LearningMemoryItem, error)
-	FindItemsByUser(ctx context.Context, userID, folderID string, limit int) ([]*learning_db.LearningMemoryItem, error)
-	FindItemsByFolders(ctx context.Context, userID string, folderIDs []string, limit int) ([]*learning_db.LearningMemoryItem, error)
+	FindItemsByDocument(ctx context.Context, documentID string, limit int) ([]*learning_db.LearningMemoryItem, error)
+	FindItemsByUser(ctx context.Context, folderID string, limit int) ([]*learning_db.LearningMemoryItem, error)
+	FindItemsByFolders(ctx context.Context, folderIDs []string, limit int) ([]*learning_db.LearningMemoryItem, error)
 }
 
 type memoryDocumentFinder interface {
@@ -54,56 +53,41 @@ func newMemoryService(repository memoryWriter, documents memoryDocumentFinder, f
 	return service
 }
 
-func (s *MemoryService) FindCoachItems(ctx context.Context, userID, rootFolderID string, limit int) ([]*learning_db.LearningMemoryItem, error) {
+func (s *MemoryService) FindCoachItems(ctx context.Context, rootFolderID string, limit int) ([]*learning_db.LearningMemoryItem, error) {
 	if s == nil || s.reader == nil {
 		return nil, errors.New("memory repository is not configured")
 	}
 	rootFolderID = strings.TrimSpace(rootFolderID)
 	if rootFolderID == "" {
-		return s.reader.FindItemsByUser(ctx, userID, "", limit)
+		return s.reader.FindItemsByUser(ctx, "", limit)
 	}
 	if s.folders == nil {
 		return nil, errors.New("memory folder scope is not configured")
-	}
-	folders, err := s.folders.List(ctx, map[string]interface{}{})
-	if err != nil {
-		return nil, err
-	}
-	accessibleFolders := FilterCoachFoldersForUser(folders, userID)
-	if !CoachFolderIsAccessible(accessibleFolders, rootFolderID) {
-		return nil, sql.ErrNoRows
 	}
 	descendantIDs, err := s.folders.GetAllSubFolderIDs(ctx, rootFolderID)
 	if err != nil {
 		return nil, err
 	}
-	accessibleIDs := make(map[string]struct{}, len(accessibleFolders))
-	for _, folder := range accessibleFolders {
-		accessibleIDs[folder.ID] = struct{}{}
-	}
 	allowedIDs := make([]string, 0, len(descendantIDs))
 	seen := make(map[string]struct{}, len(descendantIDs))
 	for _, folderID := range descendantIDs {
-		if _, ok := accessibleIDs[folderID]; !ok {
-			continue
-		}
 		if _, ok := seen[folderID]; ok {
 			continue
 		}
 		seen[folderID] = struct{}{}
 		allowedIDs = append(allowedIDs, folderID)
 	}
-	return s.reader.FindItemsByFolders(ctx, userID, allowedIDs, limit)
+	return s.reader.FindItemsByFolders(ctx, allowedIDs, limit)
 }
 
-func (s *MemoryService) FindDocumentItems(ctx context.Context, userID, documentID string, limit int) ([]*learning_db.LearningMemoryItem, error) {
+func (s *MemoryService) FindDocumentItems(ctx context.Context, documentID string, limit int) ([]*learning_db.LearningMemoryItem, error) {
 	if s == nil || s.reader == nil {
 		return nil, errors.New("memory repository is not configured")
 	}
-	return s.reader.FindItemsByDocument(ctx, userID, documentID, limit)
+	return s.reader.FindItemsByDocument(ctx, documentID, limit)
 }
 
-func (s *MemoryService) RecordExplanationReview(ctx context.Context, userID string, session *learning_db.LearningSession, review *learning_db.LearningExplanationReview) error {
+func (s *MemoryService) RecordExplanationReview(ctx context.Context, session *learning_db.LearningSession, review *learning_db.LearningExplanationReview) error {
 	if session == nil {
 		return errors.New("learning session is required")
 	}
@@ -113,9 +97,6 @@ func (s *MemoryService) RecordExplanationReview(ctx context.Context, userID stri
 	if s == nil || s.repository == nil {
 		return errors.New("memory repository is not configured")
 	}
-	if err := validateExplanationMemoryScope(userID, session, review); err != nil {
-		return err
-	}
 	if s.documents == nil || s.folders == nil {
 		return errors.New("memory document scope is not configured")
 	}
@@ -123,19 +104,15 @@ func (s *MemoryService) RecordExplanationReview(ctx context.Context, userID stri
 	if err != nil {
 		return err
 	}
-	folder, err := s.folders.FindOne(ctx, document.FolderID)
-	if err != nil {
+	if _, err := s.folders.FindOne(ctx, document.FolderID); err != nil {
 		return err
 	}
-	if len(FilterCoachFoldersForUser([]*wiki_db.Folder{folder}, userID)) == 0 {
-		return sql.ErrNoRows
-	}
 
-	event := buildExplanationMemoryEvent(userID, document.FolderID, session, review)
+	event := buildExplanationMemoryEvent(document.FolderID, session, review)
 	if err := s.repository.CreateEvent(ctx, event); err != nil {
 		return err
 	}
-	for _, item := range buildExplanationMemoryItems(userID, document.FolderID, session, event.ID, review) {
+	for _, item := range buildExplanationMemoryItems(document.FolderID, session, event.ID, review) {
 		if err := s.repository.CreateItem(ctx, item); err != nil {
 			return err
 		}
@@ -143,33 +120,26 @@ func (s *MemoryService) RecordExplanationReview(ctx context.Context, userID stri
 	return nil
 }
 
-func (s *MemoryService) RecordTeachingIntervention(ctx context.Context, userID string, session *learning_db.LearningSession, intervention *learning_db.LearningTeachingIntervention) error {
+func (s *MemoryService) RecordTeachingIntervention(ctx context.Context, session *learning_db.LearningSession, intervention *learning_db.LearningTeachingIntervention) error {
 	if session == nil || intervention == nil {
 		return errors.New("learning session and teaching intervention are required")
 	}
 	if s == nil || s.repository == nil || s.documents == nil || s.folders == nil {
 		return errors.New("memory service is not configured")
 	}
-	if strings.TrimSpace(userID) == "" || session.UserID != userID {
-		return errors.New("learning session user does not match memory user")
-	}
 	document, err := s.documents.FindOne(ctx, session.DocumentID)
 	if err != nil {
 		return err
 	}
-	folder, err := s.folders.FindOne(ctx, document.FolderID)
-	if err != nil {
+	if _, err := s.folders.FindOne(ctx, document.FolderID); err != nil {
 		return err
-	}
-	if len(FilterCoachFoldersForUser([]*wiki_db.Folder{folder}, userID)) == 0 {
-		return sql.ErrNoRows
 	}
 	folderID := document.FolderID
 	documentID := session.DocumentID
 	sessionID := session.ID
 	sourceID := intervention.ID
 	event := &learning_db.LearningMemoryEvent{
-		UserID: userID, FolderID: &folderID, DocumentID: &documentID, SessionID: &sessionID,
+		FolderID: &folderID, DocumentID: &documentID, SessionID: &sessionID,
 		SourceType: "teaching_intervention", SourceID: &sourceID, EventType: "teaching_intervention",
 		Content: firstNonBlank(intervention.ExplanationSummary, intervention.QuestionSummary),
 		Evidence: map[string]interface{}{
@@ -182,7 +152,7 @@ func (s *MemoryService) RecordTeachingIntervention(ctx context.Context, userID s
 	}
 	for _, gap := range intervention.KnowledgeGaps {
 		if gap = strings.TrimSpace(gap); gap != "" {
-			if err := s.repository.CreateItem(ctx, buildExplanationMemoryItem(userID, folderID, documentID, event.ID, "knowledge_gap", gap)); err != nil {
+			if err := s.repository.CreateItem(ctx, buildExplanationMemoryItem(folderID, documentID, event.ID, "knowledge_gap", gap)); err != nil {
 				return err
 			}
 		}
@@ -190,34 +160,15 @@ func (s *MemoryService) RecordTeachingIntervention(ctx context.Context, userID s
 	return nil
 }
 
-func validateExplanationMemoryScope(userID string, session *learning_db.LearningSession, review *learning_db.LearningExplanationReview) error {
-	if strings.TrimSpace(userID) == "" || strings.TrimSpace(session.DocumentID) == "" {
-		return errors.New("memory user and document scope are required")
-	}
-	if session.UserID != "" && session.UserID != userID {
-		return errors.New("learning session user does not match memory user")
-	}
-	if review.UserID != "" && review.UserID != userID {
-		return errors.New("explanation review user does not match memory user")
-	}
-	if review.SessionID != "" && review.SessionID != session.ID {
-		return errors.New("explanation review session does not match learning session")
-	}
-	if review.DocumentID != "" && review.DocumentID != session.DocumentID {
-		return errors.New("explanation review document does not match learning session")
-	}
-	return nil
-}
-
-func buildExplanationMemoryEvent(userID, folderID string, session *learning_db.LearningSession, review *learning_db.LearningExplanationReview) *learning_db.LearningMemoryEvent {
+func buildExplanationMemoryEvent(folderID string, session *learning_db.LearningSession, review *learning_db.LearningExplanationReview) *learning_db.LearningMemoryEvent {
 	folderIDCopy := folderID
 	documentID := session.DocumentID
 	sessionID := session.ID
 	sourceID := review.ID
 	return &learning_db.LearningMemoryEvent{
-		UserID: userID, FolderID: &folderIDCopy, DocumentID: &documentID, SessionID: &sessionID,
+		FolderID: &folderIDCopy, DocumentID: &documentID, SessionID: &sessionID,
 		SourceType: "explanation_review", SourceID: &sourceID, EventType: "explanation_review",
-		Content: firstNonBlank(review.ExplanationSummary, review.HeardSummary, review.Explanation),
+		Content: firstNonBlank(review.ExplanationSummary, review.HeardSummary),
 		Evidence: map[string]interface{}{
 			"clear_points":       review.ClearPoints,
 			"confusing_points":   review.ConfusingPoints,
@@ -229,25 +180,25 @@ func buildExplanationMemoryEvent(userID, folderID string, session *learning_db.L
 	}
 }
 
-func buildExplanationMemoryItems(userID, folderID string, session *learning_db.LearningSession, eventID string, review *learning_db.LearningExplanationReview) []*learning_db.LearningMemoryItem {
+func buildExplanationMemoryItems(folderID string, session *learning_db.LearningSession, eventID string, review *learning_db.LearningExplanationReview) []*learning_db.LearningMemoryItem {
 	items := make([]*learning_db.LearningMemoryItem, 0, len(review.ClearPoints)+len(review.Misconceptions))
 	for _, point := range review.ClearPoints {
 		if point = strings.TrimSpace(point); point != "" {
-			items = append(items, buildExplanationMemoryItem(userID, folderID, session.DocumentID, eventID, "explanation_evidence", point))
+			items = append(items, buildExplanationMemoryItem(folderID, session.DocumentID, eventID, "explanation_evidence", point))
 		}
 	}
 	for _, misconception := range review.Misconceptions {
 		if misconception = strings.TrimSpace(misconception); misconception != "" {
-			items = append(items, buildExplanationMemoryItem(userID, folderID, session.DocumentID, eventID, "misconception", misconception))
+			items = append(items, buildExplanationMemoryItem(folderID, session.DocumentID, eventID, "misconception", misconception))
 		}
 	}
 	return items
 }
 
-func buildExplanationMemoryItem(userID, folderID, documentID, eventID, kind, statement string) *learning_db.LearningMemoryItem {
+func buildExplanationMemoryItem(folderID, documentID, eventID, kind, statement string) *learning_db.LearningMemoryItem {
 	folderIDCopy := folderID
 	return &learning_db.LearningMemoryItem{
-		UserID: userID, FolderID: &folderIDCopy, DocumentID: &documentID, Kind: kind, Statement: statement,
+		FolderID: &folderIDCopy, DocumentID: &documentID, Kind: kind, Statement: statement,
 		EvidenceEventIDs: []string{eventID}, Confidence: "observed",
 	}
 }

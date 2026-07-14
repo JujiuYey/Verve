@@ -40,7 +40,6 @@ type FeynmanReviewer interface {
 }
 
 type FeynmanReviewRequest struct {
-	UserID      string
 	DocumentID  string
 	Explanation string
 	PriorTurns  []*learning_db.LearningExplanationReview
@@ -63,7 +62,7 @@ func (s *FeynmanReviewService) Review(ctx context.Context, request FeynmanReview
 	if explanation == "" {
 		return nil, errors.New("explanation is required")
 	}
-	documentContext, err := s.contextBuilder.Build(ctx, request.UserID, request.DocumentID, explanation)
+	documentContext, err := s.contextBuilder.Build(ctx, request.DocumentID, explanation)
 	if err != nil {
 		return nil, err
 	}
@@ -96,8 +95,11 @@ func feynmanReviewerQueryInput(documentContext *FeynmanDocumentContext, request 
 	}
 	turns := make([]prompts.FeynmanReviewerTurn, 0, len(prior)-recentStart)
 	for _, item := range prior[recentStart:] {
+		// ExplanationReview no longer carries the original learner explanation
+		// (the read-only column was dropped along with user_id). The summary fields
+		// below still carry enough context for the LLM to reason about prior turns.
 		turns = append(turns, prompts.FeynmanReviewerTurn{
-			Explanation: truncateRunes(strings.TrimSpace(item.Explanation), feynmanRecentExplanationBudget),
+			Explanation: "",
 			Review:      compactPriorReview(item, feynmanRecentReviewBudget),
 		})
 	}

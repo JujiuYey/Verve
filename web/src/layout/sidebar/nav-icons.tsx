@@ -205,32 +205,13 @@ export function RoleIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-export function UserManageIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <SidebarIcon {...props}>
-      <circle data-tone="blue" cx="9" cy="8" r="4" fill="currentColor" />
-      <path
-        data-tone="cyan"
-        d="M3.5 18.1C4.3 14.95 6.35 13 9 13s4.7 1.95 5.5 5.1c.3 1.17-.6 2.25-1.8 2.25H5.3c-1.2 0-2.1-1.08-1.8-2.25Z"
-        fill="currentColor"
-      />
-      <circle data-tone="amber" cx="16.8" cy="9" r="2.9" fill="currentColor" />
-      <path
-        data-tone="green"
-        d="M14.1 19.1c.48-2.12 1.82-3.42 3.55-3.42 1.72 0 3.05 1.3 3.54 3.42.24 1.02-.54 1.95-1.58 1.95h-3.93c-1.04 0-1.81-.93-1.58-1.95Z"
-        fill="currentColor"
-      />
-    </SidebarIcon>
-  );
-}
-
 export function QueueIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <SidebarIcon {...props}>
-      <path
-        data-tone="blue"
-        d="M6 3h8.4L19 7.6V19a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"
-        fill="currentColor"
+	return (
+		<SidebarIcon {...props}>
+			<path
+				data-tone="blue"
+				d="M6 3h8.4L19 7.6V19a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"
+				fill="currentColor"
       />
       <path data-tone="cyan" d="M14 3v4a1 1 0 0 0 1 1h4" fill="currentColor" />
       <path data-tone="green" d="M8 12h8v2H8zM8 16h5v2H8z" fill="currentColor" />

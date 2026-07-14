@@ -23,7 +23,6 @@ type LegacyRevisionSnapshot struct {
 	ObjectPath    string
 	ContentHash   string
 	FileSize      int64
-	ChangedBy     string
 	ChangeSummary string
 }
 
@@ -78,7 +77,6 @@ func (r *RevisionRepository) EnsureLegacyRevision(ctx context.Context, snapshot 
 			ObjectPath:    snapshot.ObjectPath,
 			ContentHash:   snapshot.ContentHash,
 			FileSize:      snapshot.FileSize,
-			ChangedBy:     snapshot.ChangedBy,
 			ChangeSummary: snapshot.ChangeSummary,
 		}
 		if _, err := tx.NewInsert().Model(revision).Exec(ctx); err != nil {

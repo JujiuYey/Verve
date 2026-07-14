@@ -13,7 +13,6 @@ import (
 	"github.com/sergi/go-diff/diffmatchpatch"
 
 	wiki_db "verve/app/wiki/models/db"
-	wiki_repo "verve/app/wiki/repository"
 	"verve/infrastructure/llm"
 	"verve/infrastructure/llm/prompts"
 )
@@ -26,7 +25,6 @@ type CuratorResult struct {
 }
 
 type CuratorRequest struct {
-	UserID                  string
 	DocumentID              string
 	TurnID                  string
 	RequestID               string
@@ -58,7 +56,7 @@ func (s *CuratorService) Propose(ctx context.Context, request CuratorRequest) (*
 	if instruction == "" {
 		return nil, errors.New("instruction is required")
 	}
-	document, content, err := s.source.LoadDocument(ctx, request.UserID, request.DocumentID)
+	document, content, err := s.source.LoadDocument(ctx, request.DocumentID)
 	if err != nil {
 		return nil, err
 	}
@@ -67,14 +65,14 @@ func (s *CuratorService) Propose(ctx context.Context, request CuratorRequest) (*
 	}
 	if request.ReplacesChangeRequestID != nil {
 		if s.writer == nil {
-			return nil, wiki_repo.ErrChangeRequestForbidden
+			return nil, errors.New("change request writer is not configured")
 		}
 		existing, err := s.writer.FindChangeRequest(ctx, *request.ReplacesChangeRequestID)
 		if err != nil {
 			return nil, err
 		}
-		if existing.DocumentID != document.ID || existing.RequestedBy != request.UserID || existing.SourceType != "learning_turn" || (existing.Status != wiki_db.ChangeRequestStatusConflict && existing.Status != wiki_db.ChangeRequestStatusFailed) {
-			return nil, wiki_repo.ErrChangeRequestForbidden
+		if existing.DocumentID != document.ID || existing.SourceType != "learning_turn" || (existing.Status != wiki_db.ChangeRequestStatusConflict && existing.Status != wiki_db.ChangeRequestStatusFailed) {
+			return nil, errors.New("change request is not replaceable in its current state")
 		}
 	}
 	text, err := s.run(ctx, prompts.WikiCuratorQueryPrompt(prompts.WikiCuratorQueryInput{
@@ -89,7 +87,7 @@ func (s *CuratorService) Propose(ctx context.Context, request CuratorRequest) (*
 	}
 	now := time.Now()
 	proposal := &wiki_db.DocumentChangeRequest{
-		DocumentID: document.ID, RequestedBy: request.UserID, SourceType: "learning_turn", SourceID: request.TurnID,
+		DocumentID: document.ID, SourceType: "learning_turn", SourceID: request.TurnID,
 		RequestID: request.RequestID, ReplacesChangeRequestID: request.ReplacesChangeRequestID,
 		BaseVersion: document.CurrentVersion, Instruction: instruction, ChangeSummary: result.ChangeSummary,
 		ProposedContent: result.ProposedContent, ProposedDiff: buildUnifiedDiff(content, result.ProposedContent),

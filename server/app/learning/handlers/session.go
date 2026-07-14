@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"log"
 	"strings"
@@ -23,7 +22,6 @@ import (
 	rag_payload "verve/app/rag/models/payload"
 	rag_service "verve/app/rag/service"
 	wiki_db "verve/app/wiki/models/db"
-	wiki_repo "verve/app/wiki/repository"
 	"verve/common/response"
 	"verve/infrastructure/database"
 	"verve/infrastructure/storage"
@@ -40,7 +38,7 @@ type documentStore interface {
 }
 
 type accessibleDocumentStore interface {
-	FindAccessible(ctx context.Context, userID, id string) (*wiki_db.Document, error)
+	FindAccessible(ctx context.Context, id string) (*wiki_db.Document, error)
 }
 
 type folderStore interface {
@@ -64,12 +62,12 @@ type listenerTurnStore interface {
 }
 
 type explanationMemoryStore interface {
-	FindDocumentItems(ctx context.Context, userID, documentID string, limit int) ([]*learning_db.LearningMemoryItem, error)
-	RecordExplanationReview(ctx context.Context, userID string, session *learning_db.LearningSession, review *learning_db.LearningExplanationReview) error
+	FindDocumentItems(ctx context.Context, documentID string, limit int) ([]*learning_db.LearningMemoryItem, error)
+	RecordExplanationReview(ctx context.Context, session *learning_db.LearningSession, review *learning_db.LearningExplanationReview) error
 }
 
 type turnSubmitter interface {
-	Submit(context.Context, string, string, learning_service.TurnRequest) (*learning_payload.TimelineItem, error)
+	Submit(context.Context, string, learning_service.TurnRequest) (*learning_payload.TimelineItem, error)
 }
 
 type timelineStore interface {
@@ -118,7 +116,6 @@ func NewSessionHandlerWithDependencies(deps SessionHandlerDependencies) *Session
 }
 
 func (h *SessionHandler) Create(c *fiber.Ctx) error {
-	userID, _ := c.Locals("user_id").(string)
 	var req learning_payload.CreateSessionRequest
 	if err := c.BodyParser(&req); err != nil {
 		return response.BadRequestCtx(c, err.Error())
@@ -127,17 +124,13 @@ func (h *SessionHandler) Create(c *fiber.Ctx) error {
 	if req.DocumentID == "" {
 		return response.BadRequestCtx(c, "document_id 不能为空")
 	}
-	if _, err := h.deps.Documents.FindAccessible(c.Context(), userID, req.DocumentID); err != nil {
-		switch {
-		case errors.Is(err, errDocumentForbidden):
-			return response.ForbiddenCtx(c, "无权访问")
-		case errors.Is(err, sql.ErrNoRows):
+	if _, err := h.deps.Documents.FindAccessible(c.Context(), req.DocumentID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
 			return response.NotFoundCtx(c, "文档不存在")
-		default:
-			return response.InternalServerCtx(c, "读取文档失败")
 		}
+		return response.InternalServerCtx(c, "读取文档失败")
 	}
-	session := &learning_db.LearningSession{UserID: userID, DocumentID: req.DocumentID, Status: "active"}
+	session := &learning_db.LearningSession{DocumentID: req.DocumentID, Status: "active"}
 	if err := h.deps.Sessions.Create(c.Context(), session); err != nil {
 		return response.InternalServerCtx(c, "创建会话失败")
 	}
@@ -145,10 +138,12 @@ func (h *SessionHandler) Create(c *fiber.Ctx) error {
 }
 
 func (h *SessionHandler) FindOne(c *fiber.Ctx) error {
-	userID, _ := c.Locals("user_id").(string)
-	session, err := h.ownedSession(c.Context(), userID, c.Params("id"))
+	session, err := h.deps.Sessions.FindOne(c.Context(), c.Params("id"))
 	if err != nil {
-		return writeSessionLookupError(c, err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return response.NotFoundCtx(c, "会话不存在")
+		}
+		return response.InternalServerCtx(c, "读取会话失败")
 	}
 	messages, err := h.deps.Messages.FindBySession(c.Context(), session.ID)
 	if err != nil {
@@ -169,7 +164,6 @@ func (h *SessionHandler) FindOne(c *fiber.Ctx) error {
 }
 
 func (h *SessionHandler) SubmitTurn(c *fiber.Ctx) error {
-	userID, _ := c.Locals("user_id").(string)
 	if h.deps.TurnService == nil {
 		return response.InternalServerCtx(c, "学习轮次服务未配置")
 	}
@@ -177,7 +171,7 @@ func (h *SessionHandler) SubmitTurn(c *fiber.Ctx) error {
 	if err := c.BodyParser(&request); err != nil {
 		return response.BadRequestCtx(c, err.Error())
 	}
-	item, err := h.deps.TurnService.Submit(c.Context(), userID, c.Params("id"), request)
+	item, err := h.deps.TurnService.Submit(c.Context(), c.Params("id"), request)
 	if err != nil {
 		return writeTurnError(c, err)
 	}
@@ -185,10 +179,12 @@ func (h *SessionHandler) SubmitTurn(c *fiber.Ctx) error {
 }
 
 func (h *SessionHandler) Review(c *fiber.Ctx) error {
-	userID, _ := c.Locals("user_id").(string)
-	session, err := h.ownedSession(c.Context(), userID, c.Params("id"))
+	session, err := h.deps.Sessions.FindOne(c.Context(), c.Params("id"))
 	if err != nil {
-		return writeSessionLookupError(c, err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return response.NotFoundCtx(c, "会话不存在")
+		}
+		return response.InternalServerCtx(c, "读取会话失败")
 	}
 	if session.Status != "active" {
 		return c.Status(fiber.StatusConflict).JSON(response.FailWithCode(fiber.StatusConflict, "会话已结束"))
@@ -206,7 +202,7 @@ func (h *SessionHandler) Review(c *fiber.Ctx) error {
 		return response.BadRequestCtx(c, "explanation 不能为空")
 	}
 	if h.deps.TurnService != nil {
-		item, submitErr := h.deps.TurnService.Submit(c.Context(), userID, session.ID, learning_service.TurnRequest{
+		item, submitErr := h.deps.TurnService.Submit(c.Context(), session.ID, learning_service.TurnRequest{
 			RequestID: req.RequestID, AgentType: learning_db.LearningAgentListener, Content: req.Explanation,
 		})
 		if submitErr != nil {
@@ -257,25 +253,25 @@ func (h *SessionHandler) Review(c *fiber.Ctx) error {
 	}
 	memoryItems := make([]*learning_db.LearningMemoryItem, 0)
 	if h.deps.Memory != nil {
-		loaded, memoryErr := h.deps.Memory.FindDocumentItems(c.Context(), userID, session.DocumentID, 20)
+		loaded, memoryErr := h.deps.Memory.FindDocumentItems(c.Context(), session.DocumentID, 20)
 		if memoryErr != nil {
-			log.Printf("load explanation memory failed, continuing without memory: session_id=%s user_id=%s document_id=%s err=%v", session.ID, userID, session.DocumentID, memoryErr)
+			log.Printf("load explanation memory failed, continuing without memory: session_id=%s document_id=%s err=%v", session.ID, session.DocumentID, memoryErr)
 		} else if loaded != nil {
 			memoryItems = loaded
 		}
 	}
 	reviewResult, err := h.deps.Reviewer.Review(c.Context(), learning_service.FeynmanReviewRequest{
-		UserID: userID, DocumentID: session.DocumentID, Explanation: req.Explanation,
+		DocumentID: session.DocumentID, Explanation: req.Explanation,
 		PriorTurns: prior, MemoryItems: memoryItems,
 	})
 	if err != nil {
 		h.failTurn(c.Context(), turn.ID, "listener_failed", err)
-		log.Printf("Feynman review failed: session_id=%s user_id=%s document_id=%s err=%v", session.ID, userID, session.DocumentID, err)
+		log.Printf("Feynman review failed: session_id=%s document_id=%s err=%v", session.ID, session.DocumentID, err)
 		return response.InternalServerCtx(c, "审阅解释失败,请重试")
 	}
 	if reviewResult == nil {
 		h.failTurn(c.Context(), turn.ID, "listener_empty_result", errors.New("reviewer returned no result"))
-		log.Printf("Feynman review returned no result: session_id=%s user_id=%s document_id=%s", session.ID, userID, session.DocumentID)
+		log.Printf("Feynman review returned no result: session_id=%s document_id=%s", session.ID, session.DocumentID)
 		return response.InternalServerCtx(c, "审阅解释失败,请重试")
 	}
 	review := reviewModelFromResult(reviewResult)
@@ -289,8 +285,8 @@ func (h *SessionHandler) Review(c *fiber.Ctx) error {
 		return response.InternalServerCtx(c, "记录解释审阅失败")
 	}
 	if h.deps.Memory != nil {
-		if err := h.deps.Memory.RecordExplanationReview(c.Context(), userID, session, review); err != nil {
-			log.Printf("record explanation memory failed: session_id=%s user_id=%s document_id=%s err=%v", session.ID, userID, session.DocumentID, err)
+		if err := h.deps.Memory.RecordExplanationReview(c.Context(), session, review); err != nil {
+			log.Printf("record explanation memory failed: session_id=%s document_id=%s err=%v", session.ID, session.DocumentID, err)
 		}
 	}
 	return response.SuccessCtx(c, reviewResult)
@@ -306,10 +302,12 @@ func (h *SessionHandler) failTurn(ctx context.Context, turnID, errorCode string,
 }
 
 func (h *SessionHandler) Complete(c *fiber.Ctx) error {
-	userID, _ := c.Locals("user_id").(string)
-	session, err := h.ownedSession(c.Context(), userID, c.Params("id"))
+	session, err := h.deps.Sessions.FindOne(c.Context(), c.Params("id"))
 	if err != nil {
-		return writeSessionLookupError(c, err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return response.NotFoundCtx(c, "会话不存在")
+		}
+		return response.InternalServerCtx(c, "读取会话失败")
 	}
 	reviews, err := h.deps.Reviews.FindBySession(c.Context(), session.ID)
 	if err != nil {
@@ -333,37 +331,8 @@ func (h *SessionHandler) Complete(c *fiber.Ctx) error {
 }
 
 var (
-	errSessionNotFound   = errors.New("session not found")
-	errSessionForbidden  = errors.New("session forbidden")
-	errDocumentForbidden = errors.New("document forbidden")
+	errSessionNotFound = errors.New("session not found")
 )
-
-func (h *SessionHandler) ownedSession(ctx context.Context, userID, id string) (*learning_db.LearningSession, error) {
-	session, err := h.deps.Sessions.FindOne(ctx, id)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, errSessionNotFound
-		}
-		return nil, fmt.Errorf("find session: %w", err)
-	}
-	if session.UserID != userID {
-		return nil, errSessionForbidden
-	}
-	return session, nil
-}
-
-func writeSessionLookupError(c *fiber.Ctx, err error) error {
-	if err == nil {
-		return nil
-	}
-	if errors.Is(err, errSessionForbidden) {
-		return response.ForbiddenCtx(c, "无权访问")
-	}
-	if errors.Is(err, errSessionNotFound) {
-		return response.NotFoundCtx(c, "会话不存在")
-	}
-	return response.InternalServerCtx(c, "读取会话失败")
-}
 
 func writeTurnError(c *fiber.Ctx, err error) error {
 	switch {
@@ -373,16 +342,12 @@ func writeTurnError(c *fiber.Ctx, err error) error {
 		return c.Status(fiber.StatusConflict).JSON(response.FailWithCode(fiber.StatusConflict, "request_conflict"))
 	case errors.Is(err, learning_service.ErrIndexNotReady):
 		return c.Status(fiber.StatusConflict).JSON(response.FailWithCode(fiber.StatusConflict, "index_not_ready"))
-	case errors.Is(err, learning_service.ErrTurnSessionForbidden):
-		return response.ForbiddenCtx(c, "无权访问")
 	case errors.Is(err, learning_service.ErrTurnSessionCompleted):
 		return c.Status(fiber.StatusConflict).JSON(response.FailWithCode(fiber.StatusConflict, "session_completed"))
 	case errors.Is(err, learning_service.ErrUnsupportedAgent):
 		return response.BadRequestCtx(c, "agent_type 无效")
 	case errors.Is(err, learning_service.ErrInvalidTurnRequest):
 		return response.BadRequestCtx(c, "request_id 和 content 不能为空")
-	case errors.Is(err, wiki_repo.ErrChangeRequestForbidden):
-		return response.ForbiddenCtx(c, "无权替代该文档变更申请")
 	case errors.Is(err, sql.ErrNoRows):
 		return response.NotFoundCtx(c, "会话不存在")
 	default:
@@ -431,23 +396,12 @@ type feynmanDocumentSource struct {
 	chunks    documentChunkStore
 }
 
-func (s *feynmanDocumentSource) FindAccessible(ctx context.Context, userID, documentID string) (*wiki_db.Document, error) {
-	doc, err := s.documents.FindOne(ctx, documentID)
-	if err != nil {
-		return nil, err
-	}
-	folder, err := s.folders.FindOne(ctx, doc.FolderID)
-	if err != nil {
-		return nil, err
-	}
-	if folder.UserID != nil && strings.TrimSpace(*folder.UserID) != "" && *folder.UserID != userID {
-		return nil, errDocumentForbidden
-	}
-	return doc, nil
+func (s *feynmanDocumentSource) FindAccessible(ctx context.Context, documentID string) (*wiki_db.Document, error) {
+	return s.documents.FindOne(ctx, documentID)
 }
 
-func (s *feynmanDocumentSource) LoadDocument(ctx context.Context, userID, documentID string) (*wiki_db.Document, string, error) {
-	doc, err := s.FindAccessible(ctx, userID, documentID)
+func (s *feynmanDocumentSource) LoadDocument(ctx context.Context, documentID string) (*wiki_db.Document, string, error) {
+	doc, err := s.FindAccessible(ctx, documentID)
 	if err != nil {
 		return nil, "", err
 	}

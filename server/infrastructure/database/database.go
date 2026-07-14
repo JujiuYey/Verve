@@ -25,7 +25,6 @@ import (
 type DatabaseService struct {
 	db *bun.DB
 	// System Repositories
-	Users        *system_repo.UserRepository
 	ModelConfigs system_repo.ModelConfigRepository
 
 	// Learning Repositories
@@ -64,7 +63,6 @@ func NewDatabaseService(dsn string) (*DatabaseService, error) {
 	db := bun.NewDB(sqldb, pgdialect.New())
 
 	// 注册模型
-	db.RegisterModel((*system_db.User)(nil))
 	db.RegisterModel((*system_db.SysModelPlatform)(nil))
 	db.RegisterModel((*system_db.SysModel)(nil))
 	db.RegisterModel((*system_db.AgentModelConfig)(nil))
@@ -102,7 +100,6 @@ func NewDatabaseService(dsn string) (*DatabaseService, error) {
 		db: db,
 
 		// System Repositories
-		Users:        system_repo.NewUserRepository(db),
 		ModelConfigs: system_repo.NewModelConfigRepository(db),
 
 		// Learning Repositories

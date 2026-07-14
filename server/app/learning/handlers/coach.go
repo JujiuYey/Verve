@@ -37,7 +37,6 @@ func NewCoachHandler(db *database.DatabaseService, retriever *rag_service.Retrie
 // 通过 eino ADK Runner 流式产出 → 写入 SSE 帧;最后解析 <ACTION> 标签
 // 追加一条 action 事件,并以 [DONE] 收尾。
 func (h *CoachHandler) Chat(c *fiber.Ctx) error {
-	userID, _ := c.Locals("user_id").(string)
 	var req struct {
 		Message      string `json:"message"`
 		RootFolderID string `json:"root_folder_id"`
@@ -48,13 +47,13 @@ func (h *CoachHandler) Chat(c *fiber.Ctx) error {
 		message = "继续学习"
 	}
 
-	runtimeContext, err := h.buildRuntimeContext(c.Context(), userID, strings.TrimSpace(req.RootFolderID))
+	runtimeContext, err := h.buildRuntimeContext(c.Context(), strings.TrimSpace(req.RootFolderID))
 	if err != nil {
-		log.Printf("❌ 构建学习调度上下文失败: user_id=%s err=%v", userID, err)
+		log.Printf("❌ 构建学习调度上下文失败: err=%v", err)
 		return response.InternalServerCtx(c, "构建学习上下文失败")
 	}
 
-	tools := learning_tools.NewCoachTools(h.db, h.retriever, userID)
+	tools := learning_tools.NewCoachTools(h.db, h.retriever)
 	agent, err := llm.NewCoachAgent(c.Context(), tools)
 	if err != nil {
 		return response.InternalServerCtx(c, "学习 agent 初始化失败: "+err.Error())
@@ -85,9 +84,9 @@ func writeScopedCoachAction(w *bufio.Writer, content string, documents []*wiki_d
 	return writeSSEEvent(w, SSEAction, map[string]interface{}{"action": action})
 }
 
-// buildRuntimeContext 聚合陪练 agent 所需的运行时上下文:用户文件夹(已过滤)、
+// buildRuntimeContext 聚合陪练 agent 所需的运行时上下文:所有文件夹(单租户下均可见)、
 // 文档和学习记忆。
-func (h *CoachHandler) buildRuntimeContext(ctx context.Context, userID string, rootFolderID string) (learning_service.CoachRuntimeContext, error) {
+func (h *CoachHandler) buildRuntimeContext(ctx context.Context, rootFolderID string) (learning_service.CoachRuntimeContext, error) {
 	if h == nil || h.db == nil {
 		return learning_service.CoachRuntimeContext{}, errors.New("learning coach database is not configured")
 	}
@@ -96,7 +95,6 @@ func (h *CoachHandler) buildRuntimeContext(ctx context.Context, userID string, r
 	if err != nil {
 		return learning_service.CoachRuntimeContext{}, err
 	}
-	folders = learning_service.FilterCoachFoldersForUser(folders, userID)
 	if rootFolderID != "" && !learning_service.CoachFolderIsAccessible(folders, rootFolderID) {
 		return learning_service.CoachRuntimeContext{}, errors.New("requested Wiki root folder is not accessible")
 	}
@@ -125,14 +123,13 @@ func (h *CoachHandler) buildRuntimeContext(ctx context.Context, userID string, r
 
 	memoryItems := make([]*learning_db.LearningMemoryItem, 0)
 	if h.db.Memories != nil {
-		memoryItems, err = learning_service.NewMemoryService(h.db).FindCoachItems(ctx, userID, rootFolderID, 20)
+		memoryItems, err = learning_service.NewMemoryService(h.db).FindCoachItems(ctx, rootFolderID, 20)
 		if err != nil {
 			return learning_service.CoachRuntimeContext{}, err
 		}
 	}
 
 	return learning_service.CoachRuntimeContext{
-		UserID:         userID,
 		RootFolderID:   rootFolderID,
 		RootFolderName: rootFolderName,
 		Folders:        folders,

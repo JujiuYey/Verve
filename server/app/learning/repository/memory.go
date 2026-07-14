@@ -35,7 +35,7 @@ func (r *MemoryRepository) CreateItem(ctx context.Context, item *learning_db.Lea
 	return err
 }
 
-func (r *MemoryRepository) FindItemsByUser(ctx context.Context, userID string, folderID string, limit int) ([]*learning_db.LearningMemoryItem, error) {
+func (r *MemoryRepository) FindItemsByUser(ctx context.Context, folderID string, limit int) ([]*learning_db.LearningMemoryItem, error) {
 	if limit <= 0 {
 		limit = 20
 	}
@@ -43,11 +43,12 @@ func (r *MemoryRepository) FindItemsByUser(ctx context.Context, userID string, f
 	var items []*learning_db.LearningMemoryItem
 	query := r.db.NewSelect().
 		Model(&items).
-		Where("user_id = ?", userID).
 		Order("last_seen_at DESC").
 		Limit(limit)
 	if folderID != "" {
 		query.Where("folder_id = ?", folderID)
+	} else {
+		query.Where("folder_id IS NULL")
 	}
 
 	if err := query.Scan(ctx); err != nil {
@@ -56,14 +57,13 @@ func (r *MemoryRepository) FindItemsByUser(ctx context.Context, userID string, f
 	return items, nil
 }
 
-func (r *MemoryRepository) FindItemsByDocument(ctx context.Context, userID, documentID string, limit int) ([]*learning_db.LearningMemoryItem, error) {
+func (r *MemoryRepository) FindItemsByDocument(ctx context.Context, documentID string, limit int) ([]*learning_db.LearningMemoryItem, error) {
 	if limit <= 0 {
 		limit = 20
 	}
 	items := make([]*learning_db.LearningMemoryItem, 0)
 	err := r.db.NewSelect().
 		Model(&items).
-		Where("user_id = ?", userID).
 		Where("document_id = ?", documentID).
 		Order("last_seen_at DESC").
 		Limit(limit).
@@ -74,7 +74,7 @@ func (r *MemoryRepository) FindItemsByDocument(ctx context.Context, userID, docu
 	return items, nil
 }
 
-func (r *MemoryRepository) FindItemsByFolders(ctx context.Context, userID string, folderIDs []string, limit int) ([]*learning_db.LearningMemoryItem, error) {
+func (r *MemoryRepository) FindItemsByFolders(ctx context.Context, folderIDs []string, limit int) ([]*learning_db.LearningMemoryItem, error) {
 	if limit <= 0 {
 		limit = 20
 	}
@@ -84,7 +84,6 @@ func (r *MemoryRepository) FindItemsByFolders(ctx context.Context, userID string
 	}
 	err := r.db.NewSelect().
 		Model(&items).
-		Where("user_id = ?", userID).
 		Where("folder_id IN (?)", bun.In(folderIDs)).
 		Order("last_seen_at DESC").
 		Limit(limit).
@@ -95,11 +94,9 @@ func (r *MemoryRepository) FindItemsByFolders(ctx context.Context, userID string
 	return items, nil
 }
 
-func (r *MemoryRepository) FindSummaryByFolder(ctx context.Context, userID string, folderID string) (*learning_db.LearningMemorySummary, error) {
+func (r *MemoryRepository) FindSummaryByFolder(ctx context.Context, folderID string) (*learning_db.LearningMemorySummary, error) {
 	summary := new(learning_db.LearningMemorySummary)
-	query := r.db.NewSelect().
-		Model(summary).
-		Where("user_id = ?", userID)
+	query := r.db.NewSelect().Model(summary)
 	if folderID == "" {
 		query.Where("folder_id IS NULL")
 	} else {
@@ -122,7 +119,7 @@ func (r *MemoryRepository) UpsertSummary(ctx context.Context, summary *learning_
 		summary.FolderID = nil
 		_, err := r.db.NewInsert().
 			Model(summary).
-			On("CONFLICT (user_id) WHERE folder_id IS NULL DO UPDATE").
+			On("CONFLICT ((1)) WHERE folder_id IS NULL DO UPDATE").
 			Set("summary = EXCLUDED.summary").
 			Set("highlights = EXCLUDED.highlights").
 			Set("generated_from_event_id = EXCLUDED.generated_from_event_id").
@@ -134,7 +131,7 @@ func (r *MemoryRepository) UpsertSummary(ctx context.Context, summary *learning_
 
 	_, err := r.db.NewInsert().
 		Model(summary).
-		On("CONFLICT (user_id, folder_id) WHERE folder_id IS NOT NULL DO UPDATE").
+		On("CONFLICT (folder_id) WHERE folder_id IS NOT NULL DO UPDATE").
 		Set("summary = EXCLUDED.summary").
 		Set("highlights = EXCLUDED.highlights").
 		Set("generated_from_event_id = EXCLUDED.generated_from_event_id").

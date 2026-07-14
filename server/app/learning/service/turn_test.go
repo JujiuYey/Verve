@@ -99,7 +99,7 @@ func TestTurnServiceSubmitsTeacherAndReturnsPersistedTimelineItem(t *testing.T) 
 	processor := &recordingProcessor{}
 	processorOutput := &learning_db.LearningTeachingIntervention{QuestionSummary: "问题", ExplanationSummary: "讲解"}
 	service := NewTurnService(
-		turnSessionStoreFake{session: &learning_db.LearningSession{ID: "session-1", UserID: "user-1", DocumentID: "doc-1", Status: "active"}},
+		turnSessionStoreFake{session: &learning_db.LearningSession{ID: "session-1", DocumentID: "doc-1", Status: "active"}},
 		lifecycle,
 		turnTimelineFake{item: &learning_payload.TimelineItem{Turn: &learning_db.LearningTurn{ID: "turn-1", Status: learning_db.LearningTurnCompleted}}},
 		map[string]AgentProcessor{learning_db.LearningAgentTeacher: AgentProcessorFunc(func(_ context.Context, input AgentInput) (*AgentOutput, error) {
@@ -110,7 +110,7 @@ func TestTurnServiceSubmitsTeacherAndReturnsPersistedTimelineItem(t *testing.T) 
 		nil,
 	)
 
-	item, err := service.Submit(context.Background(), "user-1", "session-1", TurnRequest{RequestID: "request-1", AgentType: "teacher", Content: "解释 channel"})
+	item, err := service.Submit(context.Background(), "session-1", TurnRequest{RequestID: "request-1", AgentType: "teacher", Content: "解释 channel"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,14 +126,14 @@ func TestTurnServiceMarksFailedProcessorAndRetriesFailedTurn(t *testing.T) {
 	turn := &learning_db.LearningTurn{ID: "turn-1", SessionID: "session-1", AgentType: learning_db.LearningAgentTeacher, Status: learning_db.LearningTurnFailed}
 	lifecycle := &turnLifecycleStoreFake{begin: &learning_repo.BeginTurnResult{Turn: turn}}
 	service := NewTurnService(
-		turnSessionStoreFake{session: &learning_db.LearningSession{ID: "session-1", UserID: "user-1", Status: "active"}},
+		turnSessionStoreFake{session: &learning_db.LearningSession{ID: "session-1", Status: "active"}},
 		lifecycle, turnTimelineFake{},
 		map[string]AgentProcessor{learning_db.LearningAgentTeacher: AgentProcessorFunc(func(context.Context, AgentInput) (*AgentOutput, error) {
 			return nil, errors.New("model unavailable")
 		})}, nil,
 	)
 
-	_, err := service.Submit(context.Background(), "user-1", "session-1", TurnRequest{RequestID: "request-1", AgentType: "teacher", Content: "解释"})
+	_, err := service.Submit(context.Background(), "session-1", TurnRequest{RequestID: "request-1", AgentType: "teacher", Content: "解释"})
 	if err == nil || !lifecycle.retried || !lifecycle.failed {
 		t.Fatalf("error/retried/failed = %v/%v/%v", err, lifecycle.retried, lifecycle.failed)
 	}

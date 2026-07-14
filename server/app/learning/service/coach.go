@@ -10,7 +10,6 @@ import (
 )
 
 type CoachRuntimeContext struct {
-	UserID         string
 	RootFolderID   string
 	RootFolderName string
 	Folders        []*wiki_db.Folder
@@ -71,21 +70,9 @@ func mapCoachDocuments(documents []*wiki_db.Document) []prompts.CoachDocument {
 	return result
 }
 
-// FilterCoachFoldersForUser returns folders owned by the user plus public folders.
-func FilterCoachFoldersForUser(folders []*wiki_db.Folder, userID string) []*wiki_db.Folder {
-	result := make([]*wiki_db.Folder, 0, len(folders))
-	for _, folder := range folders {
-		if folder == nil {
-			continue
-		}
-		if folder.UserID != nil && *folder.UserID != "" && *folder.UserID != userID {
-			continue
-		}
-		result = append(result, folder)
-	}
-	return result
-}
-
+// CoachFolderIsAccessible reports whether folderID is present in the supplied folder list.
+// Single-tenant means every folder is accessible by the running instance; the parameter
+// still exists so callers can express "do I have this folder in scope" without re-listing.
 func CoachFolderIsAccessible(folders []*wiki_db.Folder, folderID string) bool {
 	folderID = strings.TrimSpace(folderID)
 	if folderID == "" {
@@ -99,7 +86,7 @@ func CoachFolderIsAccessible(folders []*wiki_db.Folder, folderID string) bool {
 	return false
 }
 
-// FilterCoachDocumentsByFolders excludes documents whose folder is not visible.
+// FilterCoachDocumentsByFolders restricts a document list to those whose folder is in the supplied folder list.
 func FilterCoachDocumentsByFolders(documents []*wiki_db.Document, folders []*wiki_db.Folder) []*wiki_db.Document {
 	allowed := make(map[string]struct{}, len(folders))
 	for _, folder := range folders {

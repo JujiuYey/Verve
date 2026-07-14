@@ -11,7 +11,6 @@ type LearningSession struct {
 	bun.BaseModel `bun:"table:learning_sessions,alias:ls"`
 
 	ID         string     `bun:"id,pk,type:varchar(32)" json:"id"`                                        // 会话ID
-	UserID     string     `bun:"user_id,notnull" json:"user_id"`                                          // 用户ID
 	DocumentID string     `bun:"document_id,notnull" json:"document_id"`                                  // Wiki文档ID
 	Status     string     `bun:"status,notnull" json:"status"`                                            // 会话状态
 	Summary    *string    `bun:"summary" json:"summary,omitempty"`                                        // 会话摘要

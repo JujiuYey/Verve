@@ -61,7 +61,7 @@ func (f fakeDocumentStore) FindOne(context.Context, string) (*wiki_db.Document, 
 	return f.doc, f.err
 }
 
-func (f fakeDocumentStore) FindAccessible(context.Context, string, string) (*wiki_db.Document, error) {
+func (f fakeDocumentStore) FindAccessible(context.Context, string) (*wiki_db.Document, error) {
 	return f.doc, f.err
 }
 
@@ -116,7 +116,7 @@ type fakeTurnSubmitter struct {
 	err     error
 }
 
-func (f *fakeTurnSubmitter) Submit(_ context.Context, _, _ string, request learning_service.TurnRequest) (*learning_payload.TimelineItem, error) {
+func (f *fakeTurnSubmitter) Submit(_ context.Context, _ string, request learning_service.TurnRequest) (*learning_payload.TimelineItem, error) {
 	f.request = request
 	return f.item, f.err
 }
@@ -256,7 +256,7 @@ func TestSessionReviewPersistsListenerTurnLifecycle(t *testing.T) {
 	reviewer := &fakeFeynmanReviewer{events: &events}
 	handler := NewSessionHandlerWithDependencies(SessionHandlerDependencies{
 		Sessions: &fakeSessionStore{sessions: map[string]*learning_db.LearningSession{
-			"session-1": {ID: "session-1", UserID: "user-1", DocumentID: "doc-1", Status: "active"},
+			"session-1": {ID: "session-1",  DocumentID: "doc-1", Status: "active"},
 		}},
 		Documents: fakeDocumentStore{}, Turns: turns, Messages: fakeMessageStore{}, Reviews: &fakeReviewStore{},
 		Reviewer: reviewer, Memory: &fakeMemoryRecorder{},
@@ -288,7 +288,7 @@ func TestSessionReviewReturnsCompletedIdempotentResultWithoutReviewer(t *testing
 	reviews := &fakeReviewStore{byTurn: &learning_db.LearningExplanationReview{HeardSummary: "已经听过", ContextSufficient: true}}
 	handler := NewSessionHandlerWithDependencies(SessionHandlerDependencies{
 		Sessions: &fakeSessionStore{sessions: map[string]*learning_db.LearningSession{
-			"session-1": {ID: "session-1", UserID: "user-1", DocumentID: "doc-1", Status: "active"},
+			"session-1": {ID: "session-1",  DocumentID: "doc-1", Status: "active"},
 		}},
 		Documents: fakeDocumentStore{}, Turns: turns, Messages: fakeMessageStore{}, Reviews: reviews,
 		Reviewer: reviewer, Memory: &fakeMemoryRecorder{},
@@ -309,7 +309,7 @@ func TestSessionReviewMarksTurnFailedWhenReviewerFails(t *testing.T) {
 	turns := &fakeListenerTurnStore{}
 	handler := NewSessionHandlerWithDependencies(SessionHandlerDependencies{
 		Sessions: &fakeSessionStore{sessions: map[string]*learning_db.LearningSession{
-			"session-1": {ID: "session-1", UserID: "user-1", DocumentID: "doc-1", Status: "active"},
+			"session-1": {ID: "session-1",  DocumentID: "doc-1", Status: "active"},
 		}},
 		Documents: fakeDocumentStore{}, Turns: turns, Messages: fakeMessageStore{}, Reviews: &fakeReviewStore{},
 		Reviewer: &fakeFeynmanReviewer{err: errors.New("model unavailable")}, Memory: &fakeMemoryRecorder{},
@@ -333,7 +333,7 @@ func TestSessionReviewRejectsProcessingDuplicate(t *testing.T) {
 	}}
 	handler := NewSessionHandlerWithDependencies(SessionHandlerDependencies{
 		Sessions: &fakeSessionStore{sessions: map[string]*learning_db.LearningSession{
-			"session-1": {ID: "session-1", UserID: "user-1", DocumentID: "doc-1", Status: "active"},
+			"session-1": {ID: "session-1",  DocumentID: "doc-1", Status: "active"},
 		}},
 		Documents: fakeDocumentStore{}, Turns: turns, Messages: fakeMessageStore{}, Reviews: &fakeReviewStore{},
 		Reviewer: reviewer, Memory: &fakeMemoryRecorder{},
@@ -356,7 +356,7 @@ func TestSessionReviewRetriesFailedTurn(t *testing.T) {
 	}}
 	handler := NewSessionHandlerWithDependencies(SessionHandlerDependencies{
 		Sessions: &fakeSessionStore{sessions: map[string]*learning_db.LearningSession{
-			"session-1": {ID: "session-1", UserID: "user-1", DocumentID: "doc-1", Status: "active"},
+			"session-1": {ID: "session-1",  DocumentID: "doc-1", Status: "active"},
 		}},
 		Documents: fakeDocumentStore{}, Turns: turns, Messages: fakeMessageStore{}, Reviews: &fakeReviewStore{},
 		Reviewer: &fakeFeynmanReviewer{}, Memory: &fakeMemoryRecorder{},
@@ -377,7 +377,7 @@ func TestSessionReviewRequiresRequestID(t *testing.T) {
 	turns := &fakeListenerTurnStore{}
 	handler := NewSessionHandlerWithDependencies(SessionHandlerDependencies{
 		Sessions: &fakeSessionStore{sessions: map[string]*learning_db.LearningSession{
-			"session-1": {ID: "session-1", UserID: "user-1", DocumentID: "doc-1", Status: "active"},
+			"session-1": {ID: "session-1",  DocumentID: "doc-1", Status: "active"},
 		}},
 		Documents: fakeDocumentStore{}, Turns: turns, Messages: fakeMessageStore{}, Reviews: &fakeReviewStore{},
 		Reviewer: &fakeFeynmanReviewer{}, Memory: &fakeMemoryRecorder{},
@@ -399,7 +399,7 @@ func TestSessionReviewMarksTurnFailedWhenPriorContextCannotLoad(t *testing.T) {
 	reviewer := &fakeFeynmanReviewer{}
 	handler := NewSessionHandlerWithDependencies(SessionHandlerDependencies{
 		Sessions: &fakeSessionStore{sessions: map[string]*learning_db.LearningSession{
-			"session-1": {ID: "session-1", UserID: "user-1", DocumentID: "doc-1", Status: "active"},
+			"session-1": {ID: "session-1",  DocumentID: "doc-1", Status: "active"},
 		}},
 		Documents: fakeDocumentStore{}, Turns: turns, Messages: fakeMessageStore{},
 		Reviews:  &fakeReviewStore{findSessionErr: errors.New("database unavailable")},
@@ -422,17 +422,15 @@ type fakeMemoryRecorder struct {
 	err            error
 	readErr        error
 	items          []*learning_db.LearningMemoryItem
-	readUserID     string
 	readDocumentID string
 }
 
-func (f *fakeMemoryRecorder) FindDocumentItems(_ context.Context, userID, documentID string, _ int) ([]*learning_db.LearningMemoryItem, error) {
-	f.readUserID = userID
+func (f *fakeMemoryRecorder) FindDocumentItems(_ context.Context, documentID string, _ int) ([]*learning_db.LearningMemoryItem, error) {
 	f.readDocumentID = documentID
 	return f.items, f.readErr
 }
 
-func (f *fakeMemoryRecorder) RecordExplanationReview(_ context.Context, _ string, _ *learning_db.LearningSession, _ *learning_db.LearningExplanationReview) error {
+func (f *fakeMemoryRecorder) RecordExplanationReview(_ context.Context, _ *learning_db.LearningSession, _ *learning_db.LearningExplanationReview) error {
 	f.called = true
 	return f.err
 }
@@ -458,7 +456,7 @@ func TestSessionCreateUsesDocument(t *testing.T) {
 	if resp.StatusCode != fiber.StatusOK {
 		t.Fatalf("status = %d", resp.StatusCode)
 	}
-	if store.created == nil || store.created.DocumentID != "doc-1" || store.created.UserID != "user-1" {
+	if store.created == nil || store.created.DocumentID != "doc-1" {
 		t.Fatalf("created session = %#v", store.created)
 	}
 	var body struct {
@@ -510,10 +508,10 @@ func TestSessionCreateReturnsInternalForDocumentStoreFailure(t *testing.T) {
 	}
 }
 
-func TestSessionCreateRejectsAnotherUsersPrivateDocument(t *testing.T) {
+func TestSessionCreateRejectsDocumentStoreErrors(t *testing.T) {
 	handler := NewSessionHandlerWithDependencies(SessionHandlerDependencies{
 		Sessions:  &fakeSessionStore{sessions: map[string]*learning_db.LearningSession{}},
-		Documents: fakeDocumentStore{err: errDocumentForbidden},
+		Documents: fakeDocumentStore{err: errors.New("document not visible")},
 		Messages:  fakeMessageStore{}, Reviews: &fakeReviewStore{}, Reviewer: &fakeFeynmanReviewer{}, Memory: &fakeMemoryRecorder{},
 	})
 	app := sessionTestApp(handler)
@@ -523,13 +521,13 @@ func TestSessionCreateRejectsAnotherUsersPrivateDocument(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.StatusCode != fiber.StatusForbidden {
+	if resp.StatusCode != fiber.StatusInternalServerError {
 		t.Fatalf("status = %d", resp.StatusCode)
 	}
 }
 
 func TestSessionReviewUsesPriorTurnsAndRecordsMemoryBestEffort(t *testing.T) {
-	prior := &learning_db.LearningExplanationReview{ID: "review-1", Explanation: "值有类型", CreatedAt: time.Now()}
+	prior := &learning_db.LearningExplanationReview{ID: "review-1", CreatedAt: time.Now()}
 	reviews := &fakeReviewStore{reviews: []*learning_db.LearningExplanationReview{prior}}
 	reviewer := &fakeFeynmanReviewer{}
 	turns := &fakeListenerTurnStore{}
@@ -538,7 +536,7 @@ func TestSessionReviewUsesPriorTurnsAndRecordsMemoryBestEffort(t *testing.T) {
 		items: []*learning_db.LearningMemoryItem{{ID: "memory-1", Kind: "misconception", Statement: "曾把值和变量混为一谈"}},
 	}
 	handler := NewSessionHandlerWithDependencies(SessionHandlerDependencies{
-		Sessions:  &fakeSessionStore{sessions: map[string]*learning_db.LearningSession{"session-1": {ID: "session-1", UserID: "user-1", DocumentID: "doc-1", Status: "active"}}},
+		Sessions:  &fakeSessionStore{sessions: map[string]*learning_db.LearningSession{"session-1": {ID: "session-1",  DocumentID: "doc-1", Status: "active"}}},
 		Documents: fakeDocumentStore{doc: &wiki_db.Document{ID: "doc-1"}}, Turns: turns, Messages: fakeMessageStore{}, Reviews: reviews, Reviewer: reviewer, Memory: memory,
 	})
 	app := sessionTestApp(handler)
@@ -551,11 +549,11 @@ func TestSessionReviewUsesPriorTurnsAndRecordsMemoryBestEffort(t *testing.T) {
 	if resp.StatusCode != fiber.StatusOK {
 		t.Fatalf("status = %d", resp.StatusCode)
 	}
-	if len(reviewer.request.PriorTurns) != 1 || reviewer.request.UserID != "user-1" || reviewer.request.DocumentID != "doc-1" {
+	if len(reviewer.request.PriorTurns) != 1 || reviewer.request.DocumentID != "doc-1" {
 		t.Fatalf("reviewer request = %#v", reviewer.request)
 	}
-	if memory.readUserID != "user-1" || memory.readDocumentID != "doc-1" {
-		t.Fatalf("memory scope = user:%q document:%q", memory.readUserID, memory.readDocumentID)
+	if memory.readDocumentID != "doc-1" {
+		t.Fatalf("memory scope = document:%q", memory.readDocumentID)
 	}
 	if len(reviewer.request.MemoryItems) != 1 || reviewer.request.MemoryItems[0].ID != "memory-1" {
 		t.Fatalf("reviewer memory = %#v", reviewer.request.MemoryItems)
@@ -584,7 +582,7 @@ func TestSessionReviewContinuesWithEmptyMemoryWhenReadFails(t *testing.T) {
 	memory := &fakeMemoryRecorder{readErr: errors.New("memory unavailable")}
 	turns := &fakeListenerTurnStore{}
 	handler := NewSessionHandlerWithDependencies(SessionHandlerDependencies{
-		Sessions:  &fakeSessionStore{sessions: map[string]*learning_db.LearningSession{"session-1": {ID: "session-1", UserID: "user-1", DocumentID: "doc-1", Status: "active"}}},
+		Sessions:  &fakeSessionStore{sessions: map[string]*learning_db.LearningSession{"session-1": {ID: "session-1",  DocumentID: "doc-1", Status: "active"}}},
 		Documents: fakeDocumentStore{}, Turns: turns, Messages: fakeMessageStore{}, Reviews: &fakeReviewStore{}, Reviewer: reviewer, Memory: memory,
 	})
 	app := sessionTestApp(handler)
@@ -602,19 +600,22 @@ func TestSessionReviewContinuesWithEmptyMemoryWhenReadFails(t *testing.T) {
 	}
 }
 
-func TestSessionReviewRejectsAnotherUser(t *testing.T) {
+func TestSessionReviewRejectsAnotherUserRemovedInSingleTenant(t *testing.T) {
+	// 单租户自部署下不再区分用户身份,任何持有的 session 都可读可写。
+	// 用一个 sanity check 覆盖:发送合法 review payload 后收到 200。
 	handler := NewSessionHandlerWithDependencies(SessionHandlerDependencies{
-		Sessions:  &fakeSessionStore{sessions: map[string]*learning_db.LearningSession{"session-1": {ID: "session-1", UserID: "other", DocumentID: "doc-1"}}},
-		Documents: fakeDocumentStore{}, Messages: fakeMessageStore{}, Reviews: &fakeReviewStore{}, Reviewer: &fakeFeynmanReviewer{}, Memory: &fakeMemoryRecorder{},
+		Sessions:  &fakeSessionStore{sessions: map[string]*learning_db.LearningSession{"session-1": {ID: "session-1", DocumentID: "doc-1", Status: "active"}}},
+		Documents: fakeDocumentStore{doc: &wiki_db.Document{ID: "doc-1"}}, Turns: &fakeListenerTurnStore{result: &learning_repo.BeginTurnResult{Turn: &learning_db.LearningTurn{ID: "turn-existing", Status: learning_db.LearningTurnCompleted}}}, Messages: fakeMessageStore{},
+		Reviews:   &fakeReviewStore{byTurn: &learning_db.LearningExplanationReview{ID: "review-existing"}}, Reviewer: &fakeFeynmanReviewer{}, Memory: &fakeMemoryRecorder{},
 	})
 	app := sessionTestApp(handler)
-	req := httptest.NewRequest("POST", "/session/session-1/review", strings.NewReader(`{"explanation":"hello"}`))
+	req := httptest.NewRequest("POST", "/session/session-1/review", strings.NewReader(`{"request_id":"request-existing","explanation":"hello"}`))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.StatusCode != fiber.StatusForbidden {
+	if resp.StatusCode != fiber.StatusOK {
 		t.Fatalf("status = %d", resp.StatusCode)
 	}
 }
@@ -624,7 +625,7 @@ func TestSessionReviewRejectsInactiveSessions(t *testing.T) {
 		t.Run(status, func(t *testing.T) {
 			reviewer := &fakeFeynmanReviewer{}
 			handler := NewSessionHandlerWithDependencies(SessionHandlerDependencies{
-				Sessions:  &fakeSessionStore{sessions: map[string]*learning_db.LearningSession{"session-1": {ID: "session-1", UserID: "user-1", DocumentID: "doc-1", Status: status}}},
+				Sessions:  &fakeSessionStore{sessions: map[string]*learning_db.LearningSession{"session-1": {ID: "session-1",  DocumentID: "doc-1", Status: status}}},
 				Documents: fakeDocumentStore{}, Messages: fakeMessageStore{}, Reviews: &fakeReviewStore{}, Reviewer: reviewer, Memory: &fakeMemoryRecorder{},
 			})
 			app := sessionTestApp(handler)
@@ -673,7 +674,7 @@ func TestSessionLookupDistinguishesMissingRowsFromDatabaseFailure(t *testing.T) 
 func TestSessionFindOneReturnsOrderedReviewHistory(t *testing.T) {
 	reviews := []*learning_db.LearningExplanationReview{{ID: "review-1"}, {ID: "review-2"}}
 	handler := NewSessionHandlerWithDependencies(SessionHandlerDependencies{
-		Sessions:  &fakeSessionStore{sessions: map[string]*learning_db.LearningSession{"session-1": {ID: "session-1", UserID: "user-1", DocumentID: "doc-1"}}},
+		Sessions:  &fakeSessionStore{sessions: map[string]*learning_db.LearningSession{"session-1": {ID: "session-1",  DocumentID: "doc-1"}}},
 		Documents: fakeDocumentStore{}, Messages: fakeMessageStore{messages: []*learning_db.LearningMessage{}},
 		Reviews: &fakeReviewStore{reviews: reviews}, Reviewer: &fakeFeynmanReviewer{}, Memory: &fakeMemoryRecorder{},
 	})
@@ -699,7 +700,7 @@ func TestSessionFindOneReturnsOrderedReviewHistory(t *testing.T) {
 }
 
 func TestSessionCompleteSummarizesAllReviewTurnsWithoutNextObjective(t *testing.T) {
-	store := &fakeSessionStore{sessions: map[string]*learning_db.LearningSession{"session-1": {ID: "session-1", UserID: "user-1", DocumentID: "doc-1"}}}
+	store := &fakeSessionStore{sessions: map[string]*learning_db.LearningSession{"session-1": {ID: "session-1",  DocumentID: "doc-1"}}}
 	handler := NewSessionHandlerWithDependencies(SessionHandlerDependencies{
 		Sessions: store, Documents: fakeDocumentStore{}, Messages: fakeMessageStore{},
 		Reviews: &fakeReviewStore{reviews: []*learning_db.LearningExplanationReview{
@@ -771,7 +772,7 @@ func TestFeynmanDocumentSourceUsesDocumentFileAndScopedRAG(t *testing.T) {
 		folders:   fakeFolderStore{folder: &wiki_db.Folder{ID: "folder-public"}},
 		files:     files, retriever: retriever, chunks: chunks,
 	}
-	doc, markdown, err := source.LoadDocument(context.Background(), "user-1", "doc-1")
+	doc, markdown, err := source.LoadDocument(context.Background(), "doc-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -789,32 +790,19 @@ func TestFeynmanDocumentSourceUsesDocumentFileAndScopedRAG(t *testing.T) {
 	}
 }
 
-func TestFeynmanDocumentSourceRejectsPrivateFolderBeforeReadingContent(t *testing.T) {
-	owner := "other-user"
+func TestFeynmanDocumentSourceReturnsDocumentWithoutFolderCheck(t *testing.T) {
 	files := &fakeDocumentContent{}
 	source := &feynmanDocumentSource{
-		documents: fakeDocumentStore{doc: &wiki_db.Document{ID: "doc-private", FolderID: "folder-private", FilePath: "secret.md"}},
-		folders:   fakeFolderStore{folder: &wiki_db.Folder{ID: "folder-private", UserID: &owner}},
+		documents: fakeDocumentStore{doc: &wiki_db.Document{ID: "doc-1", FolderID: "folder-public", FilePath: "wiki/doc-1.md"}},
+		folders:   fakeFolderStore{folder: &wiki_db.Folder{ID: "folder-public"}},
 		files:     files,
 	}
-	if _, _, err := source.LoadDocument(context.Background(), "user-1", "doc-private"); !errors.Is(err, errDocumentForbidden) {
-		t.Fatalf("error = %v", err)
-	}
-	if files.calls != 0 {
-		t.Fatalf("content reads = %d", files.calls)
-	}
-}
-
-func TestFeynmanDocumentSourceAllowsFolderOwner(t *testing.T) {
-	owner := "user-1"
-	files := &fakeDocumentContent{}
-	source := &feynmanDocumentSource{
-		documents: fakeDocumentStore{doc: &wiki_db.Document{ID: "doc-owned", FolderID: "folder-owned", FilePath: "owned.md"}},
-		folders:   fakeFolderStore{folder: &wiki_db.Folder{ID: "folder-owned", UserID: &owner}},
-		files:     files,
-	}
-	if _, _, err := source.LoadDocument(context.Background(), "user-1", "doc-owned"); err != nil {
+	doc, markdown, err := source.LoadDocument(context.Background(), "doc-1")
+	if err != nil {
 		t.Fatal(err)
+	}
+	if doc.ID != "doc-1" || markdown != "# Go\n" || files.path != "wiki/doc-1.md" {
+		t.Fatalf("loaded = doc:%#v markdown:%q path:%q", doc, markdown, files.path)
 	}
 	if files.calls != 1 {
 		t.Fatalf("content reads = %d", files.calls)
@@ -823,7 +811,6 @@ func TestFeynmanDocumentSourceAllowsFolderOwner(t *testing.T) {
 
 func sessionTestApp(handler *SessionHandler) *fiber.App {
 	app := fiber.New()
-	app.Use(func(c *fiber.Ctx) error { c.Locals("user_id", "user-1"); return c.Next() })
 	app.Post("/session", handler.Create)
 	app.Get("/session/:id", handler.FindOne)
 	app.Post("/session/:id/review", handler.Review)

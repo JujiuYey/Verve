@@ -17,7 +17,6 @@ import (
 var (
 	ErrVersionConflict          = errors.New("文档版本冲突")
 	ErrChangeRequestNotProposed = errors.New("变更申请不是待应用状态")
-	ErrChangeRequestForbidden   = errors.New("无权操作变更申请")
 )
 
 // ChangeRequestRepository 管理文档变更申请。
@@ -71,8 +70,9 @@ func (r *ChangeRequestRepository) FindChangeRequest(ctx context.Context, id stri
 	return request, nil
 }
 
-// CancelChangeRequest 只允许申请人取消待应用申请，重复取消保持成功。
-func (r *ChangeRequestRepository) CancelChangeRequest(ctx context.Context, id, userID string) error {
+// CancelChangeRequest 取消待应用的变更申请，重复取消保持成功。
+// 单租户下不区分操作者,任何已发出的变更申请都可被取消。
+func (r *ChangeRequestRepository) CancelChangeRequest(ctx context.Context, id string) error {
 	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		request := new(wiki_db.DocumentChangeRequest)
 		if err := tx.NewSelect().Model(request).Where("id = ?", id).For("UPDATE").Scan(ctx); err != nil {
@@ -80,9 +80,6 @@ func (r *ChangeRequestRepository) CancelChangeRequest(ctx context.Context, id, u
 				return err
 			}
 			return fmt.Errorf("锁定文档变更申请失败: %w", err)
-		}
-		if request.RequestedBy != userID {
-			return ErrChangeRequestForbidden
 		}
 		if request.Status == wiki_db.ChangeRequestStatusCancelled {
 			return nil

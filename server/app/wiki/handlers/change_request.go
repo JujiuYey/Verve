@@ -17,8 +17,8 @@ import (
 )
 
 type changeRequestVersionService interface {
-	ApplyChangeRequest(ctx context.Context, userID, requestID string) (*wiki_db.DocumentRevision, *rag_db.IndexJob, error)
-	CancelChangeRequest(ctx context.Context, userID, requestID string) error
+	ApplyChangeRequest(ctx context.Context, requestID string) (*wiki_db.DocumentRevision, *rag_db.IndexJob, error)
+	CancelChangeRequest(ctx context.Context, requestID string) error
 }
 
 type changeRequestFinder interface {
@@ -51,12 +51,8 @@ func NewChangeRequestHandlerWithDependencies(versions changeRequestVersionServic
 }
 
 func (h *ChangeRequestHandler) Apply(c *fiber.Ctx) error {
-	userID, _ := c.Locals("user_id").(string)
-	if userID == "" {
-		return response.UnauthorizedCtx(c, "未登录或登录已过期")
-	}
 	requestID := c.Params("id")
-	request, revision, job, err := h.apply(c.Context(), userID, requestID)
+	request, revision, job, err := h.apply(c.Context(), requestID)
 	if err != nil {
 		return h.writeError(c, err)
 	}
@@ -65,18 +61,14 @@ func (h *ChangeRequestHandler) Apply(c *fiber.Ctx) error {
 }
 
 func (h *ChangeRequestHandler) Cancel(c *fiber.Ctx) error {
-	userID, _ := c.Locals("user_id").(string)
-	if userID == "" {
-		return response.UnauthorizedCtx(c, "未登录或登录已过期")
-	}
-	if err := h.versions.CancelChangeRequest(c.Context(), userID, c.Params("id")); err != nil {
+	if err := h.versions.CancelChangeRequest(c.Context(), c.Params("id")); err != nil {
 		return h.writeError(c, err)
 	}
 	return response.SuccessMsgCtx(c, "文档变更申请已取消")
 }
 
-func (h *ChangeRequestHandler) apply(ctx context.Context, userID, requestID string) (*wiki_db.DocumentChangeRequest, *wiki_db.DocumentRevision, *rag_db.IndexJob, error) {
-	revision, job, err := h.versions.ApplyChangeRequest(ctx, userID, requestID)
+func (h *ChangeRequestHandler) apply(ctx context.Context, requestID string) (*wiki_db.DocumentChangeRequest, *wiki_db.DocumentRevision, *rag_db.IndexJob, error) {
+	revision, job, err := h.versions.ApplyChangeRequest(ctx, requestID)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -102,8 +94,6 @@ func (h *ChangeRequestHandler) writeError(c *fiber.Ctx, err error) error {
 	switch {
 	case errors.Is(err, wiki_repo.ErrVersionConflict):
 		return response.FailWithCodeCtx(c, fiber.StatusConflict, "文档版本已变化，请重新生成修改建议")
-	case errors.Is(err, wiki_repo.ErrChangeRequestForbidden):
-		return response.ForbiddenCtx(c, "无权操作该文档变更申请")
 	case errors.Is(err, wiki_repo.ErrChangeRequestNotProposed):
 		return response.BadRequestCtx(c, "文档变更申请当前不可操作")
 	default:

@@ -27,7 +27,6 @@ type TeachingResult struct {
 }
 
 type TeachingRequest struct {
-	UserID      string
 	DocumentID  string
 	Question    string
 	PriorTurns  []*learning_db.LearningExplanationReview
@@ -54,7 +53,7 @@ func (s *TeacherService) Teach(ctx context.Context, request TeachingRequest) (*T
 	if question == "" {
 		return nil, errors.New("question is required")
 	}
-	documentContext, err := s.contextBuilder.Build(ctx, request.UserID, request.DocumentID, question)
+	documentContext, err := s.contextBuilder.Build(ctx, request.DocumentID, question)
 	if err != nil {
 		return nil, err
 	}

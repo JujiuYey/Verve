@@ -19,7 +19,7 @@ func TestTeacherRejectsRAGContextThatIsNotReady(t *testing.T) {
 		return "", nil
 	})
 
-	_, err := service.Teach(context.Background(), TeachingRequest{UserID: "user-1", DocumentID: "doc-1", Question: "channel 为什么阻塞？"})
+	_, err := service.Teach(context.Background(), TeachingRequest{DocumentID: "doc-1", Question: "channel 为什么阻塞？"})
 	if !errors.Is(err, ErrIndexNotReady) {
 		t.Fatalf("error = %v", err)
 	}

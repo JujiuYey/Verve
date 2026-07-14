@@ -14,11 +14,10 @@ import (
 )
 
 var (
-	ErrTurnProcessing       = errors.New("learning turn is processing")
-	ErrTurnSessionForbidden = errors.New("learning session is forbidden")
+	ErrTurnProcessing     = errors.New("learning turn is processing")
 	ErrTurnSessionCompleted = errors.New("learning session is completed")
-	ErrUnsupportedAgent     = errors.New("unsupported learning agent")
-	ErrInvalidTurnRequest   = errors.New("invalid learning turn request")
+	ErrUnsupportedAgent   = errors.New("unsupported learning agent")
+	ErrInvalidTurnRequest = errors.New("invalid learning turn request")
 )
 
 type TurnRequest struct {
@@ -29,7 +28,6 @@ type TurnRequest struct {
 }
 
 type AgentInput struct {
-	UserID                  string
 	Session                 *learning_db.LearningSession
 	Turn                    *learning_db.LearningTurn
 	Content                 string
@@ -72,8 +70,8 @@ type turnTimelineReader interface {
 }
 
 type turnMemoryRecorder interface {
-	RecordExplanationReview(context.Context, string, *learning_db.LearningSession, *learning_db.LearningExplanationReview) error
-	RecordTeachingIntervention(context.Context, string, *learning_db.LearningSession, *learning_db.LearningTeachingIntervention) error
+	RecordExplanationReview(context.Context, *learning_db.LearningSession, *learning_db.LearningExplanationReview) error
+	RecordTeachingIntervention(context.Context, *learning_db.LearningSession, *learning_db.LearningTeachingIntervention) error
 }
 
 type TurnService struct {
@@ -97,7 +95,7 @@ func (s *TurnService) processorFor(agentType string) (AgentProcessor, error) {
 	return processor, nil
 }
 
-func (s *TurnService) Submit(ctx context.Context, userID, sessionID string, request TurnRequest) (*learning_payload.TimelineItem, error) {
+func (s *TurnService) Submit(ctx context.Context, sessionID string, request TurnRequest) (*learning_payload.TimelineItem, error) {
 	request.RequestID = strings.TrimSpace(request.RequestID)
 	request.AgentType = strings.TrimSpace(request.AgentType)
 	request.Content = strings.TrimSpace(request.Content)
@@ -111,9 +109,6 @@ func (s *TurnService) Submit(ctx context.Context, userID, sessionID string, requ
 	session, err := s.sessions.FindOne(ctx, sessionID)
 	if err != nil {
 		return nil, err
-	}
-	if session.UserID != userID {
-		return nil, ErrTurnSessionForbidden
 	}
 	if session.Status != "active" {
 		return nil, ErrTurnSessionCompleted
@@ -144,7 +139,7 @@ func (s *TurnService) Submit(ctx context.Context, userID, sessionID string, requ
 		}
 	}
 	output, err := processor.Process(ctx, AgentInput{
-		UserID: userID, Session: session, Turn: turn, Content: request.Content, RequestID: request.RequestID,
+		Session: session, Turn: turn, Content: request.Content, RequestID: request.RequestID,
 		ReplacesChangeRequestID: request.ReplacesChangeRequestID,
 	})
 	if err != nil {
@@ -183,7 +178,7 @@ func (s *TurnService) Submit(ctx context.Context, userID, sessionID string, requ
 		s.fail(ctx, turn.ID, request.AgentType+"_persistence_failed", err)
 		return nil, err
 	}
-	s.recordMemory(ctx, userID, session, output)
+	s.recordMemory(ctx, session, output)
 	return s.timeline.FindByTurn(ctx, turn.ID)
 }
 
@@ -193,15 +188,15 @@ func (s *TurnService) fail(ctx context.Context, turnID, code string, cause error
 	}
 }
 
-func (s *TurnService) recordMemory(ctx context.Context, userID string, session *learning_db.LearningSession, output *AgentOutput) {
+func (s *TurnService) recordMemory(ctx context.Context, session *learning_db.LearningSession, output *AgentOutput) {
 	if s.memory == nil {
 		return
 	}
 	var err error
 	if output.Review != nil {
-		err = s.memory.RecordExplanationReview(ctx, userID, session, output.Review)
+		err = s.memory.RecordExplanationReview(ctx, session, output.Review)
 	} else if output.Intervention != nil {
-		err = s.memory.RecordTeachingIntervention(ctx, userID, session, output.Intervention)
+		err = s.memory.RecordTeachingIntervention(ctx, session, output.Intervention)
 	}
 	if err != nil {
 		log.Printf("record learning turn memory failed: session_id=%s err=%v", session.ID, err)

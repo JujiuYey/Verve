@@ -1,7 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 
 import type { WikiDocumentChangeRequest } from "@/api/wiki/document";
-import { useAuthStore } from "@/stores/auth";
 import { request } from "@/utils/request";
 
 export type { WikiDocumentChangeRequest } from "@/api/wiki/document";
@@ -209,11 +208,7 @@ export async function coachChatStream(
   options?: CoachChatOptions,
 ): Promise<void> {
   try {
-    const { accessToken } = useAuthStore.getState();
     const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (accessToken) {
-      headers.Authorization = `Bearer ${accessToken}`;
-    }
 
     const response = await fetch(`${API_BASE_URL}${BASE}/coach/chat`, {
       method: "POST",

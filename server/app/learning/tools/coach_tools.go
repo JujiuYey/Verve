@@ -67,23 +67,24 @@ type CompleteTaskOutput struct {
 	Status  string `json:"status"`
 }
 
-func NewCoachTools(db *database.DatabaseService, retriever *rag_service.Retriever, userID string) []tool.BaseTool {
+// NewCoachTools 构造陪练 agent 用的所有工具;实例是单租户,不再按用户身份做隔离。
+func NewCoachTools(db *database.DatabaseService, retriever *rag_service.Retriever) []tool.BaseTool {
 	tools := []tool.BaseTool{
-		newListFoldersTool(db, userID),
-		newListDocumentsTool(db, userID),
-		newSearchLearningMemoryTool(db, userID),
+		newListFoldersTool(db),
+		newListDocumentsTool(db),
+		newSearchLearningMemoryTool(db),
 		newCompleteTaskTool(),
 	}
 	if retriever != nil {
-		tools = append(tools, newSearchWikiKnowledgeTool(db.Folders, db.Documents, retriever, userID))
+		tools = append(tools, newSearchWikiKnowledgeTool(db.Folders, db.Documents, retriever))
 	}
 	return tools
 }
 
-func newSearchWikiKnowledgeTool(folders coachFolderLister, documents coachDocumentLister, retriever coachKnowledgeSearcher, userID string) tool.InvokableTool {
+func newSearchWikiKnowledgeTool(folders coachFolderLister, documents coachDocumentLister, retriever coachKnowledgeSearcher) tool.InvokableTool {
 	t, err := utils.InferTool("search_wiki_knowledge", "按 Wiki 根目录检索真实文档片段,用于回答概念问题或决定下一步学习内容",
 		func(ctx context.Context, input *SearchWikiKnowledgeInput) (*SearchWikiKnowledgeOutput, error) {
-			return searchAccessibleWikiKnowledge(ctx, folders, documents, retriever, userID, input)
+			return searchAccessibleWikiKnowledge(ctx, folders, documents, retriever, input)
 		})
 	if err != nil {
 		log.Fatal(err)
@@ -96,7 +97,6 @@ func searchAccessibleWikiKnowledge(
 	folders coachFolderLister,
 	documents coachDocumentLister,
 	retriever coachKnowledgeSearcher,
-	userID string,
 	input *SearchWikiKnowledgeInput,
 ) (*SearchWikiKnowledgeOutput, error) {
 	if input == nil {
@@ -106,16 +106,15 @@ func searchAccessibleWikiKnowledge(
 	if err != nil {
 		return nil, err
 	}
-	accessibleFolders := learning_service.FilterCoachFoldersForUser(allFolders, userID)
 	rootFolderID := strings.TrimSpace(input.RootFolderID)
-	if !learning_service.CoachFolderIsAccessible(accessibleFolders, rootFolderID) {
+	if !learning_service.CoachFolderIsAccessible(allFolders, rootFolderID) {
 		return nil, sql.ErrNoRows
 	}
 	allDocuments, err := documents.List(ctx, "", "")
 	if err != nil {
 		return nil, err
 	}
-	accessibleDocuments := learning_service.FilterCoachDocumentsByFolders(allDocuments, accessibleFolders)
+	accessibleDocuments := learning_service.FilterCoachDocumentsByFolders(allDocuments, allFolders)
 	accessibleDocumentIDs := make(map[string]struct{}, len(accessibleDocuments))
 	for _, document := range accessibleDocuments {
 		accessibleDocumentIDs[document.ID] = struct{}{}
@@ -140,7 +139,7 @@ func searchAccessibleWikiKnowledge(
 	return out, nil
 }
 
-func newSearchLearningMemoryTool(db *database.DatabaseService, userID string) tool.InvokableTool {
+func newSearchLearningMemoryTool(db *database.DatabaseService) tool.InvokableTool {
 	t, err := utils.InferTool("search_learning_memory", "搜索学习记忆",
 		func(ctx context.Context, input *SearchLearningMemoryInput) (*SearchLearningMemoryOutput, error) {
 			out := &SearchLearningMemoryOutput{Results: []map[string]interface{}{}}
@@ -157,7 +156,7 @@ func newSearchLearningMemoryTool(db *database.DatabaseService, userID string) to
 			if query != "" {
 				candidateLimit = max(limit*5, 50)
 			}
-			items, err := learning_service.NewMemoryService(db).FindCoachItems(ctx, userID, input.FolderID, candidateLimit)
+			items, err := learning_service.NewMemoryService(db).FindCoachItems(ctx, input.FolderID, candidateLimit)
 			if err != nil {
 				return nil, err
 			}
@@ -194,7 +193,7 @@ func newSearchLearningMemoryTool(db *database.DatabaseService, userID string) to
 	return t
 }
 
-func newListFoldersTool(db *database.DatabaseService, userID string) tool.InvokableTool {
+func newListFoldersTool(db *database.DatabaseService) tool.InvokableTool {
 	t, err := utils.InferTool("list_folders", "列出 Wiki 文件夹,用于判断用户有哪些学习范围",
 		func(ctx context.Context, input *ListFoldersInput) ([]map[string]interface{}, error) {
 			folders, err := db.Folders.List(ctx, map[string]interface{}{})
@@ -204,9 +203,6 @@ func newListFoldersTool(db *database.DatabaseService, userID string) tool.Invoka
 			limit := normalizeLimit(input.Limit, 50)
 			result := make([]map[string]interface{}, 0, min(len(folders), limit))
 			for _, folder := range folders {
-				if folder.UserID != nil && *folder.UserID != "" && *folder.UserID != userID {
-					continue
-				}
 				result = append(result, map[string]interface{}{
 					"id":          folder.ID,
 					"name":        folder.Name,
@@ -225,13 +221,13 @@ func newListFoldersTool(db *database.DatabaseService, userID string) tool.Invoka
 	return t
 }
 
-func newListDocumentsTool(db *database.DatabaseService, userID string) tool.InvokableTool {
+func newListDocumentsTool(db *database.DatabaseService) tool.InvokableTool {
 	t, err := utils.InferTool("list_documents", "列出 Wiki 文档,可按文件夹过滤",
 		func(ctx context.Context, input *ListDocumentsInput) ([]map[string]interface{}, error) {
 			if input == nil {
 				input = &ListDocumentsInput{}
 			}
-			docs, err := loadAccessibleCoachDocuments(ctx, db.Folders, db.Documents, userID, input.FolderID)
+			docs, err := loadAccessibleCoachDocuments(ctx, db.Folders, db.Documents, input.FolderID)
 			if err != nil {
 				return nil, err
 			}
@@ -260,23 +256,21 @@ func loadAccessibleCoachDocuments(
 	ctx context.Context,
 	folders coachFolderLister,
 	documents coachDocumentLister,
-	userID string,
 	folderID string,
 ) ([]*wiki_db.Document, error) {
 	allFolders, err := folders.List(ctx, map[string]interface{}{})
 	if err != nil {
 		return nil, err
 	}
-	accessibleFolders := learning_service.FilterCoachFoldersForUser(allFolders, userID)
 	folderID = strings.TrimSpace(folderID)
-	if folderID != "" && !learning_service.CoachFolderIsAccessible(accessibleFolders, folderID) {
+	if folderID != "" && !learning_service.CoachFolderIsAccessible(allFolders, folderID) {
 		return nil, sql.ErrNoRows
 	}
 	docs, err := documents.List(ctx, "", folderID)
 	if err != nil {
 		return nil, err
 	}
-	return learning_service.FilterCoachDocumentsByFolders(docs, accessibleFolders), nil
+	return learning_service.FilterCoachDocumentsByFolders(docs, allFolders), nil
 }
 
 func newCompleteTaskTool() tool.InvokableTool {

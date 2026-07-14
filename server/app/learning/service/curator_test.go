@@ -2,12 +2,10 @@ package service
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"testing"
 
 	wiki_db "verve/app/wiki/models/db"
-	wiki_repo "verve/app/wiki/repository"
 )
 
 type curatorChangeRequestStoreFake struct {
@@ -31,7 +29,7 @@ func TestCuratorRejectsDocumentsOverCodePointLimit(t *testing.T) {
 		return "", nil
 	})
 
-	if _, err := service.Propose(context.Background(), CuratorRequest{UserID: "user-1", DocumentID: "doc-1", Instruction: "整理结构"}); err == nil {
+	if _, err := service.Propose(context.Background(), CuratorRequest{DocumentID: "doc-1", Instruction: "整理结构"}); err == nil {
 		t.Fatal("oversized document must be rejected")
 	}
 }
@@ -48,12 +46,12 @@ func TestCuratorBuildsDeterministicUnifiedDiff(t *testing.T) {
 func TestCuratorRejectsReplacementFromAnotherDocument(t *testing.T) {
 	replaces := "change-other"
 	source := &fakeFeynmanDocumentSource{document: &wiki_db.Document{ID: "doc-1", Filename: "文档.md", CurrentVersion: 2}, markdown: "# 文档"}
-	service := newCuratorService(source, curatorChangeRequestStoreFake{existing: &wiki_db.DocumentChangeRequest{ID: replaces, DocumentID: "doc-other", RequestedBy: "user-1"}}, func(context.Context, string) (string, error) {
+	service := newCuratorService(source, curatorChangeRequestStoreFake{existing: &wiki_db.DocumentChangeRequest{ID: replaces, DocumentID: "doc-other"}}, func(context.Context, string) (string, error) {
 		t.Fatal("agent must not run for an invalid replacement")
 		return "", nil
 	})
-	_, err := service.Propose(context.Background(), CuratorRequest{UserID: "user-1", DocumentID: "doc-1", ReplacesChangeRequestID: &replaces, Instruction: "重写"})
-	if !errors.Is(err, wiki_repo.ErrChangeRequestForbidden) {
+	_, err := service.Propose(context.Background(), CuratorRequest{DocumentID: "doc-1", ReplacesChangeRequestID: &replaces, Instruction: "重写"})
+	if err == nil || !strings.Contains(err.Error(), "not replaceable") {
 		t.Fatalf("error = %v", err)
 	}
 }

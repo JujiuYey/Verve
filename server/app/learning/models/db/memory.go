@@ -11,7 +11,6 @@ type LearningMemoryEvent struct {
 	bun.BaseModel `bun:"table:learning_memory_events,alias:lme"`
 
 	ID         string                 `bun:"id,pk,type:varchar(32)" json:"id"`                                          // 事件ID
-	UserID     string                 `bun:"user_id,notnull" json:"user_id"`                                            // 用户ID
 	FolderID   *string                `bun:"folder_id,type:varchar(32)" json:"folder_id,omitempty"`                     // Wiki文件夹ID
 	DocumentID *string                `bun:"document_id,type:varchar(32)" json:"document_id,omitempty"`                 // Wiki文档ID
 	SessionID  *string                `bun:"session_id,type:varchar(32)" json:"session_id,omitempty"`                   // 学习会话ID
@@ -29,7 +28,6 @@ type LearningMemoryItem struct {
 	bun.BaseModel `bun:"table:learning_memory_items,alias:lmi"`
 
 	ID               string    `bun:"id,pk,type:varchar(32)" json:"id"`                                            // 记忆ID
-	UserID           string    `bun:"user_id,notnull" json:"user_id"`                                              // 用户ID
 	FolderID         *string   `bun:"folder_id,type:varchar(32)" json:"folder_id,omitempty"`                       // Wiki文件夹ID
 	DocumentID       *string   `bun:"document_id,type:varchar(32)" json:"document_id,omitempty"`                   // Wiki文档ID
 	Kind             string    `bun:"kind,notnull" json:"kind"`                                                    // 记忆类型
@@ -46,7 +44,6 @@ type LearningMemorySummary struct {
 	bun.BaseModel `bun:"table:learning_memory_summaries,alias:lms"`
 
 	ID                   string    `bun:"id,pk,type:varchar(32)" json:"id"`                                                  // 汇总ID
-	UserID               string    `bun:"user_id,notnull" json:"user_id"`                                                    // 用户ID
 	FolderID             *string   `bun:"folder_id,type:varchar(32)" json:"folder_id,omitempty"`                             // Wiki文件夹ID
 	Summary              string    `bun:"summary,notnull" json:"summary"`                                                    // 汇总内容
 	Highlights           []string  `bun:"highlights,type:jsonb,notnull" json:"highlights"`                                   // 重点摘要

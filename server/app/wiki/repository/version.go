@@ -20,7 +20,6 @@ type ApplyVersionInput struct {
 	ObjectPath      string
 	ContentHash     string
 	FileSize        int64
-	ChangedBy       string
 	ChangeSummary   string
 }
 
@@ -132,7 +131,6 @@ func applyLockedVersion(ctx context.Context, tx bun.Tx, input ApplyVersionInput,
 		ContentHash:     input.ContentHash,
 		FileSize:        input.FileSize,
 		ChangeRequestID: input.ChangeRequestID,
-		ChangedBy:       input.ChangedBy,
 		ChangeSummary:   input.ChangeSummary,
 	}
 	job := &rag_db.IndexJob{

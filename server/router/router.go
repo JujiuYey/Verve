@@ -15,7 +15,6 @@ import (
 	"verve/infrastructure/database"
 	"verve/infrastructure/storage"
 	"verve/infrastructure/vector"
-	"verve/middleware"
 )
 
 // 配置路由
@@ -35,8 +34,8 @@ func SetupRouter(
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     "http://localhost:5200",
 		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS",
-		AllowHeaders:     "Origin,Content-Type,Accept,Authorization",
-		AllowCredentials: true,
+		AllowHeaders:     "Origin,Content-Type,Accept",
+		AllowCredentials: false,
 	}))
 
 	// 路由组
@@ -48,35 +47,24 @@ func SetupRouter(
 	// 文件访问路由（公开访问，通过后端代理 MinIO）
 	file_router.SetupFileRoutes(api.Group("/"), minioService)
 
-	// 认证路由（包含公开和受保护的路由）
-	system_router.SetupAuthRoutes(api.Group("/"), dbService)
+	// 系统配置路由
+	system_router.SetupPlatformRoutes(api.Group("/"), dbService)
+	system_router.SetupModelRoutes(api.Group("/"), dbService)
+	system_router.SetupAgentModelConfigRoutes(api.Group("/"), dbService)
 
-	// 需要认证的路由组
-	protected := api.Group("/")
-	protected.Use(middleware.AuthMiddleware())
-	{
-		// 用户管理路由
-		system_router.SetupUserRoutes(protected.Group("/"), dbService, minioService)
+	// 知识库路由
+	wiki_router.SetupFolderRoutes(api.Group("/"), dbService)
+	wiki_router.SetupDocumentRoutes(api.Group("/"), dbService, minioService, indexer)
 
-		// 模型配置路由
-		system_router.SetupPlatformRoutes(protected.Group("/"), dbService)
-		system_router.SetupModelRoutes(protected.Group("/"), dbService)
-		system_router.SetupAgentModelConfigRoutes(protected.Group("/"), dbService)
+	// RAG 路由
+	rag_router.SetupRAGRoutes(
+		api.Group("/"),
+		indexer,
+		dbService.RAGJobs,
+	)
 
-		// 知识库路由
-		wiki_router.SetupFolderRoutes(protected.Group("/"), dbService)
-		wiki_router.SetupDocumentRoutes(protected.Group("/"), dbService, minioService, indexer)
-
-		// RAG 路由
-		rag_router.SetupRAGRoutes(
-			protected.Group("/"),
-			indexer,
-			dbService.RAGJobs,
-		)
-
-		// 学习平台路由
-		learning_router.SetupLearningRoutes(protected.Group("/"), dbService, minioService, retriever)
-	}
+	// 学习平台路由
+	learning_router.SetupLearningRoutes(api.Group("/"), dbService, minioService, retriever)
 
 	return app
 }

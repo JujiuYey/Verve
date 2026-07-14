@@ -44,7 +44,7 @@ func TestMemoryRepositoryCreateEventReusesIdempotentSourceEventID(t *testing.T) 
 	repo := NewMemoryRepository(db)
 	sourceID := "review-1"
 	event := &learning_db.LearningMemoryEvent{
-		UserID: "user-1", SourceType: "explanation_review", SourceID: &sourceID,
+		SourceType: "explanation_review", SourceID: &sourceID,
 		EventType: "explanation_review", Content: "understood types", Evidence: map[string]interface{}{},
 	}
 
@@ -72,7 +72,7 @@ func TestMemoryRepositoryFindItemsByDocumentScopesUserAndDocument(t *testing.T) 
 	defer db.Close()
 	repo := NewMemoryRepository(db)
 
-	items, err := repo.FindItemsByDocument(context.Background(), "user-1", "doc-1", 12)
+	items, err := repo.FindItemsByDocument(context.Background(), "doc-1", 12)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +80,7 @@ func TestMemoryRepositoryFindItemsByDocumentScopesUserAndDocument(t *testing.T) 
 		t.Fatalf("items = %#v", items)
 	}
 	for _, want := range []string{
-		`WHERE (user_id = 'user-1') AND (document_id = 'doc-1')`,
+		`WHERE (document_id = 'doc-1')`,
 		`ORDER BY "last_seen_at" DESC`, `LIMIT 12`,
 	} {
 		if !strings.Contains(recorder.selectQuery, want) {
@@ -89,14 +89,14 @@ func TestMemoryRepositoryFindItemsByDocumentScopesUserAndDocument(t *testing.T) 
 	}
 }
 
-func TestMemoryRepositoryFindItemsByFoldersScopesUserAndFolderSet(t *testing.T) {
+func TestMemoryRepositoryFindItemsByFoldersScopesFolderSet(t *testing.T) {
 	recorder := &reviewQueryRecorder{rows: emptyMemoryRows{}}
 	sqldb := sql.OpenDB(recorder)
 	db := bun.NewDB(sqldb, pgdialect.New())
 	defer db.Close()
 	repo := NewMemoryRepository(db)
 
-	items, err := repo.FindItemsByFolders(context.Background(), "user-1", []string{"root", "child"}, 15)
+	items, err := repo.FindItemsByFolders(context.Background(), []string{"root", "child"}, 15)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +104,7 @@ func TestMemoryRepositoryFindItemsByFoldersScopesUserAndFolderSet(t *testing.T) 
 		t.Fatalf("items = %#v", items)
 	}
 	for _, want := range []string{
-		`WHERE (user_id = 'user-1') AND (folder_id IN ('root', 'child'))`,
+		`WHERE (folder_id IN ('root', 'child'))`,
 		`ORDER BY "last_seen_at" DESC`, `LIMIT 15`,
 	} {
 		if !strings.Contains(recorder.selectQuery, want) {

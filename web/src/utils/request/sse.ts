@@ -1,5 +1,3 @@
-import { useAuthStore } from "@/stores/auth";
-
 // ========== SSE 请求封装 ==========
 
 export type SSECallback = (data: string) => void;
@@ -16,8 +14,8 @@ export interface SSERequestOptions {
 }
 
 /**
- * SSE 请求封装
- * 支持流式读取 Server-Sent Events，自动携带 token
+ * SSE 请求封装,支持流式读取 Server-Sent Events。
+ * 单租户自部署下不再注入 Authorization 头。
  */
 export function sseRequest(options: SSERequestOptions): () => void {
   const {
@@ -32,19 +30,14 @@ export function sseRequest(options: SSERequestOptions): () => void {
   } = options;
 
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
-  const { accessToken } = useAuthStore.getState();
 
   const controller = new AbortController();
   const finalSignal = signal ? signal : controller.signal;
 
-  // 合并 headers，自动添加 token
   const requestHeaders: Record<string, string> = {
     "Content-Type": "application/json",
     ...headers,
   };
-  if (accessToken) {
-    requestHeaders.Authorization = `Bearer ${accessToken}`;
-  }
 
   let buffer = "";
   let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;

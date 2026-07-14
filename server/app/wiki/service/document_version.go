@@ -40,9 +40,8 @@ type versionChangeRequestFinder interface {
 	FindChangeRequest(ctx context.Context, id string) (*wiki_db.DocumentChangeRequest, error)
 }
 
-// InitialDocumentInput 是首次上传所需的文档内容和归属信息。
+// InitialDocumentInput 是首次上传所需的文档内容与目标文件夹。
 type InitialDocumentInput struct {
-	UserID      string
 	FolderID    string
 	Filename    string
 	ContentType string
@@ -82,8 +81,8 @@ func (s *DocumentVersionService) CreateInitial(ctx context.Context, input Initia
 	if s.revisions == nil || s.files == nil {
 		return nil, nil, fmt.Errorf("文档版本服务未初始化")
 	}
-	if strings.TrimSpace(input.UserID) == "" || strings.TrimSpace(input.FolderID) == "" || strings.TrimSpace(input.Filename) == "" {
-		return nil, nil, fmt.Errorf("文档归属和文件名不能为空")
+	if strings.TrimSpace(input.FolderID) == "" || strings.TrimSpace(input.Filename) == "" {
+		return nil, nil, fmt.Errorf("目标文件夹和文件名不能为空")
 	}
 
 	documentID := newDocumentID()
@@ -114,7 +113,6 @@ func (s *DocumentVersionService) CreateInitial(ctx context.Context, input Initia
 		ObjectPath:    objectPath,
 		ContentHash:   contentHash,
 		FileSize:      document.FileSize,
-		ChangedBy:     input.UserID,
 		ChangeSummary: "初始上传",
 	}
 	job := &rag_db.IndexJob{
@@ -132,7 +130,7 @@ func (s *DocumentVersionService) CreateInitial(ctx context.Context, input Initia
 }
 
 // SaveDirectEdit 先保存旧文档快照，再发布编辑后的新版本。
-func (s *DocumentVersionService) SaveDirectEdit(ctx context.Context, userID, documentID, content string) (*wiki_db.DocumentRevision, *rag_db.IndexJob, error) {
+func (s *DocumentVersionService) SaveDirectEdit(ctx context.Context, documentID, content string) (*wiki_db.DocumentRevision, *rag_db.IndexJob, error) {
 	if s.publisher == nil || s.documents == nil || s.files == nil {
 		return nil, nil, fmt.Errorf("文档版本服务未初始化")
 	}
@@ -140,7 +138,7 @@ func (s *DocumentVersionService) SaveDirectEdit(ctx context.Context, userID, doc
 	if err != nil {
 		return nil, nil, err
 	}
-	if err := s.ensureLegacyRevision(ctx, userID, document); err != nil {
+	if err := s.ensureLegacyRevision(ctx, document); err != nil {
 		return nil, nil, err
 	}
 
@@ -156,22 +154,18 @@ func (s *DocumentVersionService) SaveDirectEdit(ctx context.Context, userID, doc
 		ObjectPath:      objectPath,
 		ContentHash:     contentHash,
 		FileSize:        int64(len(contentBytes)),
-		ChangedBy:       userID,
 		ChangeSummary:   "手动编辑",
 	})
 }
 
-// ApplyChangeRequest 应用用户自己的待确认申请，并为其发布一个新版本。
-func (s *DocumentVersionService) ApplyChangeRequest(ctx context.Context, userID, requestID string) (*wiki_db.DocumentRevision, *rag_db.IndexJob, error) {
+// ApplyChangeRequest 应用待确认的变更申请，并发布对应的新版本。
+func (s *DocumentVersionService) ApplyChangeRequest(ctx context.Context, requestID string) (*wiki_db.DocumentRevision, *rag_db.IndexJob, error) {
 	if s.publisher == nil || s.documents == nil || s.files == nil || s.requests == nil {
 		return nil, nil, fmt.Errorf("文档版本服务未初始化")
 	}
 	request, err := s.requests.FindChangeRequest(ctx, requestID)
 	if err != nil {
 		return nil, nil, err
-	}
-	if request.RequestedBy != userID {
-		return nil, nil, wiki_repo.ErrChangeRequestForbidden
 	}
 	if request.Status == wiki_db.ChangeRequestStatusApplied {
 		return s.publisher.FindAppliedChangeRequest(ctx, request.ID)
@@ -184,7 +178,7 @@ func (s *DocumentVersionService) ApplyChangeRequest(ctx context.Context, userID,
 	if err != nil {
 		return nil, nil, err
 	}
-	if err := s.ensureLegacyRevision(ctx, userID, document); err != nil {
+	if err := s.ensureLegacyRevision(ctx, document); err != nil {
 		return nil, nil, err
 	}
 	contentBytes := []byte(request.ProposedContent)
@@ -200,24 +194,24 @@ func (s *DocumentVersionService) ApplyChangeRequest(ctx context.Context, userID,
 		ObjectPath:      objectPath,
 		ContentHash:     contentHash,
 		FileSize:        int64(len(contentBytes)),
-		ChangedBy:       userID,
 		ChangeSummary:   request.ChangeSummary,
 	})
 }
 
-func (s *DocumentVersionService) CancelChangeRequest(ctx context.Context, userID, requestID string) error {
+// CancelChangeRequest 取消一条待应用的变更申请。
+func (s *DocumentVersionService) CancelChangeRequest(ctx context.Context, requestID string) error {
 	if s.requests == nil {
 		return fmt.Errorf("文档版本服务未初始化")
 	}
 	if canceller, ok := s.requests.(interface {
-		CancelChangeRequest(context.Context, string, string) error
+		CancelChangeRequest(context.Context, string) error
 	}); ok {
-		return canceller.CancelChangeRequest(ctx, requestID, userID)
+		return canceller.CancelChangeRequest(ctx, requestID)
 	}
 	return fmt.Errorf("变更申请仓储不支持取消")
 }
 
-func (s *DocumentVersionService) ensureLegacyRevision(ctx context.Context, userID string, document *wiki_db.Document) error {
+func (s *DocumentVersionService) ensureLegacyRevision(ctx context.Context, document *wiki_db.Document) error {
 	if document.ContentHash != nil {
 		return nil
 	}
@@ -241,7 +235,6 @@ func (s *DocumentVersionService) ensureLegacyRevision(ctx context.Context, userI
 		ObjectPath:    objectPath,
 		ContentHash:   contentSHA256(contentBytes),
 		FileSize:      int64(len(contentBytes)),
-		ChangedBy:     userID,
 		ChangeSummary: "历史文档快照",
 	})
 }

@@ -20,7 +20,6 @@ type DocumentChangeRequest struct {
 
 	ID                      string     `bun:"id,pk,type:varchar(32)" json:"id"`                                              // 主键ID
 	DocumentID              string     `bun:"document_id,type:varchar(32),notnull" json:"document_id"`                       // 文档ID
-	RequestedBy             string     `bun:"requested_by,type:varchar(32),notnull" json:"requested_by"`                     // 申请用户ID
 	SourceType              string     `bun:"source_type,notnull" json:"source_type"`                                        // 来源类型
 	SourceID                string     `bun:"source_id,notnull" json:"source_id"`                                            // 来源记录ID
 	RequestID               string     `bun:"request_id,notnull" json:"request_id"`                                          // 幂等请求ID

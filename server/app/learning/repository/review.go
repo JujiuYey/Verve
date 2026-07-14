@@ -39,11 +39,5 @@ func (r *ReviewRepository) FindByTurn(ctx context.Context, turnID string) (*lear
 func reviewSelect(db bun.IDB, model interface{}) *bun.SelectQuery {
 	return db.NewSelect().Model(model).
 		ColumnExpr("ler.*").
-		ColumnExpr("lt.session_id AS session_id").
-		ColumnExpr("ls.document_id AS document_id").
-		ColumnExpr("ls.user_id AS user_id").
-		ColumnExpr("user_message.content AS explanation").
-		Join("JOIN learning_turns AS lt ON lt.id = ler.turn_id").
-		Join("JOIN learning_sessions AS ls ON ls.id = lt.session_id").
-		Join("JOIN learning_messages AS user_message ON user_message.turn_id = lt.id AND user_message.role = 'user'")
+		Join("JOIN learning_turns AS lt ON lt.id = ler.turn_id")
 }

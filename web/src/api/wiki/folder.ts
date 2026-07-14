@@ -1,21 +1,14 @@
 import { request } from "@/utils/request";
 
-import type { User } from "../system/user";
-
 // 文件夹接口定义
 export interface Folder {
   id: string;
   name: string;
   description?: string;
   parent_id?: string;
-  user_id?: string;
   sort_order: number;
-  created_by?: string;
-  updated_by?: string;
   created_at: string;
   updated_at: string;
-  created_by_user: User;
-  updated_by_user: User;
 }
 
 // 文件夹树节点
@@ -24,7 +17,6 @@ export interface FolderTreeNode {
   name: string;
   description?: string;
   parent_id?: string;
-  user_id?: string;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -53,16 +45,6 @@ export interface FolderPageResponse {
   page: number;
   page_size: number;
   total_page: number;
-}
-
-export interface SelectedItem {
-  id: string;
-  name: string;
-  type: "user" | "department";
-}
-
-export interface SetPermissionsRequest {
-  items: SelectedItem[];
 }
 
 const RESOURCE_PATH = "/api/wiki/folders";
@@ -95,11 +77,4 @@ export const folderApi = {
 
   // 删除文件夹
   delete: (id: string) => request.delete(`${RESOURCE_PATH}/${id}`),
-
-  // 获取文件夹权限
-  getPermissions: (id: string) => request.get<SelectedItem[]>(`${RESOURCE_PATH}/${id}/permissions`),
-
-  // 设置文件夹权限
-  setPermissions: (id: string, data: SetPermissionsRequest) =>
-    request.put(`${RESOURCE_PATH}/${id}/permissions`, data),
 };

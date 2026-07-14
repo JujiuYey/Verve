@@ -23,6 +23,11 @@ type stubCoachDocumentLister struct {
 	called    bool
 }
 
+func (s *stubCoachDocumentLister) List(context.Context, string, string) ([]*wiki_db.Document, error) {
+	s.called = true
+	return s.documents, nil
+}
+
 type stubCoachKnowledgeSearcher struct {
 	called       bool
 	rootFolderID string
@@ -35,63 +40,50 @@ func (s *stubCoachKnowledgeSearcher) Search(_ context.Context, rootFolderID, _ s
 	return s.results, nil
 }
 
-func (s *stubCoachDocumentLister) List(context.Context, string, string) ([]*wiki_db.Document, error) {
-	s.called = true
-	return s.documents, nil
-}
-
-func TestLoadAccessibleCoachDocumentsFiltersForeignFolders(t *testing.T) {
-	owner := "user-1"
-	other := "user-2"
+func TestLoadAccessibleCoachDocumentsReturnsAllDocumentsInKnownFolders(t *testing.T) {
 	folders := stubCoachFolderLister{folders: []*wiki_db.Folder{
-		{ID: "owned", UserID: &owner},
-		{ID: "foreign", UserID: &other},
-		{ID: "public"},
+		{ID: "owned"},
+		{ID: "shared"},
 	}}
 	documents := &stubCoachDocumentLister{documents: []*wiki_db.Document{
 		{ID: "doc-owned", FolderID: "owned"},
-		{ID: "doc-foreign", FolderID: "foreign"},
-		{ID: "doc-public", FolderID: "public"},
+		{ID: "doc-shared", FolderID: "shared"},
+		{ID: "doc-orphan", FolderID: "missing"},
 	}}
 
-	got, err := loadAccessibleCoachDocuments(context.Background(), folders, documents, owner, "")
+	got, err := loadAccessibleCoachDocuments(context.Background(), folders, documents, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 2 || got[0].ID != "doc-owned" || got[1].ID != "doc-public" {
+	if len(got) != 2 || got[0].ID != "doc-owned" || got[1].ID != "doc-shared" {
 		t.Fatalf("documents = %#v", got)
 	}
 }
 
-func TestLoadAccessibleCoachDocumentsRejectsForeignFolderScope(t *testing.T) {
-	owner := "user-1"
-	other := "user-2"
-	folders := stubCoachFolderLister{folders: []*wiki_db.Folder{{ID: "foreign", UserID: &other}}}
+func TestLoadAccessibleCoachDocumentsRejectsUnknownFolderScope(t *testing.T) {
+	folders := stubCoachFolderLister{folders: []*wiki_db.Folder{{ID: "known"}}}
 	documents := &stubCoachDocumentLister{}
 
-	_, err := loadAccessibleCoachDocuments(context.Background(), folders, documents, owner, "foreign")
+	_, err := loadAccessibleCoachDocuments(context.Background(), folders, documents, "foreign")
 	if !errors.Is(err, sql.ErrNoRows) {
 		t.Fatalf("error = %v, want sql.ErrNoRows", err)
 	}
 	if documents.called {
-		t.Fatal("foreign folder scope must be rejected before loading documents")
+		t.Fatal("unknown folder scope must be rejected before loading documents")
 	}
 }
 
-func TestSearchAccessibleWikiKnowledgeAllowsOwnedAndPublicRoots(t *testing.T) {
-	owner := "user-1"
-	other := "user-2"
+func TestSearchAccessibleWikiKnowledgeReturnsResultsForKnownRoots(t *testing.T) {
 	folders := stubCoachFolderLister{folders: []*wiki_db.Folder{
-		{ID: "owned", UserID: &owner},
+		{ID: "owned"},
 		{ID: "public"},
-		{ID: "foreign", UserID: &other},
 	}}
 
 	for _, rootFolderID := range []string{"owned", "public"} {
 		t.Run(rootFolderID, func(t *testing.T) {
 			documents := &stubCoachDocumentLister{documents: []*wiki_db.Document{{ID: "doc-visible", FolderID: rootFolderID}}}
 			searcher := &stubCoachKnowledgeSearcher{results: []rag_payload.SearchResult{{DocumentID: "doc-visible", DocumentTitle: "Go", Content: "值有具体类型"}}}
-			output, err := searchAccessibleWikiKnowledge(context.Background(), folders, documents, searcher, owner, &SearchWikiKnowledgeInput{
+			output, err := searchAccessibleWikiKnowledge(context.Background(), folders, documents, searcher, &SearchWikiKnowledgeInput{
 				RootFolderID: rootFolderID,
 				Query:        "值和类型",
 				Limit:        3,
@@ -109,19 +101,16 @@ func TestSearchAccessibleWikiKnowledgeAllowsOwnedAndPublicRoots(t *testing.T) {
 	}
 }
 
-func TestSearchAccessibleWikiKnowledgeRejectsForeignMissingAndBlankRootsBeforeRetrieval(t *testing.T) {
-	owner := "user-1"
-	other := "user-2"
+func TestSearchAccessibleWikiKnowledgeRejectsUnknownRootsBeforeRetrieval(t *testing.T) {
 	folders := stubCoachFolderLister{folders: []*wiki_db.Folder{
-		{ID: "owned", UserID: &owner},
-		{ID: "foreign", UserID: &other},
+		{ID: "owned"},
 	}}
 
 	for _, rootFolderID := range []string{"foreign", "missing", ""} {
 		t.Run(rootFolderID, func(t *testing.T) {
 			documents := &stubCoachDocumentLister{}
 			searcher := &stubCoachKnowledgeSearcher{}
-			_, err := searchAccessibleWikiKnowledge(context.Background(), folders, documents, searcher, owner, &SearchWikiKnowledgeInput{
+			_, err := searchAccessibleWikiKnowledge(context.Background(), folders, documents, searcher, &SearchWikiKnowledgeInput{
 				RootFolderID: rootFolderID,
 				Query:        "secret",
 			})
@@ -129,38 +118,36 @@ func TestSearchAccessibleWikiKnowledgeRejectsForeignMissingAndBlankRootsBeforeRe
 				t.Fatalf("error = %v, want sql.ErrNoRows", err)
 			}
 			if searcher.called {
-				t.Fatal("unauthorized root must be rejected before retrieval")
+				t.Fatal("unknown root must be rejected before retrieval")
 			}
 		})
 	}
 }
 
-func TestSearchAccessibleWikiKnowledgeFiltersPrivateChildDocumentsUnderPublicRoot(t *testing.T) {
-	owner := "user-1"
-	other := "user-2"
-	publicRootID := "public-root"
+func TestSearchAccessibleWikiKnowledgeReturnsAllIndexedMatchesInSingleTenant(t *testing.T) {
+	// In single-tenant mode every Wiki folder and document is reachable, so the
+	// tool returns every search hit whose document ID is known to the indexer.
 	folders := stubCoachFolderLister{folders: []*wiki_db.Folder{
-		{ID: publicRootID},
-		{ID: "public-child", ParentID: &publicRootID},
-		{ID: "private-child", ParentID: &publicRootID, UserID: &other},
+		{ID: "root-a"},
+		{ID: "root-b"},
 	}}
 	documents := &stubCoachDocumentLister{documents: []*wiki_db.Document{
-		{ID: "doc-visible", FolderID: "public-child"},
-		{ID: "doc-hidden", FolderID: "private-child"},
+		{ID: "doc-a", FolderID: "root-a"},
+		{ID: "doc-b", FolderID: "root-b"},
 	}}
 	searcher := &stubCoachKnowledgeSearcher{results: []rag_payload.SearchResult{
-		{DocumentID: "doc-hidden", FolderID: "private-child", Content: "private secret"},
-		{DocumentID: "doc-visible", FolderID: "public-child", Content: "public lesson"},
+		{DocumentID: "doc-b", Content: "lesson in B"},
+		{DocumentID: "doc-a", Content: "lesson in A"},
 	}}
 
-	output, err := searchAccessibleWikiKnowledge(context.Background(), folders, documents, searcher, owner, &SearchWikiKnowledgeInput{
-		RootFolderID: publicRootID,
+	output, err := searchAccessibleWikiKnowledge(context.Background(), folders, documents, searcher, &SearchWikiKnowledgeInput{
+		RootFolderID: "root-a",
 		Query:        "lesson",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(output.Results) != 1 || output.Results[0]["content"] != "public lesson" {
-		t.Fatalf("output leaked inaccessible result: %#v", output)
+	if len(output.Results) != 2 {
+		t.Fatalf("expected both matches to be returned in single-tenant: %#v", output)
 	}
 }

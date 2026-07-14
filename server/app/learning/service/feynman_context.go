@@ -45,7 +45,7 @@ type FeynmanDocumentContext struct {
 }
 
 type FeynmanDocumentSource interface {
-	LoadDocument(ctx context.Context, userID, documentID string) (*wiki_db.Document, string, error)
+	LoadDocument(ctx context.Context, documentID string) (*wiki_db.Document, string, error)
 	SearchDocument(ctx context.Context, documentID, query string, limit int) ([]rag_payload.SearchResult, error)
 	FindNeighbors(ctx context.Context, documentID string, indexes []int, radius int) ([]*rag_db.WikiChunk, error)
 }
@@ -58,7 +58,7 @@ func NewFeynmanContextBuilder(source FeynmanDocumentSource) *FeynmanContextBuild
 	return &FeynmanContextBuilder{source: source}
 }
 
-func (b *FeynmanContextBuilder) Build(ctx context.Context, userID, documentID, learnerExplanation string) (*FeynmanDocumentContext, error) {
+func (b *FeynmanContextBuilder) Build(ctx context.Context, documentID, learnerExplanation string) (*FeynmanDocumentContext, error) {
 	if b == nil || b.source == nil {
 		return nil, fmt.Errorf("feynman document source is required")
 	}
@@ -66,7 +66,7 @@ func (b *FeynmanContextBuilder) Build(ctx context.Context, userID, documentID, l
 	if documentID == "" {
 		return nil, fmt.Errorf("document_id is required")
 	}
-	doc, markdown, err := b.source.LoadDocument(ctx, userID, documentID)
+	doc, markdown, err := b.source.LoadDocument(ctx, documentID)
 	if err != nil {
 		return nil, fmt.Errorf("load Feynman document %q: %w", documentID, err)
 	}

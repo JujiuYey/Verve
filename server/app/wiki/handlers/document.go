@@ -43,7 +43,7 @@ type documentIndexer interface {
 
 type documentVersionService interface {
 	CreateInitial(ctx context.Context, input wiki_service.InitialDocumentInput) (*wiki_db.Document, *rag_db.IndexJob, error)
-	SaveDirectEdit(ctx context.Context, userID, documentID, content string) (*wiki_db.DocumentRevision, *rag_db.IndexJob, error)
+	SaveDirectEdit(ctx context.Context, documentID, content string) (*wiki_db.DocumentRevision, *rag_db.IndexJob, error)
 }
 
 type revisionPathRepository interface {
@@ -169,10 +169,6 @@ func (h *DocumentHandler) Upload(c *fiber.Ctx) error {
 	if h.versions == nil {
 		return response.InternalServerCtx(c, "文档版本服务未初始化")
 	}
-	userID, _ := c.Locals("user_id").(string)
-	if userID == "" {
-		return response.UnauthorizedCtx(c, "未登录或登录已过期")
-	}
 	content, err := io.ReadAll(f)
 	if err != nil {
 		return response.InternalServerCtx(c, "读取上传文件失败")
@@ -182,7 +178,7 @@ func (h *DocumentHandler) Upload(c *fiber.Ctx) error {
 		contentType = "text/markdown"
 	}
 	doc, job, err := h.versions.CreateInitial(c.Context(), wiki_service.InitialDocumentInput{
-		UserID: userID, FolderID: folderID, Filename: file.Filename, Content: content, ContentType: contentType,
+		FolderID: folderID, Filename: file.Filename, Content: content, ContentType: contentType,
 	})
 	if err != nil {
 		return response.InternalServerCtx(c, "创建文档版本失败")
@@ -252,11 +248,7 @@ func (h *DocumentHandler) UpdateContent(c *fiber.Ctx) error {
 	if h.versions == nil {
 		return response.InternalServerCtx(c, "文档版本服务未初始化")
 	}
-	userID, _ := c.Locals("user_id").(string)
-	if userID == "" {
-		return response.UnauthorizedCtx(c, "未登录或登录已过期")
-	}
-	_, job, err := h.versions.SaveDirectEdit(c.Context(), userID, docID, req.Content)
+	_, job, err := h.versions.SaveDirectEdit(c.Context(), docID, req.Content)
 	if err != nil {
 		return response.InternalServerCtx(c, "保存文件内容失败")
 	}

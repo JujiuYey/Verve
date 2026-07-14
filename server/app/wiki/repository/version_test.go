@@ -17,7 +17,7 @@ func TestApplyVersionInputExposesImmutableRevisionData(t *testing.T) {
 
 	typeOfInput := reflect.TypeOf(ApplyVersionInput{})
 	for _, name := range []string{
-		"ChangeRequestID", "DocumentID", "ExpectedVersion", "ObjectPath", "ContentHash", "FileSize", "ChangedBy", "ChangeSummary",
+		"ChangeRequestID", "DocumentID", "ExpectedVersion", "ObjectPath", "ContentHash", "FileSize", "ChangeSummary",
 	} {
 		if _, ok := typeOfInput.FieldByName(name); !ok {
 			t.Fatalf("ApplyVersionInput.%s is missing", name)
@@ -45,7 +45,7 @@ func TestVersionRepositoryLocksDocumentAndChangeRequest(t *testing.T) {
 func TestVersionRepositoryExposesConflictAndChangeRequestErrors(t *testing.T) {
 	t.Parallel()
 
-	for _, err := range []error{ErrVersionConflict, ErrChangeRequestNotProposed, ErrChangeRequestForbidden} {
+	for _, err := range []error{ErrVersionConflict, ErrChangeRequestNotProposed} {
 		if err == nil {
 			t.Fatal("version repository sentinel errors must be non-nil")
 		}
@@ -80,7 +80,7 @@ func TestVersionRepositoryContracts(t *testing.T) {
 	var _ func(context.Context, string) ([]string, error) = revisions.ListRevisionObjectPaths
 	var _ func(context.Context, ApplyVersionInput) (*wiki_db.DocumentRevision, *rag_db.IndexJob, error) = versions.ApplyChangeRequest
 	var _ func(context.Context, ApplyVersionInput) (*wiki_db.DocumentRevision, *rag_db.IndexJob, error) = versions.ApplyDirectEdit
-	var _ func(context.Context, string, string) error = requests.CancelChangeRequest
+	var _ func(context.Context, string) error = requests.CancelChangeRequest
 
 	if errors.Is(ErrVersionConflict, ErrChangeRequestNotProposed) {
 		t.Fatal("version errors must remain distinguishable")

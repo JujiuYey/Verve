@@ -13,7 +13,6 @@ func TestBuildCoachQueryIncludesRuntimeContext(t *testing.T) {
 	docID := "doc-interface"
 
 	ctx := CoachRuntimeContext{
-		UserID: "user-1",
 		Folders: []*wiki_db.Folder{
 			{ID: folderID, Name: "Go 基础"},
 		},
@@ -46,7 +45,6 @@ func TestBuildCoachQueryIncludesRuntimeContext(t *testing.T) {
 
 func TestBuildCoachQueryNavigatesDirectlyToDocuments(t *testing.T) {
 	ctx := CoachRuntimeContext{
-		UserID: "user-1",
 		Folders: []*wiki_db.Folder{
 			{ID: "folder-go", Name: "Go 基础"},
 		},
@@ -65,7 +63,7 @@ func TestBuildCoachQueryNavigatesDirectlyToDocuments(t *testing.T) {
 }
 
 func TestBuildCoachQueryIncludesExplicitEmptyStates(t *testing.T) {
-	query := BuildCoachQuery(CoachRuntimeContext{UserID: "user-1"}, "继续学习")
+	query := BuildCoachQuery(CoachRuntimeContext{}, "继续学习")
 
 	for _, want := range []string{
 		"- 暂无文件夹",
@@ -108,41 +106,16 @@ func TestParseCoachActionRejectsNavigateActionWithoutDocument(t *testing.T) {
 	}
 }
 
-func TestFilterCoachDocumentsForUserIncludesOwnedAndPublicFolders(t *testing.T) {
-	owner := "user-1"
-	other := "user-2"
-	emptyOwner := ""
+func TestCoachFolderAccessibilityUsesProvidedList(t *testing.T) {
 	folders := []*wiki_db.Folder{
-		{ID: "owned", UserID: &owner},
-		{ID: "foreign", UserID: &other},
-		{ID: "public-nil"},
-		{ID: "public-empty", UserID: &emptyOwner},
+		{ID: "owned"},
+		{ID: "shared"},
 	}
-	documents := []*wiki_db.Document{
-		{ID: "doc-owned", FolderID: "owned"},
-		{ID: "doc-foreign", FolderID: "foreign"},
-		{ID: "doc-public-nil", FolderID: "public-nil"},
-		{ID: "doc-public-empty", FolderID: "public-empty"},
-		{ID: "doc-orphan", FolderID: "missing"},
+	if !CoachFolderIsAccessible(folders, "owned") || !CoachFolderIsAccessible(folders, "shared") {
+		t.Fatal("folders provided to the agent should all be reachable")
 	}
-
-	accessibleFolders := FilterCoachFoldersForUser(folders, owner)
-	got := FilterCoachDocumentsByFolders(documents, accessibleFolders)
-
-	want := []string{"doc-owned", "doc-public-nil", "doc-public-empty"}
-	if len(got) != len(want) {
-		t.Fatalf("documents = %#v, want IDs %v", got, want)
-	}
-	for i, documentID := range want {
-		if got[i].ID != documentID {
-			t.Fatalf("document[%d] = %q, want %q", i, got[i].ID, documentID)
-		}
-	}
-	if !CoachFolderIsAccessible(accessibleFolders, "owned") || !CoachFolderIsAccessible(accessibleFolders, "public-nil") {
-		t.Fatal("owned and public folders should be accessible")
-	}
-	if CoachFolderIsAccessible(accessibleFolders, "foreign") || CoachFolderIsAccessible(accessibleFolders, "") {
-		t.Fatal("foreign and blank folder scopes should not be accessible")
+	if CoachFolderIsAccessible(folders, "missing") || CoachFolderIsAccessible(folders, "") {
+		t.Fatal("folders not in the supplied list should be unreachable")
 	}
 }
 

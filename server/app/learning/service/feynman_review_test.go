@@ -14,7 +14,6 @@ func TestFeynmanReviewerQueryInputBoundsPriorHistoryAndKeepsNewestTurns(t *testi
 	turns := make([]*learning_db.LearningExplanationReview, 20)
 	for i := range turns {
 		turns[i] = &learning_db.LearningExplanationReview{
-			Explanation:        fmt.Sprintf("old-explanation-%02d:%s", i, strings.Repeat("解释", 800)),
 			HeardSummary:       strings.Repeat("复述", 400),
 			ExplanationSummary: fmt.Sprintf("summary-%02d:%s", i, strings.Repeat("摘要", 200)),
 			FollowUpQuestion:   strings.Repeat("追问", 200),
@@ -22,7 +21,7 @@ func TestFeynmanReviewerQueryInputBoundsPriorHistoryAndKeepsNewestTurns(t *testi
 	}
 	current := strings.Repeat("本轮解释", 5000)
 	input := feynmanReviewerQueryInput(&FeynmanDocumentContext{Title: "Go", Mode: "full", ContextSufficient: true}, FeynmanReviewRequest{
-		UserID: "user-1", DocumentID: "doc-1", Explanation: current, PriorTurns: turns,
+		DocumentID: "doc-1", Explanation: current, PriorTurns: turns,
 	})
 
 	if input.NewExplanation != current {
@@ -31,11 +30,8 @@ func TestFeynmanReviewerQueryInputBoundsPriorHistoryAndKeepsNewestTurns(t *testi
 	if len(input.PriorTurns) == 0 || len(input.PriorTurns) > FeynmanRecentTurnLimit {
 		t.Fatalf("recent turns = %d", len(input.PriorTurns))
 	}
-	if !strings.Contains(input.PriorTurns[len(input.PriorTurns)-1].Explanation, "old-explanation-19") {
-		t.Fatalf("newest turn missing: %#v", input.PriorTurns)
-	}
-	if strings.Contains(input.PriorSummary, "old-explanation-00") {
-		t.Fatalf("older full explanation leaked into summary: %q", input.PriorSummary)
+	if !strings.Contains(input.PriorTurns[len(input.PriorTurns)-1].Review, "summary-19") {
+		t.Fatalf("newest turn missing its summary in review: %#v", input.PriorTurns)
 	}
 	if !strings.Contains(input.PriorSummary, "summary-") {
 		t.Fatalf("older summaries missing: %q", input.PriorSummary)
@@ -52,7 +48,7 @@ func TestFeynmanReviewerQueryInputBoundsPriorHistoryAndKeepsNewestTurns(t *testi
 
 func TestFeynmanReviewerQueryInputIncludesScopedMemory(t *testing.T) {
 	input := feynmanReviewerQueryInput(&FeynmanDocumentContext{Title: "Go values", Mode: "full", ContextSufficient: true}, FeynmanReviewRequest{
-		UserID: "user-1", DocumentID: "doc-1", Explanation: "值有类型",
+		DocumentID: "doc-1", Explanation: "值有类型",
 		MemoryItems: []*learning_db.LearningMemoryItem{
 			{Kind: "explanation_evidence", Statement: "能说明类型约束操作", Confidence: "observed"},
 		},

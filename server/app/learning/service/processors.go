@@ -13,7 +13,7 @@ type processorReviewReader interface {
 }
 
 type processorMemoryReader interface {
-	FindDocumentItems(context.Context, string, string, int) ([]*learning_db.LearningMemoryItem, error)
+	FindDocumentItems(context.Context, string, int) ([]*learning_db.LearningMemoryItem, error)
 }
 
 type ListenerProcessor struct {
@@ -33,12 +33,12 @@ func (p *ListenerProcessor) Process(ctx context.Context, input AgentInput) (*Age
 	}
 	memory := make([]*learning_db.LearningMemoryItem, 0)
 	if p.memory != nil {
-		if loaded, loadErr := p.memory.FindDocumentItems(ctx, input.UserID, input.Session.DocumentID, 20); loadErr == nil && loaded != nil {
+		if loaded, loadErr := p.memory.FindDocumentItems(ctx, input.Session.DocumentID, 20); loadErr == nil && loaded != nil {
 			memory = loaded
 		}
 	}
 	result, err := p.reviewer.Review(ctx, FeynmanReviewRequest{
-		UserID: input.UserID, DocumentID: input.Session.DocumentID, Explanation: input.Content,
+		DocumentID: input.Session.DocumentID, Explanation: input.Content,
 		PriorTurns: prior, MemoryItems: memory,
 	})
 	if err != nil {
@@ -72,12 +72,12 @@ func (p *TeacherProcessor) Process(ctx context.Context, input AgentInput) (*Agen
 	}
 	memory := make([]*learning_db.LearningMemoryItem, 0)
 	if p.memory != nil {
-		if loaded, loadErr := p.memory.FindDocumentItems(ctx, input.UserID, input.Session.DocumentID, 20); loadErr == nil && loaded != nil {
+		if loaded, loadErr := p.memory.FindDocumentItems(ctx, input.Session.DocumentID, 20); loadErr == nil && loaded != nil {
 			memory = loaded
 		}
 	}
 	result, err := p.teacher.Teach(ctx, TeachingRequest{
-		UserID: input.UserID, DocumentID: input.Session.DocumentID, Question: input.Content,
+		DocumentID: input.Session.DocumentID, Question: input.Content,
 		PriorTurns: prior, MemoryItems: memory,
 	})
 	if err != nil {
@@ -100,7 +100,7 @@ func (p *CuratorProcessor) Process(ctx context.Context, input AgentInput) (*Agen
 		return nil, errors.New("curator is not configured")
 	}
 	request, err := p.curator.Propose(ctx, CuratorRequest{
-		UserID: input.UserID, DocumentID: input.Session.DocumentID, TurnID: input.Turn.ID,
+		DocumentID: input.Session.DocumentID, TurnID: input.Turn.ID,
 		RequestID: input.RequestID, Instruction: input.Content, ReplacesChangeRequestID: input.ReplacesChangeRequestID,
 	})
 	if err != nil {

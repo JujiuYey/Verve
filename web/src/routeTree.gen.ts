@@ -9,26 +9,18 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as LoginRouteImport } from './routes/login'
 import { Route as LayoutRouteImport } from './routes/_layout'
 import { Route as LayoutIndexRouteImport } from './routes/_layout/index'
 import { Route as LayoutWikiIndexRouteImport } from './routes/_layout/wiki/index'
-import { Route as LayoutSystemUserRouteImport } from './routes/_layout/system/user'
 import { Route as LayoutSystemModelConfigRouteImport } from './routes/_layout/system/model-config'
 import { Route as LayoutSystemAgentConfigRouteImport } from './routes/_layout/system/agent-config'
 import { Route as LayoutLearnProfileRouteImport } from './routes/_layout/learn/profile'
 import { Route as LayoutLearnJournalRouteImport } from './routes/_layout/learn/journal'
 import { Route as LayoutLearnFeynmanRouteImport } from './routes/_layout/learn/feynman'
 import { Route as LayoutCommonAppSettingRouteImport } from './routes/_layout/common/app-setting'
-import { Route as LayoutCommonAccountRouteImport } from './routes/_layout/common/account'
 import { Route as LayoutLearnSessionSessionIdRouteImport } from './routes/_layout/learn/session/$sessionId'
 import { Route as LayoutLearnFeynmanPracticeDocumentIdRouteImport } from './routes/_layout/learn/feynman-practice/$documentId'
 
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const LayoutRoute = LayoutRouteImport.update({
   id: '/_layout',
   getParentRoute: () => rootRouteImport,
@@ -41,11 +33,6 @@ const LayoutIndexRoute = LayoutIndexRouteImport.update({
 const LayoutWikiIndexRoute = LayoutWikiIndexRouteImport.update({
   id: '/wiki/',
   path: '/wiki/',
-  getParentRoute: () => LayoutRoute,
-} as any)
-const LayoutSystemUserRoute = LayoutSystemUserRouteImport.update({
-  id: '/system/user',
-  path: '/system/user',
   getParentRoute: () => LayoutRoute,
 } as any)
 const LayoutSystemModelConfigRoute = LayoutSystemModelConfigRouteImport.update({
@@ -78,11 +65,6 @@ const LayoutCommonAppSettingRoute = LayoutCommonAppSettingRouteImport.update({
   path: '/common/app-setting',
   getParentRoute: () => LayoutRoute,
 } as any)
-const LayoutCommonAccountRoute = LayoutCommonAccountRouteImport.update({
-  id: '/common/account',
-  path: '/common/account',
-  getParentRoute: () => LayoutRoute,
-} as any)
 const LayoutLearnSessionSessionIdRoute =
   LayoutLearnSessionSessionIdRouteImport.update({
     id: '/learn/session/$sessionId',
@@ -98,30 +80,24 @@ const LayoutLearnFeynmanPracticeDocumentIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof LayoutIndexRoute
-  '/login': typeof LoginRoute
-  '/common/account': typeof LayoutCommonAccountRoute
   '/common/app-setting': typeof LayoutCommonAppSettingRoute
   '/learn/feynman': typeof LayoutLearnFeynmanRoute
   '/learn/journal': typeof LayoutLearnJournalRoute
   '/learn/profile': typeof LayoutLearnProfileRoute
   '/system/agent-config': typeof LayoutSystemAgentConfigRoute
   '/system/model-config': typeof LayoutSystemModelConfigRoute
-  '/system/user': typeof LayoutSystemUserRoute
   '/wiki/': typeof LayoutWikiIndexRoute
   '/learn/feynman-practice/$documentId': typeof LayoutLearnFeynmanPracticeDocumentIdRoute
   '/learn/session/$sessionId': typeof LayoutLearnSessionSessionIdRoute
 }
 export interface FileRoutesByTo {
-  '/login': typeof LoginRoute
   '/': typeof LayoutIndexRoute
-  '/common/account': typeof LayoutCommonAccountRoute
   '/common/app-setting': typeof LayoutCommonAppSettingRoute
   '/learn/feynman': typeof LayoutLearnFeynmanRoute
   '/learn/journal': typeof LayoutLearnJournalRoute
   '/learn/profile': typeof LayoutLearnProfileRoute
   '/system/agent-config': typeof LayoutSystemAgentConfigRoute
   '/system/model-config': typeof LayoutSystemModelConfigRoute
-  '/system/user': typeof LayoutSystemUserRoute
   '/wiki': typeof LayoutWikiIndexRoute
   '/learn/feynman-practice/$documentId': typeof LayoutLearnFeynmanPracticeDocumentIdRoute
   '/learn/session/$sessionId': typeof LayoutLearnSessionSessionIdRoute
@@ -129,16 +105,13 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_layout': typeof LayoutRouteWithChildren
-  '/login': typeof LoginRoute
   '/_layout/': typeof LayoutIndexRoute
-  '/_layout/common/account': typeof LayoutCommonAccountRoute
   '/_layout/common/app-setting': typeof LayoutCommonAppSettingRoute
   '/_layout/learn/feynman': typeof LayoutLearnFeynmanRoute
   '/_layout/learn/journal': typeof LayoutLearnJournalRoute
   '/_layout/learn/profile': typeof LayoutLearnProfileRoute
   '/_layout/system/agent-config': typeof LayoutSystemAgentConfigRoute
   '/_layout/system/model-config': typeof LayoutSystemModelConfigRoute
-  '/_layout/system/user': typeof LayoutSystemUserRoute
   '/_layout/wiki/': typeof LayoutWikiIndexRoute
   '/_layout/learn/feynman-practice/$documentId': typeof LayoutLearnFeynmanPracticeDocumentIdRoute
   '/_layout/learn/session/$sessionId': typeof LayoutLearnSessionSessionIdRoute
@@ -147,46 +120,37 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/login'
-    | '/common/account'
     | '/common/app-setting'
     | '/learn/feynman'
     | '/learn/journal'
     | '/learn/profile'
     | '/system/agent-config'
     | '/system/model-config'
-    | '/system/user'
     | '/wiki/'
     | '/learn/feynman-practice/$documentId'
     | '/learn/session/$sessionId'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/login'
     | '/'
-    | '/common/account'
     | '/common/app-setting'
     | '/learn/feynman'
     | '/learn/journal'
     | '/learn/profile'
     | '/system/agent-config'
     | '/system/model-config'
-    | '/system/user'
     | '/wiki'
     | '/learn/feynman-practice/$documentId'
     | '/learn/session/$sessionId'
   id:
     | '__root__'
     | '/_layout'
-    | '/login'
     | '/_layout/'
-    | '/_layout/common/account'
     | '/_layout/common/app-setting'
     | '/_layout/learn/feynman'
     | '/_layout/learn/journal'
     | '/_layout/learn/profile'
     | '/_layout/system/agent-config'
     | '/_layout/system/model-config'
-    | '/_layout/system/user'
     | '/_layout/wiki/'
     | '/_layout/learn/feynman-practice/$documentId'
     | '/_layout/learn/session/$sessionId'
@@ -194,18 +158,10 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   LayoutRoute: typeof LayoutRouteWithChildren
-  LoginRoute: typeof LoginRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/_layout': {
       id: '/_layout'
       path: ''
@@ -225,13 +181,6 @@ declare module '@tanstack/react-router' {
       path: '/wiki'
       fullPath: '/wiki/'
       preLoaderRoute: typeof LayoutWikiIndexRouteImport
-      parentRoute: typeof LayoutRoute
-    }
-    '/_layout/system/user': {
-      id: '/_layout/system/user'
-      path: '/system/user'
-      fullPath: '/system/user'
-      preLoaderRoute: typeof LayoutSystemUserRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/system/model-config': {
@@ -276,13 +225,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutCommonAppSettingRouteImport
       parentRoute: typeof LayoutRoute
     }
-    '/_layout/common/account': {
-      id: '/_layout/common/account'
-      path: '/common/account'
-      fullPath: '/common/account'
-      preLoaderRoute: typeof LayoutCommonAccountRouteImport
-      parentRoute: typeof LayoutRoute
-    }
     '/_layout/learn/session/$sessionId': {
       id: '/_layout/learn/session/$sessionId'
       path: '/learn/session/$sessionId'
@@ -302,14 +244,12 @@ declare module '@tanstack/react-router' {
 
 interface LayoutRouteChildren {
   LayoutIndexRoute: typeof LayoutIndexRoute
-  LayoutCommonAccountRoute: typeof LayoutCommonAccountRoute
   LayoutCommonAppSettingRoute: typeof LayoutCommonAppSettingRoute
   LayoutLearnFeynmanRoute: typeof LayoutLearnFeynmanRoute
   LayoutLearnJournalRoute: typeof LayoutLearnJournalRoute
   LayoutLearnProfileRoute: typeof LayoutLearnProfileRoute
   LayoutSystemAgentConfigRoute: typeof LayoutSystemAgentConfigRoute
   LayoutSystemModelConfigRoute: typeof LayoutSystemModelConfigRoute
-  LayoutSystemUserRoute: typeof LayoutSystemUserRoute
   LayoutWikiIndexRoute: typeof LayoutWikiIndexRoute
   LayoutLearnFeynmanPracticeDocumentIdRoute: typeof LayoutLearnFeynmanPracticeDocumentIdRoute
   LayoutLearnSessionSessionIdRoute: typeof LayoutLearnSessionSessionIdRoute
@@ -317,14 +257,12 @@ interface LayoutRouteChildren {
 
 const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutIndexRoute: LayoutIndexRoute,
-  LayoutCommonAccountRoute: LayoutCommonAccountRoute,
   LayoutCommonAppSettingRoute: LayoutCommonAppSettingRoute,
   LayoutLearnFeynmanRoute: LayoutLearnFeynmanRoute,
   LayoutLearnJournalRoute: LayoutLearnJournalRoute,
   LayoutLearnProfileRoute: LayoutLearnProfileRoute,
   LayoutSystemAgentConfigRoute: LayoutSystemAgentConfigRoute,
   LayoutSystemModelConfigRoute: LayoutSystemModelConfigRoute,
-  LayoutSystemUserRoute: LayoutSystemUserRoute,
   LayoutWikiIndexRoute: LayoutWikiIndexRoute,
   LayoutLearnFeynmanPracticeDocumentIdRoute:
     LayoutLearnFeynmanPracticeDocumentIdRoute,
@@ -336,7 +274,6 @@ const LayoutRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   LayoutRoute: LayoutRouteWithChildren,
-  LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

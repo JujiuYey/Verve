@@ -12,6 +12,8 @@ import (
 	wiki_repo "verve/app/wiki/repository"
 )
 
+var _ = errors.Is
+
 type versionFileStoreFake struct {
 	calls   *[]string
 	content string
@@ -57,8 +59,10 @@ func (f *versionPublisherFake) ApplyDirectEdit(_ context.Context, input wiki_rep
 	f.input = input
 	return &wiki_db.DocumentRevision{DocumentID: input.DocumentID, Version: input.ExpectedVersion + 1}, &rag_db.IndexJob{ID: "job-2"}, nil
 }
-func (f *versionPublisherFake) ApplyChangeRequest(context.Context, wiki_repo.ApplyVersionInput) (*wiki_db.DocumentRevision, *rag_db.IndexJob, error) {
-	return nil, nil, errors.New("not used")
+func (f *versionPublisherFake) ApplyChangeRequest(_ context.Context, input wiki_repo.ApplyVersionInput) (*wiki_db.DocumentRevision, *rag_db.IndexJob, error) {
+	f.calls = append(f.calls, "publisher:change_request")
+	f.input = input
+	return &wiki_db.DocumentRevision{DocumentID: input.DocumentID, Version: input.ExpectedVersion + 1}, &rag_db.IndexJob{ID: "job-3"}, nil
 }
 func (f *versionPublisherFake) FindAppliedChangeRequest(context.Context, string) (*wiki_db.DocumentRevision, *rag_db.IndexJob, error) {
 	return nil, nil, errors.New("not used")
@@ -88,7 +92,7 @@ func TestCreateInitialWritesImmutableObjectBeforeDatabase(t *testing.T) {
 	service := NewDocumentVersionService(revisions, nil, nil, files)
 
 	document, job, err := service.CreateInitial(context.Background(), InitialDocumentInput{
-		UserID: "user-1", FolderID: "folder-1", Filename: "notes.md", Content: []byte("# Go\n"), ContentType: "text/markdown",
+		FolderID: "folder-1", Filename: "notes.md", Content: []byte("# Go\n"), ContentType: "text/markdown",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -107,25 +111,25 @@ func TestCreateInitialWritesImmutableObjectBeforeDatabase(t *testing.T) {
 	}
 }
 
-func TestApplyChangeRequestRejectsDifferentUserBeforeWritingObject(t *testing.T) {
+func TestApplyChangeRequestAppliesProposedChangeWithoutUserGate(t *testing.T) {
 	calls := make([]string, 0)
 	files := &versionFileStoreFake{calls: &calls}
+	publisher := &versionPublisherFake{}
 	service := NewDocumentVersionService(
-		nil,
-		&versionPublisherFake{},
+		&versionRevisionWriterFake{},
+		publisher,
 		versionDocumentFinderFake{document: &wiki_db.Document{ID: "doc-1", CurrentVersion: 1}},
 		files,
 		versionRequestFinderFake{request: &wiki_db.DocumentChangeRequest{
-			ID: "request-1", RequestedBy: "owner-1", Status: wiki_db.ChangeRequestStatusProposed,
+			ID: "request-1", Status: wiki_db.ChangeRequestStatusProposed,
 		}},
 	)
 
-	_, _, err := service.ApplyChangeRequest(context.Background(), "other-user", "request-1")
-	if !errors.Is(err, wiki_repo.ErrChangeRequestForbidden) {
-		t.Fatalf("error = %v", err)
+	if _, _, err := service.ApplyChangeRequest(context.Background(), "request-1"); err != nil {
+		t.Fatalf("apply = %v", err)
 	}
-	if len(files.paths) != 0 || len(calls) != 0 {
-		t.Fatalf("unauthorized apply wrote objects: %#v", files.paths)
+	if publisher.calls == nil {
+		t.Fatal("publisher was not invoked")
 	}
 }
 
@@ -138,7 +142,7 @@ func TestSaveDirectEditPublishesNextImmutableVersion(t *testing.T) {
 		ID: "doc-1", Filename: "notes.md", CurrentVersion: 1, ContentHash: &hash,
 	}}, files)
 
-	revision, _, err := service.SaveDirectEdit(context.Background(), "user-1", "doc-1", "# Updated\n")
+	revision, _, err := service.SaveDirectEdit(context.Background(), "doc-1", "# Updated\n")
 	if err != nil {
 		t.Fatal(err)
 	}
