@@ -1,6 +1,6 @@
-import { IconPlus, IconRefresh, IconSearch, IconUpload } from "@tabler/icons-react";
 import { useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
+import { FolderPlusIcon, RefreshCwIcon, SearchIcon, UploadIcon } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { type IndexJobProgress, ragWikiApi } from "@/api/rag/wiki";
@@ -15,83 +15,60 @@ import {
 } from "@/api/wiki/folder";
 import { ConfirmDialog } from "@/components/sag-ui";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-import { BreadcrumbNav } from "./_components/breadcrumb-nav";
+import { DocumentReader } from "./_components/document-reader";
 import { FolderFormModal } from "./_components/folder-form-modal";
-import { ItemGrid } from "./_components/item-grid";
 import { UploadDialog } from "./_components/upload-dialog";
-import { getFolderContentView } from "./_shared/content-view";
+import { WikiFileTree } from "./_components/wiki-file-tree";
 
-const sortFolders = (folders: Folder[]) =>
-  [...folders].sort((a, b) => {
-    if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
-    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-  });
+function flattenFolders(folders: FolderTreeNode[]): FolderTreeNode[] {
+  return folders.flatMap((folder) => [folder, ...flattenFolders(folder.children)]);
+}
 
 export function WikiIndexPage() {
   const navigate = useNavigate();
-  const [data, setData] = useState<Folder[]>([]);
   const [folderTreeData, setFolderTreeData] = useState<FolderTreeNode[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  // 文档相关状态
   const [documents, setDocuments] = useState<Document[]>([]);
   const [indexJobsByDocumentId, setIndexJobsByDocumentId] = useState<
     Record<string, IndexJobProgress | undefined>
   >({});
-  const [documentsLoading, setDocumentsLoading] = useState(false);
-  const [deleteDocumentTarget, setDeleteDocumentTarget] = useState<Document | null>(null);
-  // const [deletingDocument, setDeletingDocument] = useState(false);
-
-  // 面包屑导航状态
-  const [breadcrumb, setBreadcrumb] = useState<{ id?: string; name: string }[]>([]);
-  // 当前进入的文件夹对象（用于右侧详情面板）
-  const [currentFolder, setCurrentFolder] = useState<Folder | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [searchKeyword, setSearchKeyword] = useState("");
+  const [selectedFolderId, setSelectedFolderId] = useState<string>();
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string>();
 
   const [formOpen, setFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<"create" | "edit">("create");
   const [selectedFolder, setSelectedFolder] = useState<Folder | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [searchKeyword, setSearchKeyword] = useState("");
-
   const [uploadOpen, setUploadOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<Folder | null>(null);
+  const [deleteFolderTarget, setDeleteFolderTarget] = useState<Folder | null>(null);
+  const [deleteDocumentTarget, setDeleteDocumentTarget] = useState<Document | null>(null);
 
-  // 获取当前文件夹ID（面包屑最后一个）
-  const currentFolderId = breadcrumb.length > 0 ? breadcrumb[breadcrumb.length - 1].id : undefined;
+  const flatFolders = useMemo(() => flattenFolders(folderTreeData), [folderTreeData]);
+  const activeFolder = useMemo(
+    () => flatFolders.find((folder) => folder.id === selectedFolderId),
+    [flatFolders, selectedFolderId],
+  );
+  const activeDocument = useMemo(
+    () => documents.find((document) => document.id === selectedDocumentId),
+    [documents, selectedDocumentId],
+  );
 
-  const loadFolders = useCallback(async (parentId?: string) => {
-    setLoading(true);
+  const loadLibrary = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     try {
-      const res = await folderApi.list(parentId);
-      setData(res || []);
-    } catch {
-      toast.error("加载文件夹列表失败");
+      const [folders, allDocuments] = await Promise.all([folderApi.tree(), documentApi.list()]);
+      setFolderTreeData(folders ?? []);
+      setDocuments(allDocuments ?? []);
+    } catch (error) {
+      console.error("加载知识库失败:", error);
+      toast.error("加载知识库失败");
     } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const loadFolderTree = useCallback(async () => {
-    try {
-      const res = await folderApi.tree();
-      setFolderTreeData(res || []);
-    } catch {
-      toast.error("加载文件夹树失败");
-    }
-  }, []);
-
-  // 加载文档列表
-  const loadDocuments = useCallback(async (folderId: string) => {
-    setDocumentsLoading(true);
-    try {
-      const res = await documentApi.list({ folder_id: folderId });
-      setDocuments(res || []);
-    } catch {
-      toast.error("加载文档列表失败");
-    } finally {
-      setDocumentsLoading(false);
+      if (showLoading) setLoading(false);
     }
   }, []);
 
@@ -99,244 +76,245 @@ export function WikiIndexPage() {
     try {
       const jobs = await ragWikiApi.listJobs();
       const nextJobsByDocumentId: Record<string, IndexJobProgress> = {};
-      for (const job of jobs) {
+      jobs.forEach((job) => {
         if (!nextJobsByDocumentId[job.document_id]) {
           nextJobsByDocumentId[job.document_id] = job;
         }
-      }
+      });
       setIndexJobsByDocumentId(nextJobsByDocumentId);
-    } catch {
+    } catch (error) {
+      console.error("加载文档解析状态失败:", error);
       toast.error("加载文档解析状态失败");
     }
   }, []);
 
-  // 加载文件夹列表，使用当前面包屑路径的最后一个文件夹ID
   useEffect(() => {
-    void loadFolders(currentFolderId);
-  }, [loadFolders, currentFolderId]);
-
-  // 当进入文件夹时，加载该文件夹下的文档
-  useEffect(() => {
-    if (currentFolderId) {
-      void loadDocuments(currentFolderId);
-      void loadIndexJobs();
-    } else {
-      setDocuments([]);
-    }
-  }, [currentFolderId, loadDocuments, loadIndexJobs]);
+    void loadLibrary();
+    void loadIndexJobs();
+  }, [loadIndexJobs, loadLibrary]);
 
   useEffect(() => {
-    if (!currentFolderId || documents.length === 0) return;
-
-    const hasActiveJob = documents.some((document) => {
+    const hasActiveIndexJob = documents.some((document) => {
       const status = indexJobsByDocumentId[document.id]?.status;
       return status === "pending" || status === "running";
     });
-    if (!hasActiveJob) return;
+    if (!hasActiveIndexJob) return;
 
     const intervalId = window.setInterval(() => {
       void loadIndexJobs();
     }, 4000);
-
     return () => window.clearInterval(intervalId);
-  }, [currentFolderId, documents, indexJobsByDocumentId, loadIndexJobs]);
-
-  // 删除文档
-  const handleDeleteDocument = useCallback((doc: Document) => {
-    setDeleteDocumentTarget(doc);
-  }, []);
-
-  const handleOpenDocument = useCallback(
-    (doc: Document) => {
-      navigate({
-        to: "/learn/feynman-practice/$documentId",
-        params: { documentId: doc.id },
-      });
-    },
-    [navigate],
-  );
-
-  const handleConfirmDeleteDocument = async () => {
-    if (!deleteDocumentTarget) return;
-    // setDeletingDocument(true);
-    try {
-      await documentApi.delete(deleteDocumentTarget.id);
-      toast.success("删除成功");
-      setDeleteDocumentTarget(null);
-      if (currentFolderId) {
-        void loadDocuments(currentFolderId);
-      }
-    } catch (error) {
-      toast.error(`删除失败，${error}`);
-    }
-  };
-
-  const handleRefresh = useCallback(() => {
-    void loadFolders(currentFolderId);
-    if (currentFolderId) {
-      void loadDocuments(currentFolderId);
-    }
-  }, [currentFolderId, loadDocuments, loadFolders]);
+  }, [documents, indexJobsByDocumentId, loadIndexJobs]);
 
   useEffect(() => {
-    void loadFolderTree();
-  }, [loadFolderTree]);
+    if (selectedDocumentId && !documents.some((document) => document.id === selectedDocumentId)) {
+      setSelectedDocumentId(undefined);
+    }
+  }, [documents, selectedDocumentId]);
 
-  // 进入文件夹
-  const handleEnterFolder = useCallback((folder: Folder) => {
-    setBreadcrumb((prev) => [...prev, { id: folder.id, name: folder.name }]);
-    setCurrentFolder(folder);
-  }, []);
+  useEffect(() => {
+    if (selectedFolderId && !flatFolders.some((folder) => folder.id === selectedFolderId)) {
+      setSelectedFolderId(undefined);
+    }
+  }, [flatFolders, selectedFolderId]);
 
-  // 面包屑导航点击
-  const handleBreadcrumbNavigate = useCallback(
-    (item: { id?: string; name: string } | null, index: number) => {
-      if (item === null) {
-        // 返回根目录
-        setBreadcrumb([]);
-        setCurrentFolder(null);
-      } else {
-        // 导航到指定层级
-        setBreadcrumb((prev) => prev.slice(0, index + 1));
-        // 面包屑导航回退时重新获取文件夹详情
-        if (item.id) {
-          folderApi
-            .findOne(item.id)
-            .then(setCurrentFolder)
-            .catch((error) => {
-              console.error("获取文件夹详情失败:", error);
-            });
-        }
-      }
-    },
-    [],
-  );
+  const handleRefresh = useCallback(async () => {
+    await Promise.all([loadLibrary(false), loadIndexJobs()]);
+    toast.success("知识库已刷新");
+  }, [loadIndexJobs, loadLibrary]);
 
-  const handleCreate = () => {
+  const handleCreateFolder = () => {
     setFormMode("create");
     setSelectedFolder(null);
     setFormOpen(true);
   };
 
-  const handleEdit = (folder: Folder) => {
+  const handleEditFolder = (folder: Folder) => {
     setFormMode("edit");
     setSelectedFolder(folder);
     setFormOpen(true);
   };
 
-  const handleDelete = (folder: Folder) => {
-    setDeleteTarget(folder);
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!deleteTarget) return;
-    try {
-      await folderApi.delete(deleteTarget.id);
-      toast.success("删除成功");
-      void loadFolders(currentFolderId);
-      void loadFolderTree();
-    } catch (error) {
-      toast.error(`删除失败，${error}`);
-    }
-  };
-
-  const handleSubmit = async (formData: CreateFolderRequest | UpdateFolderRequest) => {
+  const handleSubmitFolder = async (formData: CreateFolderRequest | UpdateFolderRequest) => {
     setSubmitting(true);
     try {
       if (formMode === "create") {
-        // 创建时传入当前目录的 parent_id
         const createdFolder = await folderApi.create({
           ...(formData as CreateFolderRequest),
-          parent_id: currentFolderId,
+          parent_id: selectedFolderId,
         });
-        setData((prev) => sortFolders([...prev, createdFolder]));
-        toast.success("创建成功");
+        setSelectedFolderId(createdFolder.id);
+        setSelectedDocumentId(undefined);
+        toast.success("文件夹已创建");
       } else {
-        const updatedFolder = await folderApi.update(formData as UpdateFolderRequest);
-        setData((prev) =>
-          sortFolders(
-            prev.map((folder) => (folder.id === updatedFolder.id ? updatedFolder : folder)),
-          ),
-        );
-        setCurrentFolder((prev) => (prev?.id === updatedFolder.id ? updatedFolder : prev));
-        toast.success("更新成功");
+        await folderApi.update(formData as UpdateFolderRequest);
+        toast.success("文件夹已更新");
       }
       setFormOpen(false);
-      void loadFolderTree();
+      await loadLibrary(false);
     } catch (error) {
       console.error("保存文件夹失败:", error);
-      toast.error(formMode === "create" ? "创建失败" : "更新失败");
+      toast.error(formMode === "create" ? "创建文件夹失败" : "更新文件夹失败");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const contentView = getFolderContentView({
-    folders: data,
-    documents,
-    searchKeyword,
-  });
+  const handleDeleteFolder = async () => {
+    if (!deleteFolderTarget) return;
+    try {
+      await folderApi.delete(deleteFolderTarget.id);
+      setDeleteFolderTarget(null);
+      setSelectedFolderId(undefined);
+      setSelectedDocumentId(undefined);
+      await loadLibrary(false);
+      toast.success("文件夹已删除");
+    } catch (error) {
+      console.error("删除文件夹失败:", error);
+      toast.error("删除文件夹失败");
+    }
+  };
+
+  const handleDeleteDocument = async () => {
+    if (!deleteDocumentTarget) return;
+    try {
+      await documentApi.delete(deleteDocumentTarget.id);
+      setDocuments((current) =>
+        current.filter((document) => document.id !== deleteDocumentTarget.id),
+      );
+      setIndexJobsByDocumentId((current) => {
+        const next = { ...current };
+        delete next[deleteDocumentTarget.id];
+        return next;
+      });
+      if (selectedDocumentId === deleteDocumentTarget.id) setSelectedDocumentId(undefined);
+      setDeleteDocumentTarget(null);
+      toast.success("文档已删除");
+    } catch (error) {
+      console.error("删除文档失败:", error);
+      toast.error("删除文档失败");
+    }
+  };
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div
-        key={currentFolder ? "with-detail" : "without-detail"}
-        className="min-h-0 flex-1 overflow-hidden"
-      >
-        <div id="folder-content-panel" className="h-full min-w-0 overflow-y-auto">
-          <div className="flex h-full min-h-0 flex-col gap-4 p-2">
-            <div className="flex items-center justify-between gap-4">
-              <div className="relative max-w-sm flex-1">
-                <IconSearch className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="搜索文件夹和文档..."
-                  value={searchKeyword}
-                  onChange={(e) => setSearchKeyword(e.target.value)}
-                  className="pl-9"
-                />
+    <div className="h-full min-h-0 p-2">
+      <div className="grid h-full min-h-0 overflow-hidden rounded-lg border bg-background grid-rows-[minmax(220px,36%)_minmax(0,1fr)] md:grid-cols-[280px_minmax(0,1fr)] md:grid-rows-1">
+        <aside className="flex min-h-0 flex-col overflow-hidden border-b bg-muted/10 md:border-r md:border-b-0">
+          <div className="flex shrink-0 flex-col gap-3 border-b p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <h1 className="text-sm font-semibold">知识库</h1>
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                  {activeFolder?.name ?? `${documents.length} 篇文档`}
+                </p>
               </div>
-              <div className="flex items-center gap-2">
-                {currentFolderId && (
-                  <>
-                    <Button size="sm" variant="outline" onClick={handleRefresh}>
-                      <IconRefresh className="h-4 w-4" />
-                    </Button>
-                    <Button onClick={() => setUploadOpen(true)}>
-                      <IconUpload className="mr-2 h-4 w-4" />
-                      上传文档
-                    </Button>
-                  </>
-                )}
-                <Button onClick={handleCreate}>
-                  <IconPlus className="mr-2 h-4 w-4" />
-                  添加文件夹
-                </Button>
-              </div>
+
+              <TooltipProvider>
+                <div className="flex shrink-0 items-center gap-1">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label="刷新知识库"
+                        onClick={() => void handleRefresh()}
+                      >
+                        <RefreshCwIcon />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>刷新</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label="上传文档"
+                        disabled={flatFolders.length === 0}
+                        onClick={() => setUploadOpen(true)}
+                      >
+                        <UploadIcon />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {flatFolders.length === 0 ? "请先创建文件夹" : "上传文档"}
+                    </TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={
+                          activeFolder ? `在${activeFolder.name}中新建文件夹` : "新建文件夹"
+                        }
+                        onClick={handleCreateFolder}
+                      >
+                        <FolderPlusIcon />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{activeFolder ? "新建子文件夹" : "新建文件夹"}</TooltipContent>
+                  </Tooltip>
+                </div>
+              </TooltipProvider>
             </div>
 
-            {/* 面包屑导航 */}
-            {breadcrumb.length > 0 && (
-              <BreadcrumbNav items={breadcrumb} onNavigate={handleBreadcrumbNavigate} />
-            )}
-
-            <div className="flex-1 min-h-0">
-              <div className="min-h-0 min-w-0">
-                <ItemGrid
-                  folders={contentView.folders}
-                  documents={contentView.documents}
-                  indexJobsByDocumentId={indexJobsByDocumentId}
-                  loading={loading || documentsLoading}
-                  onEditFolder={handleEdit}
-                  onDeleteFolder={handleDelete}
-                  onEnterFolder={handleEnterFolder}
-                  onDeleteDocument={handleDeleteDocument}
-                  onOpenDocument={(document) => void handleOpenDocument(document)}
-                  onIndexStatusRefresh={() => void loadIndexJobs()}
-                />
-              </div>
-            </div>
+            <InputGroup>
+              <InputGroupAddon>
+                <SearchIcon />
+              </InputGroupAddon>
+              <InputGroupInput
+                value={searchKeyword}
+                placeholder="搜索文件夹和文档"
+                aria-label="搜索文件夹和文档"
+                onChange={(event) => setSearchKeyword(event.target.value)}
+              />
+            </InputGroup>
           </div>
-        </div>
+
+          <ScrollArea className="min-h-0 flex-1">
+            <WikiFileTree
+              folders={folderTreeData}
+              documents={documents}
+              loading={loading}
+              searchKeyword={searchKeyword}
+              selectedFolderId={selectedDocumentId ? undefined : selectedFolderId}
+              selectedDocumentId={selectedDocumentId}
+              onSelectRoot={() => {
+                setSelectedFolderId(undefined);
+                setSelectedDocumentId(undefined);
+              }}
+              onSelectFolder={(folder) => {
+                setSelectedFolderId(folder.id);
+                setSelectedDocumentId(undefined);
+              }}
+              onSelectDocument={(document) => {
+                setSelectedFolderId(document.folder_id);
+                setSelectedDocumentId(document.id);
+              }}
+              onEditFolder={handleEditFolder}
+              onDeleteFolder={setDeleteFolderTarget}
+            />
+          </ScrollArea>
+        </aside>
+
+        <main className="min-h-0 overflow-hidden">
+          <DocumentReader
+            document={activeDocument}
+            indexJob={activeDocument ? indexJobsByDocumentId[activeDocument.id] : undefined}
+            onDelete={setDeleteDocumentTarget}
+            onIndexStatusRefresh={() => void loadIndexJobs()}
+            onStartPractice={(document) => {
+              void navigate({
+                to: "/learn/feynman-practice/$documentId",
+                params: { documentId: document.id },
+              });
+            }}
+          />
+        </main>
       </div>
 
       <FolderFormModal
@@ -345,56 +323,55 @@ export function WikiIndexPage() {
         folder={selectedFolder}
         loading={submitting}
         onOpenChange={setFormOpen}
-        onSubmit={handleSubmit}
+        onSubmit={handleSubmitFolder}
       />
 
       <UploadDialog
         open={uploadOpen}
-        defaultFolderId={currentFolderId}
+        defaultFolderId={selectedFolderId}
         folderTree={folderTreeData}
         onOpenChange={setUploadOpen}
         onSuccess={(document, folderId) => {
-          if (folderId === currentFolderId) {
-            setDocuments((prev) => [...prev, { ...document, folder_id: folderId }]);
-            setIndexJobsByDocumentId((prev) => ({
-              ...prev,
-              [document.id]: {
-                id: `local-${document.id}`,
-                document_id: document.id,
-                document_version: document.current_version,
-                status: "pending",
-                chunk_count: 0,
-                created_at: new Date().toISOString(),
-              },
-            }));
-            window.setTimeout(() => void loadIndexJobs(), 1000);
-          }
+          setDocuments((current) => [...current, { ...document, folder_id: folderId }]);
+          setIndexJobsByDocumentId((current) => ({
+            ...current,
+            [document.id]: {
+              id: `local-${document.id}`,
+              document_id: document.id,
+              document_version: document.current_version,
+              status: "pending",
+              chunk_count: 0,
+              created_at: new Date().toISOString(),
+            },
+          }));
+          setSelectedFolderId(folderId);
+          setSelectedDocumentId((current) => current ?? document.id);
+          window.setTimeout(() => void loadIndexJobs(), 1000);
         }}
       />
 
       <ConfirmDialog
-        open={!!deleteTarget}
+        open={!!deleteFolderTarget}
         title="删除文件夹"
-        description={`确定要删除文件夹"${deleteTarget?.name}"吗？此操作将删除该文件夹及其所有文档，且无法撤销。`}
+        description={`确定要删除文件夹“${deleteFolderTarget?.name}”吗？此操作会删除其子文件夹和文档，且无法撤销。`}
         confirmText="删除"
         destructive
         onOpenChange={(open) => {
-          if (!open) setDeleteTarget(null);
+          if (!open) setDeleteFolderTarget(null);
         }}
-        onConfirm={handleConfirmDelete}
+        onConfirm={handleDeleteFolder}
       />
 
-      {/* 删除文档确认对话框 */}
       <ConfirmDialog
         open={!!deleteDocumentTarget}
         title="删除文档"
-        description={`确定要删除文档"${deleteDocumentTarget?.filename}"吗？此操作无法撤销。`}
+        description={`确定要删除文档“${deleteDocumentTarget?.filename}”吗？此操作无法撤销。`}
         confirmText="删除"
         destructive
         onOpenChange={(open) => {
           if (!open) setDeleteDocumentTarget(null);
         }}
-        onConfirm={handleConfirmDeleteDocument}
+        onConfirm={handleDeleteDocument}
       />
     </div>
   );
