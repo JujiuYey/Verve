@@ -1,7 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import {
-  BookOpenIcon,
   CircleAlertIcon,
   FilePenIcon,
   GraduationCapIcon,
@@ -41,7 +40,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { AgentComposer } from "./_components/agent-composer";
 import { AgentTimeline } from "./_components/agent-timeline";
-import { SourcePanel } from "./_components/source-panel";
 import { curatorRegenerationInput, filterTimelineByAgent, mergeTimeline } from "./_lib/timeline";
 
 const routeApi = getRouteApi("/_layout/learn/feynman-practice/$documentId");
@@ -72,7 +70,7 @@ export function FeynmanWorkbenchPage() {
   } | null>(null);
   const [creatingIdentity, setCreatingIdentity] = useState("");
   const [createFailureIdentity, setCreateFailureIdentity] = useState("");
-  const [activeView, setActiveView] = useState("source");
+  const [activeView, setActiveView] = useState("listener");
   const [drafts, setDrafts] = useState<AgentDrafts>(emptyAgentDrafts);
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   const [completedSummary, setCompletedSummary] = useState("");
@@ -109,7 +107,7 @@ export function FeynmanWorkbenchPage() {
     setCreatedSession(null);
     setCreatingIdentity("");
     setCreateFailureIdentity("");
-    setActiveView("source");
+    setActiveView("listener");
     setDrafts(emptyAgentDrafts());
     setTimeline([]);
     setCompletedSummary("");
@@ -391,10 +389,6 @@ export function FeynmanWorkbenchPage() {
         className="min-h-0 flex-1 overflow-hidden"
       >
         <TabsList className="h-auto max-w-full flex-wrap justify-start">
-          <TabsTrigger value="source">
-            <BookOpenIcon />
-            阅读文章
-          </TabsTrigger>
           <TabsTrigger value="listener">
             <MessageSquareTextIcon />
             开始讲解
@@ -409,9 +403,6 @@ export function FeynmanWorkbenchPage() {
             修订文档{itemsByAgent.curator.length > 0 ? ` (${itemsByAgent.curator.length})` : ""}
           </TabsTrigger>
         </TabsList>
-        <TabsContent value="source" className="flex min-h-0 overflow-hidden">
-          <SourcePanel documentId={documentId} />
-        </TabsContent>
         {(["listener", "teacher", "curator"] as const).map((agentType) => (
           <TabsContent key={agentType} value={agentType} className="flex min-h-0 overflow-hidden">
             <section className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">

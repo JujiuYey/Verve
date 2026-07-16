@@ -16,8 +16,10 @@ import {
 import { ConfirmDialog } from "@/components/sag-ui";
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 import { DocumentReader } from "./_components/document-reader";
 import { FolderFormModal } from "./_components/folder-form-modal";
@@ -30,6 +32,7 @@ function flattenFolders(folders: FolderTreeNode[]): FolderTreeNode[] {
 
 export function WikiIndexPage() {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [folderTreeData, setFolderTreeData] = useState<FolderTreeNode[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [indexJobsByDocumentId, setIndexJobsByDocumentId] = useState<
@@ -198,124 +201,142 @@ export function WikiIndexPage() {
 
   return (
     <div className="h-full min-h-0 p-2">
-      <div className="grid h-full min-h-0 overflow-hidden rounded-lg border bg-background grid-rows-[minmax(220px,36%)_minmax(0,1fr)] md:grid-cols-[280px_minmax(0,1fr)] md:grid-rows-1">
-        <aside className="flex min-h-0 flex-col overflow-hidden border-b bg-muted/10 md:border-r md:border-b-0">
-          <div className="flex shrink-0 flex-col gap-3 border-b p-3">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <h1 className="text-sm font-semibold">知识库</h1>
-                <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                  {activeFolder?.name ?? `${documents.length} 篇文档`}
-                </p>
+      <ResizablePanelGroup
+        key={isMobile ? "mobile" : "desktop"}
+        orientation={isMobile ? "vertical" : "horizontal"}
+        className="overflow-hidden rounded-lg border bg-background"
+      >
+        <ResizablePanel
+          id="wiki-file-tree"
+          defaultSize={isMobile ? "36%" : "280px"}
+          minSize={isMobile ? "180px" : "200px"}
+          maxSize={isMobile ? "55%" : "45%"}
+          groupResizeBehavior={isMobile ? "preserve-relative-size" : "preserve-pixel-size"}
+        >
+          <aside className="flex h-full min-h-0 flex-col overflow-hidden bg-muted/10">
+            <div className="flex shrink-0 flex-col gap-3 border-b p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <h1 className="text-sm font-semibold">知识库</h1>
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {activeFolder?.name ?? `${documents.length} 篇文档`}
+                  </p>
+                </div>
+
+                <TooltipProvider>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label="刷新知识库"
+                          onClick={() => void handleRefresh()}
+                        >
+                          <RefreshCwIcon />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>刷新</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label="上传文档"
+                          disabled={flatFolders.length === 0}
+                          onClick={() => setUploadOpen(true)}
+                        >
+                          <UploadIcon />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {flatFolders.length === 0 ? "请先创建文件夹" : "上传文档"}
+                      </TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={
+                            activeFolder ? `在${activeFolder.name}中新建文件夹` : "新建文件夹"
+                          }
+                          onClick={handleCreateFolder}
+                        >
+                          <FolderPlusIcon />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {activeFolder ? "新建子文件夹" : "新建文件夹"}
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                </TooltipProvider>
               </div>
 
-              <TooltipProvider>
-                <div className="flex shrink-0 items-center gap-1">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label="刷新知识库"
-                        onClick={() => void handleRefresh()}
-                      >
-                        <RefreshCwIcon />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>刷新</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label="上传文档"
-                        disabled={flatFolders.length === 0}
-                        onClick={() => setUploadOpen(true)}
-                      >
-                        <UploadIcon />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      {flatFolders.length === 0 ? "请先创建文件夹" : "上传文档"}
-                    </TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={
-                          activeFolder ? `在${activeFolder.name}中新建文件夹` : "新建文件夹"
-                        }
-                        onClick={handleCreateFolder}
-                      >
-                        <FolderPlusIcon />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>{activeFolder ? "新建子文件夹" : "新建文件夹"}</TooltipContent>
-                  </Tooltip>
-                </div>
-              </TooltipProvider>
+              <InputGroup>
+                <InputGroupAddon>
+                  <SearchIcon />
+                </InputGroupAddon>
+                <InputGroupInput
+                  value={searchKeyword}
+                  placeholder="搜索文件夹和文档"
+                  aria-label="搜索文件夹和文档"
+                  onChange={(event) => setSearchKeyword(event.target.value)}
+                />
+              </InputGroup>
             </div>
 
-            <InputGroup>
-              <InputGroupAddon>
-                <SearchIcon />
-              </InputGroupAddon>
-              <InputGroupInput
-                value={searchKeyword}
-                placeholder="搜索文件夹和文档"
-                aria-label="搜索文件夹和文档"
-                onChange={(event) => setSearchKeyword(event.target.value)}
+            <ScrollArea className="min-h-0 flex-1">
+              <WikiFileTree
+                folders={folderTreeData}
+                documents={documents}
+                loading={loading}
+                searchKeyword={searchKeyword}
+                selectedFolderId={selectedDocumentId ? undefined : selectedFolderId}
+                selectedDocumentId={selectedDocumentId}
+                onSelectRoot={() => {
+                  setSelectedFolderId(undefined);
+                  setSelectedDocumentId(undefined);
+                }}
+                onSelectFolder={(folder) => {
+                  setSelectedFolderId(folder.id);
+                  setSelectedDocumentId(undefined);
+                }}
+                onSelectDocument={(document) => {
+                  setSelectedFolderId(document.folder_id);
+                  setSelectedDocumentId(document.id);
+                }}
+                onEditFolder={handleEditFolder}
+                onDeleteFolder={setDeleteFolderTarget}
               />
-            </InputGroup>
-          </div>
+            </ScrollArea>
+          </aside>
+        </ResizablePanel>
 
-          <ScrollArea className="min-h-0 flex-1">
-            <WikiFileTree
-              folders={folderTreeData}
-              documents={documents}
-              loading={loading}
-              searchKeyword={searchKeyword}
-              selectedFolderId={selectedDocumentId ? undefined : selectedFolderId}
-              selectedDocumentId={selectedDocumentId}
-              onSelectRoot={() => {
-                setSelectedFolderId(undefined);
-                setSelectedDocumentId(undefined);
+        <ResizableHandle withHandle />
+
+        <ResizablePanel id="wiki-document-reader" minSize={isMobile ? "260px" : "320px"}>
+          <main className="h-full min-h-0 overflow-hidden">
+            <DocumentReader
+              document={activeDocument}
+              indexJob={activeDocument ? indexJobsByDocumentId[activeDocument.id] : undefined}
+              onDelete={setDeleteDocumentTarget}
+              onIndexStatusRefresh={() => void loadIndexJobs()}
+              onStartPractice={(document) => {
+                void navigate({
+                  to: "/learn/feynman-practice/$documentId",
+                  params: { documentId: document.id },
+                });
               }}
-              onSelectFolder={(folder) => {
-                setSelectedFolderId(folder.id);
-                setSelectedDocumentId(undefined);
-              }}
-              onSelectDocument={(document) => {
-                setSelectedFolderId(document.folder_id);
-                setSelectedDocumentId(document.id);
-              }}
-              onEditFolder={handleEditFolder}
-              onDeleteFolder={setDeleteFolderTarget}
             />
-          </ScrollArea>
-        </aside>
-
-        <main className="min-h-0 overflow-hidden">
-          <DocumentReader
-            document={activeDocument}
-            indexJob={activeDocument ? indexJobsByDocumentId[activeDocument.id] : undefined}
-            onDelete={setDeleteDocumentTarget}
-            onIndexStatusRefresh={() => void loadIndexJobs()}
-            onStartPractice={(document) => {
-              void navigate({
-                to: "/learn/feynman-practice/$documentId",
-                params: { documentId: document.id },
-              });
-            }}
-          />
-        </main>
-      </div>
+          </main>
+        </ResizablePanel>
+      </ResizablePanelGroup>
 
       <FolderFormModal
         open={formOpen}
