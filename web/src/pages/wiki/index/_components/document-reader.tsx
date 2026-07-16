@@ -3,12 +3,15 @@ import {
   AlertCircleIcon,
   BookOpenIcon,
   CheckCircle2Icon,
+  ChevronDownIcon,
   Clock3Icon,
   DatabaseIcon,
   DownloadIcon,
+  FilePenIcon,
   FileTextIcon,
   GraduationCapIcon,
   Loader2Icon,
+  MessageSquareTextIcon,
   RefreshCwIcon,
   TableOfContentsIcon,
   Trash2Icon,
@@ -16,12 +19,20 @@ import {
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import type { LearningAgentType } from "@/api/learning";
 import { type IndexJobProgress, type IndexJobStatus, ragWikiApi } from "@/api/rag/wiki";
 import type { Document } from "@/api/wiki/document";
 import { documentApi } from "@/api/wiki/document";
 import { MessageResponse } from "@/components/ai-elements/message";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Empty,
   EmptyContent,
@@ -47,7 +58,7 @@ interface DocumentReaderProps {
   indexJob?: IndexJobProgress;
   onDelete: (document: Document) => void;
   onIndexStatusRefresh: () => void;
-  onStartPractice: (document: Document) => void;
+  onOpenPractice: (document: Document, agentType: LearningAgentType) => void;
 }
 
 const statusMeta: Record<
@@ -103,7 +114,7 @@ export function DocumentReader({
   indexJob,
   onDelete,
   onIndexStatusRefresh,
-  onStartPractice,
+  onOpenPractice,
 }: DocumentReaderProps) {
   const [catalogOpen, setCatalogOpen] = useState(true);
   const [downloading, setDownloading] = useState(false);
@@ -226,15 +237,31 @@ export function DocumentReader({
             >
               <TableOfContentsIcon />
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => onStartPractice(document)}
-            >
-              <GraduationCapIcon data-icon="inline-start" />
-              费曼练习
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button type="button" variant="outline" size="sm">
+                  <GraduationCapIcon data-icon="inline-start" />
+                  费曼练习
+                  <ChevronDownIcon data-icon="inline-end" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuGroup>
+                  <DropdownMenuItem onSelect={() => onOpenPractice(document, "listener")}>
+                    <MessageSquareTextIcon />
+                    开始讲解
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => onOpenPractice(document, "teacher")}>
+                    <GraduationCapIcon />
+                    教学补充
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => onOpenPractice(document, "curator")}>
+                    <FilePenIcon />
+                    修订文档
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button
               type="button"
               variant="outline"

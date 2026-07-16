@@ -20,6 +20,10 @@ import { Route as LayoutLearnFeynmanRouteImport } from './routes/_layout/learn/f
 import { Route as LayoutCommonAppSettingRouteImport } from './routes/_layout/common/app-setting'
 import { Route as LayoutLearnSessionSessionIdRouteImport } from './routes/_layout/learn/session/$sessionId'
 import { Route as LayoutLearnFeynmanPracticeDocumentIdRouteImport } from './routes/_layout/learn/feynman-practice/$documentId'
+import { Route as LayoutLearnFeynmanPracticeDocumentIdIndexRouteImport } from './routes/_layout/learn/feynman-practice/$documentId/index'
+import { Route as LayoutLearnFeynmanPracticeDocumentIdTeacherRouteImport } from './routes/_layout/learn/feynman-practice/$documentId/teacher'
+import { Route as LayoutLearnFeynmanPracticeDocumentIdListenerRouteImport } from './routes/_layout/learn/feynman-practice/$documentId/listener'
+import { Route as LayoutLearnFeynmanPracticeDocumentIdCuratorRouteImport } from './routes/_layout/learn/feynman-practice/$documentId/curator'
 
 const LayoutRoute = LayoutRouteImport.update({
   id: '/_layout',
@@ -77,6 +81,30 @@ const LayoutLearnFeynmanPracticeDocumentIdRoute =
     path: '/learn/feynman-practice/$documentId',
     getParentRoute: () => LayoutRoute,
   } as any)
+const LayoutLearnFeynmanPracticeDocumentIdIndexRoute =
+  LayoutLearnFeynmanPracticeDocumentIdIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => LayoutLearnFeynmanPracticeDocumentIdRoute,
+  } as any)
+const LayoutLearnFeynmanPracticeDocumentIdTeacherRoute =
+  LayoutLearnFeynmanPracticeDocumentIdTeacherRouteImport.update({
+    id: '/teacher',
+    path: '/teacher',
+    getParentRoute: () => LayoutLearnFeynmanPracticeDocumentIdRoute,
+  } as any)
+const LayoutLearnFeynmanPracticeDocumentIdListenerRoute =
+  LayoutLearnFeynmanPracticeDocumentIdListenerRouteImport.update({
+    id: '/listener',
+    path: '/listener',
+    getParentRoute: () => LayoutLearnFeynmanPracticeDocumentIdRoute,
+  } as any)
+const LayoutLearnFeynmanPracticeDocumentIdCuratorRoute =
+  LayoutLearnFeynmanPracticeDocumentIdCuratorRouteImport.update({
+    id: '/curator',
+    path: '/curator',
+    getParentRoute: () => LayoutLearnFeynmanPracticeDocumentIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof LayoutIndexRoute
@@ -87,8 +115,12 @@ export interface FileRoutesByFullPath {
   '/system/agent-config': typeof LayoutSystemAgentConfigRoute
   '/system/model-config': typeof LayoutSystemModelConfigRoute
   '/wiki/': typeof LayoutWikiIndexRoute
-  '/learn/feynman-practice/$documentId': typeof LayoutLearnFeynmanPracticeDocumentIdRoute
+  '/learn/feynman-practice/$documentId': typeof LayoutLearnFeynmanPracticeDocumentIdRouteWithChildren
   '/learn/session/$sessionId': typeof LayoutLearnSessionSessionIdRoute
+  '/learn/feynman-practice/$documentId/curator': typeof LayoutLearnFeynmanPracticeDocumentIdCuratorRoute
+  '/learn/feynman-practice/$documentId/listener': typeof LayoutLearnFeynmanPracticeDocumentIdListenerRoute
+  '/learn/feynman-practice/$documentId/teacher': typeof LayoutLearnFeynmanPracticeDocumentIdTeacherRoute
+  '/learn/feynman-practice/$documentId/': typeof LayoutLearnFeynmanPracticeDocumentIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof LayoutIndexRoute
@@ -99,8 +131,11 @@ export interface FileRoutesByTo {
   '/system/agent-config': typeof LayoutSystemAgentConfigRoute
   '/system/model-config': typeof LayoutSystemModelConfigRoute
   '/wiki': typeof LayoutWikiIndexRoute
-  '/learn/feynman-practice/$documentId': typeof LayoutLearnFeynmanPracticeDocumentIdRoute
   '/learn/session/$sessionId': typeof LayoutLearnSessionSessionIdRoute
+  '/learn/feynman-practice/$documentId/curator': typeof LayoutLearnFeynmanPracticeDocumentIdCuratorRoute
+  '/learn/feynman-practice/$documentId/listener': typeof LayoutLearnFeynmanPracticeDocumentIdListenerRoute
+  '/learn/feynman-practice/$documentId/teacher': typeof LayoutLearnFeynmanPracticeDocumentIdTeacherRoute
+  '/learn/feynman-practice/$documentId': typeof LayoutLearnFeynmanPracticeDocumentIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -113,8 +148,12 @@ export interface FileRoutesById {
   '/_layout/system/agent-config': typeof LayoutSystemAgentConfigRoute
   '/_layout/system/model-config': typeof LayoutSystemModelConfigRoute
   '/_layout/wiki/': typeof LayoutWikiIndexRoute
-  '/_layout/learn/feynman-practice/$documentId': typeof LayoutLearnFeynmanPracticeDocumentIdRoute
+  '/_layout/learn/feynman-practice/$documentId': typeof LayoutLearnFeynmanPracticeDocumentIdRouteWithChildren
   '/_layout/learn/session/$sessionId': typeof LayoutLearnSessionSessionIdRoute
+  '/_layout/learn/feynman-practice/$documentId/curator': typeof LayoutLearnFeynmanPracticeDocumentIdCuratorRoute
+  '/_layout/learn/feynman-practice/$documentId/listener': typeof LayoutLearnFeynmanPracticeDocumentIdListenerRoute
+  '/_layout/learn/feynman-practice/$documentId/teacher': typeof LayoutLearnFeynmanPracticeDocumentIdTeacherRoute
+  '/_layout/learn/feynman-practice/$documentId/': typeof LayoutLearnFeynmanPracticeDocumentIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -129,6 +168,10 @@ export interface FileRouteTypes {
     | '/wiki/'
     | '/learn/feynman-practice/$documentId'
     | '/learn/session/$sessionId'
+    | '/learn/feynman-practice/$documentId/curator'
+    | '/learn/feynman-practice/$documentId/listener'
+    | '/learn/feynman-practice/$documentId/teacher'
+    | '/learn/feynman-practice/$documentId/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -139,8 +182,11 @@ export interface FileRouteTypes {
     | '/system/agent-config'
     | '/system/model-config'
     | '/wiki'
-    | '/learn/feynman-practice/$documentId'
     | '/learn/session/$sessionId'
+    | '/learn/feynman-practice/$documentId/curator'
+    | '/learn/feynman-practice/$documentId/listener'
+    | '/learn/feynman-practice/$documentId/teacher'
+    | '/learn/feynman-practice/$documentId'
   id:
     | '__root__'
     | '/_layout'
@@ -154,6 +200,10 @@ export interface FileRouteTypes {
     | '/_layout/wiki/'
     | '/_layout/learn/feynman-practice/$documentId'
     | '/_layout/learn/session/$sessionId'
+    | '/_layout/learn/feynman-practice/$documentId/curator'
+    | '/_layout/learn/feynman-practice/$documentId/listener'
+    | '/_layout/learn/feynman-practice/$documentId/teacher'
+    | '/_layout/learn/feynman-practice/$documentId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -239,8 +289,60 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutLearnFeynmanPracticeDocumentIdRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/learn/feynman-practice/$documentId/': {
+      id: '/_layout/learn/feynman-practice/$documentId/'
+      path: '/'
+      fullPath: '/learn/feynman-practice/$documentId/'
+      preLoaderRoute: typeof LayoutLearnFeynmanPracticeDocumentIdIndexRouteImport
+      parentRoute: typeof LayoutLearnFeynmanPracticeDocumentIdRoute
+    }
+    '/_layout/learn/feynman-practice/$documentId/teacher': {
+      id: '/_layout/learn/feynman-practice/$documentId/teacher'
+      path: '/teacher'
+      fullPath: '/learn/feynman-practice/$documentId/teacher'
+      preLoaderRoute: typeof LayoutLearnFeynmanPracticeDocumentIdTeacherRouteImport
+      parentRoute: typeof LayoutLearnFeynmanPracticeDocumentIdRoute
+    }
+    '/_layout/learn/feynman-practice/$documentId/listener': {
+      id: '/_layout/learn/feynman-practice/$documentId/listener'
+      path: '/listener'
+      fullPath: '/learn/feynman-practice/$documentId/listener'
+      preLoaderRoute: typeof LayoutLearnFeynmanPracticeDocumentIdListenerRouteImport
+      parentRoute: typeof LayoutLearnFeynmanPracticeDocumentIdRoute
+    }
+    '/_layout/learn/feynman-practice/$documentId/curator': {
+      id: '/_layout/learn/feynman-practice/$documentId/curator'
+      path: '/curator'
+      fullPath: '/learn/feynman-practice/$documentId/curator'
+      preLoaderRoute: typeof LayoutLearnFeynmanPracticeDocumentIdCuratorRouteImport
+      parentRoute: typeof LayoutLearnFeynmanPracticeDocumentIdRoute
+    }
   }
 }
+
+interface LayoutLearnFeynmanPracticeDocumentIdRouteChildren {
+  LayoutLearnFeynmanPracticeDocumentIdCuratorRoute: typeof LayoutLearnFeynmanPracticeDocumentIdCuratorRoute
+  LayoutLearnFeynmanPracticeDocumentIdListenerRoute: typeof LayoutLearnFeynmanPracticeDocumentIdListenerRoute
+  LayoutLearnFeynmanPracticeDocumentIdTeacherRoute: typeof LayoutLearnFeynmanPracticeDocumentIdTeacherRoute
+  LayoutLearnFeynmanPracticeDocumentIdIndexRoute: typeof LayoutLearnFeynmanPracticeDocumentIdIndexRoute
+}
+
+const LayoutLearnFeynmanPracticeDocumentIdRouteChildren: LayoutLearnFeynmanPracticeDocumentIdRouteChildren =
+  {
+    LayoutLearnFeynmanPracticeDocumentIdCuratorRoute:
+      LayoutLearnFeynmanPracticeDocumentIdCuratorRoute,
+    LayoutLearnFeynmanPracticeDocumentIdListenerRoute:
+      LayoutLearnFeynmanPracticeDocumentIdListenerRoute,
+    LayoutLearnFeynmanPracticeDocumentIdTeacherRoute:
+      LayoutLearnFeynmanPracticeDocumentIdTeacherRoute,
+    LayoutLearnFeynmanPracticeDocumentIdIndexRoute:
+      LayoutLearnFeynmanPracticeDocumentIdIndexRoute,
+  }
+
+const LayoutLearnFeynmanPracticeDocumentIdRouteWithChildren =
+  LayoutLearnFeynmanPracticeDocumentIdRoute._addFileChildren(
+    LayoutLearnFeynmanPracticeDocumentIdRouteChildren,
+  )
 
 interface LayoutRouteChildren {
   LayoutIndexRoute: typeof LayoutIndexRoute
@@ -251,7 +353,7 @@ interface LayoutRouteChildren {
   LayoutSystemAgentConfigRoute: typeof LayoutSystemAgentConfigRoute
   LayoutSystemModelConfigRoute: typeof LayoutSystemModelConfigRoute
   LayoutWikiIndexRoute: typeof LayoutWikiIndexRoute
-  LayoutLearnFeynmanPracticeDocumentIdRoute: typeof LayoutLearnFeynmanPracticeDocumentIdRoute
+  LayoutLearnFeynmanPracticeDocumentIdRoute: typeof LayoutLearnFeynmanPracticeDocumentIdRouteWithChildren
   LayoutLearnSessionSessionIdRoute: typeof LayoutLearnSessionSessionIdRoute
 }
 
@@ -265,7 +367,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutSystemModelConfigRoute: LayoutSystemModelConfigRoute,
   LayoutWikiIndexRoute: LayoutWikiIndexRoute,
   LayoutLearnFeynmanPracticeDocumentIdRoute:
-    LayoutLearnFeynmanPracticeDocumentIdRoute,
+    LayoutLearnFeynmanPracticeDocumentIdRouteWithChildren,
   LayoutLearnSessionSessionIdRoute: LayoutLearnSessionSessionIdRoute,
 }
 

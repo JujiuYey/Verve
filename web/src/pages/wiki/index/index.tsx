@@ -3,6 +3,7 @@ import { FolderPlusIcon, RefreshCwIcon, SearchIcon, UploadIcon } from "lucide-re
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import type { LearningAgentType } from "@/api/learning";
 import { type IndexJobProgress, ragWikiApi } from "@/api/rag/wiki";
 import type { Document } from "@/api/wiki/document";
 import { documentApi } from "@/api/wiki/document";
@@ -25,6 +26,12 @@ import { DocumentReader } from "./_components/document-reader";
 import { FolderFormModal } from "./_components/folder-form-modal";
 import { UploadDialog } from "./_components/upload-dialog";
 import { WikiFileTree } from "./_components/wiki-file-tree";
+
+const practiceRoutes = {
+  listener: "/learn/feynman-practice/$documentId/listener",
+  teacher: "/learn/feynman-practice/$documentId/teacher",
+  curator: "/learn/feynman-practice/$documentId/curator",
+} as const satisfies Record<LearningAgentType, string>;
 
 function flattenFolders(folders: FolderTreeNode[]): FolderTreeNode[] {
   return folders.flatMap((folder) => [folder, ...flattenFolders(folder.children)]);
@@ -327,9 +334,9 @@ export function WikiIndexPage() {
               indexJob={activeDocument ? indexJobsByDocumentId[activeDocument.id] : undefined}
               onDelete={setDeleteDocumentTarget}
               onIndexStatusRefresh={() => void loadIndexJobs()}
-              onStartPractice={(document) => {
+              onOpenPractice={(document, agentType) => {
                 void navigate({
-                  to: "/learn/feynman-practice/$documentId",
+                  to: practiceRoutes[agentType],
                   params: { documentId: document.id },
                 });
               }}

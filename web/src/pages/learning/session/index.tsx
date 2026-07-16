@@ -21,7 +21,7 @@ export function SessionPage() {
   useEffect(() => {
     if (!detail?.session.document_id) return;
     navigate({
-      to: "/learn/feynman-practice/$documentId",
+      to: "/learn/feynman-practice/$documentId/listener",
       params: { documentId: detail.session.document_id },
       search: { sessionId },
       replace: true,

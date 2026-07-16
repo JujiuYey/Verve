@@ -44,11 +44,17 @@ import { curatorRegenerationInput, filterTimelineByAgent, mergeTimeline } from "
 
 const routeApi = getRouteApi("/_layout/learn/feynman-practice/$documentId");
 
+const agentRoutes = {
+  listener: "/learn/feynman-practice/$documentId/listener",
+  teacher: "/learn/feynman-practice/$documentId/teacher",
+  curator: "/learn/feynman-practice/$documentId/curator",
+} as const;
+
 type AgentDrafts = Record<LearningAgentType, string>;
 
 const emptyAgentDrafts = (): AgentDrafts => ({ listener: "", teacher: "", curator: "" });
 
-export function FeynmanWorkbenchPage() {
+export function FeynmanWorkbenchPage({ agentType }: { agentType: LearningAgentType }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { documentId } = routeApi.useParams();
@@ -70,7 +76,6 @@ export function FeynmanWorkbenchPage() {
   } | null>(null);
   const [creatingIdentity, setCreatingIdentity] = useState("");
   const [createFailureIdentity, setCreateFailureIdentity] = useState("");
-  const [activeView, setActiveView] = useState("listener");
   const [drafts, setDrafts] = useState<AgentDrafts>(emptyAgentDrafts);
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   const [completedSummary, setCompletedSummary] = useState("");
@@ -107,7 +112,6 @@ export function FeynmanWorkbenchPage() {
     setCreatedSession(null);
     setCreatingIdentity("");
     setCreateFailureIdentity("");
-    setActiveView("listener");
     setDrafts(emptyAgentDrafts());
     setTimeline([]);
     setCompletedSummary("");
@@ -135,6 +139,12 @@ export function FeynmanWorkbenchPage() {
       .then((result) => {
         if (currentRouteIdentityRef.current === routeIdentity) {
           setCreatedSession({ routeIdentity, id: result.session_id });
+          void navigate({
+            to: agentRoutes[agentType],
+            params: { documentId },
+            search: { sessionId: result.session_id },
+            replace: true,
+          });
         }
       })
       .catch(() => {
@@ -151,7 +161,9 @@ export function FeynmanWorkbenchPage() {
     createAttempt,
     createSession,
     createdSessionId,
+    agentType,
     documentId,
+    navigate,
     requestedSessionId,
     routeIdentity,
   ]);
@@ -297,7 +309,7 @@ export function FeynmanWorkbenchPage() {
 
   const startNewSession = () => {
     navigate({
-      to: "/learn/feynman-practice/$documentId",
+      to: agentRoutes[agentType],
       params: { documentId },
       search: {},
       replace: true,
@@ -384,8 +396,15 @@ export function FeynmanWorkbenchPage() {
       </div>
 
       <Tabs
-        value={activeView}
-        onValueChange={setActiveView}
+        value={agentType}
+        onValueChange={(value) => {
+          const nextAgentType = value as LearningAgentType;
+          void navigate({
+            to: agentRoutes[nextAgentType],
+            params: { documentId },
+            search: { sessionId },
+          });
+        }}
         className="min-h-0 flex-1 overflow-hidden"
       >
         <TabsList className="h-auto max-w-full flex-wrap justify-start">
@@ -403,66 +422,62 @@ export function FeynmanWorkbenchPage() {
             修订文档{itemsByAgent.curator.length > 0 ? ` (${itemsByAgent.curator.length})` : ""}
           </TabsTrigger>
         </TabsList>
-        {(["listener", "teacher", "curator"] as const).map((agentType) => (
-          <TabsContent key={agentType} value={agentType} className="flex min-h-0 overflow-hidden">
-            <section className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-              {agentType === "teacher" &&
-              (indexStatusQuery.data?.status === "pending" ||
-                indexStatusQuery.data?.status === "running") ? (
-                <Alert className="mt-4">
-                  <CircleAlertIcon />
-                  <AlertTitle>当前文档版本正在建立索引</AlertTitle>
-                  <AlertDescription>教学补充暂时不会使用旧版本证据。</AlertDescription>
-                </Alert>
-              ) : agentType === "teacher" && indexStatusQuery.data?.status === "failed" ? (
-                <Alert className="mt-4">
-                  <CircleAlertIcon />
-                  <AlertTitle>当前文档版本索引失败</AlertTitle>
-                  <AlertDescription className="flex items-center justify-between gap-3">
-                    <span>{indexStatusQuery.data.error_message || "请重试索引。"}</span>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() =>
-                        retryIndex.mutate(documentId, { onSuccess: refreshDocumentState })
-                      }
-                      disabled={retryIndex.isPending}
-                    >
-                      重试
-                    </Button>
-                  </AlertDescription>
-                </Alert>
-              ) : null}
-              {isCompleted ? (
-                <Alert className="mt-4">
-                  <AlertTitle>本次练习已结束</AlertTitle>
-                  <AlertDescription>
-                    {completedSummary || "你的解释记录已经保存。"}
-                  </AlertDescription>
-                </Alert>
-              ) : null}
-              <AgentTimeline
-                agentType={agentType}
-                items={itemsByAgent[agentType]}
-                busyChangeRequestId={busyChangeRequestId}
-                onApply={(item) => void applyCuratorChange(item)}
-                onCancel={(item) => void cancelCuratorChange(item)}
-                onRegenerate={regenerateCuratorChange}
-              />
-              <AgentComposer
-                agentType={agentType}
-                value={drafts[agentType]}
-                disabled={!sessionReady || isCompleting || isCompleted}
-                isSubmitting={isSubmitting}
-                canComplete={agentType === "listener" && !isCompleted && listenerTurnCount > 0}
-                isCompleting={isCompleting}
-                onChange={(value) => setDrafts((current) => ({ ...current, [agentType]: value }))}
-                onSubmit={() => void submitAgentTurn(agentType)}
-                onComplete={() => void finishPractice()}
-              />
-            </section>
-          </TabsContent>
-        ))}
+        <TabsContent value={agentType} className="flex min-h-0 overflow-hidden">
+          <section className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
+            {agentType === "teacher" &&
+            (indexStatusQuery.data?.status === "pending" ||
+              indexStatusQuery.data?.status === "running") ? (
+              <Alert className="mt-4">
+                <CircleAlertIcon />
+                <AlertTitle>当前文档版本正在建立索引</AlertTitle>
+                <AlertDescription>教学补充暂时不会使用旧版本证据。</AlertDescription>
+              </Alert>
+            ) : agentType === "teacher" && indexStatusQuery.data?.status === "failed" ? (
+              <Alert className="mt-4">
+                <CircleAlertIcon />
+                <AlertTitle>当前文档版本索引失败</AlertTitle>
+                <AlertDescription className="flex items-center justify-between gap-3">
+                  <span>{indexStatusQuery.data.error_message || "请重试索引。"}</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      retryIndex.mutate(documentId, { onSuccess: refreshDocumentState })
+                    }
+                    disabled={retryIndex.isPending}
+                  >
+                    重试
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            ) : null}
+            {isCompleted ? (
+              <Alert className="mt-4">
+                <AlertTitle>本次练习已结束</AlertTitle>
+                <AlertDescription>{completedSummary || "你的解释记录已经保存。"}</AlertDescription>
+              </Alert>
+            ) : null}
+            <AgentTimeline
+              agentType={agentType}
+              items={itemsByAgent[agentType]}
+              busyChangeRequestId={busyChangeRequestId}
+              onApply={(item) => void applyCuratorChange(item)}
+              onCancel={(item) => void cancelCuratorChange(item)}
+              onRegenerate={regenerateCuratorChange}
+            />
+            <AgentComposer
+              agentType={agentType}
+              value={drafts[agentType]}
+              disabled={!sessionReady || isCompleting || isCompleted}
+              isSubmitting={isSubmitting}
+              canComplete={agentType === "listener" && !isCompleted && listenerTurnCount > 0}
+              isCompleting={isCompleting}
+              onChange={(value) => setDrafts((current) => ({ ...current, [agentType]: value }))}
+              onSubmit={() => void submitAgentTurn(agentType)}
+              onComplete={() => void finishPractice()}
+            />
+          </section>
+        </TabsContent>
       </Tabs>
     </div>
   );

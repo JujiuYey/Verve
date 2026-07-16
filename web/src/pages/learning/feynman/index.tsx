@@ -128,7 +128,7 @@ export function FeynmanExercisePage() {
   const enterPractice = () => {
     if (action?.type !== "navigate_to_practice" || !action.document_id) return;
     navigate({
-      to: "/learn/feynman-practice/$documentId",
+      to: "/learn/feynman-practice/$documentId/listener",
       params: { documentId: action.document_id },
     });
   };
