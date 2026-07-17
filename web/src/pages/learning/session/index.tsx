@@ -43,8 +43,8 @@ export function SessionPage() {
       </EmptyHeader>
       {isError ? (
         <EmptyContent>
-          <Button variant="outline" onClick={() => navigate({ to: "/learn/feynman" })}>
-            返回学习 Agent
+          <Button variant="outline" onClick={() => navigate({ to: "/learn/ask" })}>
+            返回知识问答
           </Button>
         </EmptyContent>
       ) : null}

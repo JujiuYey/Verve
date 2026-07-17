@@ -20,11 +20,8 @@ export const SourcesTrigger = ({ className, count, children, ...props }: Sources
   <CollapsibleTrigger className={cn("flex items-center gap-2", className)} {...props}>
     {children ?? (
       <>
-        <p className="font-medium">
-          Used
-          {count} sources
-        </p>
-        <ChevronDownIcon className="h-4 w-4" />
+        <p className="font-medium">参考 {count} 条来源</p>
+        <ChevronDownIcon className="size-4" />
       </>
     )}
   </CollapsibleTrigger>
@@ -43,15 +40,43 @@ export const SourcesContent = ({ className, ...props }: SourcesContentProps) => 
   />
 );
 
-export type SourceProps = ComponentProps<"a">;
+type SourceLinkProps = ComponentProps<"a"> & { href: string };
+type SourceRowProps = ComponentProps<"div"> & { href?: never };
 
-export const Source = ({ href, title, children, ...props }: SourceProps) => (
-  <a className="flex items-center gap-2" href={href} rel="noreferrer" target="_blank" {...props}>
-    {children ?? (
+export type SourceProps = SourceLinkProps | SourceRowProps;
+
+export const Source = (sourceProps: SourceProps) => {
+  if (sourceProps.href) {
+    const { href, rel, target, title, children, className, ...props } =
+      sourceProps as SourceLinkProps;
+    return (
+      <a
+        {...props}
+        className={cn("flex min-w-0 items-center gap-2", className)}
+        href={href}
+        rel={rel ?? "noreferrer"}
+        target={target ?? "_blank"}
+        title={title}
+      >
+        {sourceContent(title, children)}
+      </a>
+    );
+  }
+  const { title, children, className, ...props } = sourceProps as SourceRowProps;
+  return (
+    <div {...props} className={cn("flex min-w-0 items-center gap-2", className)} title={title}>
+      {sourceContent(title, children)}
+    </div>
+  );
+};
+
+function sourceContent(title: string | undefined, children: SourceProps["children"]) {
+  return (
+    children ?? (
       <>
-        <BookIcon className="h-4 w-4" />
+        <BookIcon className="size-4" />
         <span className="block font-medium">{title}</span>
       </>
-    )}
-  </a>
-);
+    )
+  );
+}

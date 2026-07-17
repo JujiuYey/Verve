@@ -89,6 +89,41 @@ func TestMemoryRepositoryFindItemsByDocumentScopesUserAndDocument(t *testing.T) 
 	}
 }
 
+func TestMemoryRepositoryFindItemsByDocumentsScopesDistinctDocumentSet(t *testing.T) {
+	recorder := &reviewQueryRecorder{rows: emptyMemoryRows{}}
+	sqldb := sql.OpenDB(recorder)
+	db := bun.NewDB(sqldb, pgdialect.New())
+	defer db.Close()
+	repo := NewMemoryRepository(db)
+
+	items, err := repo.FindItemsByDocuments(context.Background(), []string{" doc-1 ", "doc-2", "doc-1", ""}, 18)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if items == nil || len(items) != 0 {
+		t.Fatalf("items = %#v", items)
+	}
+	for _, want := range []string{
+		`WHERE (document_id IN ('doc-1', 'doc-2'))`,
+		`ORDER BY "last_seen_at" DESC`, `LIMIT 18`,
+	} {
+		if !strings.Contains(recorder.selectQuery, want) {
+			t.Fatalf("query does not contain %q: %s", want, recorder.selectQuery)
+		}
+	}
+}
+
+func TestMemoryRepositoryFindItemsByDocumentsReturnsEmptyWithoutDatabaseQuery(t *testing.T) {
+	repo := NewMemoryRepository(nil)
+	items, err := repo.FindItemsByDocuments(context.Background(), []string{"", "  "}, 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if items == nil || len(items) != 0 {
+		t.Fatalf("items = %#v", items)
+	}
+}
+
 func TestMemoryRepositoryFindItemsByFoldersScopesFolderSet(t *testing.T) {
 	recorder := &reviewQueryRecorder{rows: emptyMemoryRows{}}
 	sqldb := sql.OpenDB(recorder)

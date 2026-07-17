@@ -1,5 +1,6 @@
 import {
   AgentIcon,
+  ChatIcon,
   DashboardIcon,
   DocumentIcon,
   FolderIcon,
@@ -15,7 +16,7 @@ export type NavItem = {
 
 export const learnNav: NavItem[] = [
   { title: "知识库", url: "/wiki", icon: FolderIcon },
-  { title: "费曼练习", url: "/learn/feynman", icon: AgentIcon },
+  { title: "知识问答", url: "/learn/ask", icon: ChatIcon },
   { title: "日志", url: "/learn/journal", icon: DocumentIcon },
   { title: "学习记忆", url: "/learn/profile", icon: DashboardIcon },
 ];

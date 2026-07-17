@@ -12,7 +12,7 @@ import (
 // 配置学习平台路由(/api/learning/*)
 func SetupLearningRoutes(router fiber.Router, dbService *database.DatabaseService, minioService *storage.MinIOService, retriever *rag_service.Retriever) {
 	sessionHandler := learning_handlers.NewSessionHandler(dbService, minioService, retriever)
-	coachHandler := learning_handlers.NewCoachHandler(dbService, retriever)
+	knowledgeQAHandler := learning_handlers.NewKnowledgeQAHandler(dbService, retriever)
 	memoryHandler := learning_handlers.NewMemoryHandler(dbService)
 
 	learning := router.Group("/learning")
@@ -27,10 +27,7 @@ func SetupLearningRoutes(router fiber.Router, dbService *database.DatabaseServic
 			session.Post("/:id/complete", sessionHandler.Complete) // 结束本节
 		}
 
-		coach := learning.Group("/coach")
-		{
-			coach.Post("/chat", coachHandler.Chat)
-		}
+		learning.Post("/ask", knowledgeQAHandler.Ask)
 
 		learning.Get("/memory", memoryHandler.Get)
 	}

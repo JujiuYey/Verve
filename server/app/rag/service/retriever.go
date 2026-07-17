@@ -24,6 +24,14 @@ func NewRetriever(chunks chunkFinder, embed Embedder, vectors vector.Store) *Ret
 	return &Retriever{chunks: chunks, embed: embed, vectors: vectors}
 }
 
+func (r *Retriever) SearchAll(ctx context.Context, query string, limit int) ([]rag_payload.SearchResult, error) {
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return nil, fmt.Errorf("query is required")
+	}
+	return r.search(ctx, query, limit, nil)
+}
+
 func (r *Retriever) Search(ctx context.Context, rootFolderID, query string, limit int) ([]rag_payload.SearchResult, error) {
 	rootFolderID = strings.TrimSpace(rootFolderID)
 	query = strings.TrimSpace(query)

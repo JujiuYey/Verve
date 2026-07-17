@@ -389,8 +389,8 @@ export function FeynmanWorkbenchPage({ agentType }: { agentType: LearningAgentTy
           <Button variant="outline" onClick={() => navigate({ to: "/wiki" })}>
             返回 Wiki
           </Button>
-          <Button variant="secondary" onClick={() => navigate({ to: "/learn/feynman" })}>
-            学习 Agent
+          <Button variant="secondary" onClick={() => navigate({ to: "/learn/ask" })}>
+            知识问答
           </Button>
         </div>
       </div>

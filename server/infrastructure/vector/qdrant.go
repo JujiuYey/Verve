@@ -87,10 +87,12 @@ func (s *QdrantStore) Upsert(ctx context.Context, collection string, points []Po
 func (s *QdrantStore) Search(ctx context.Context, collection string, vector []float32, filter map[string]any, limit int) ([]ScoredPoint, error) {
 	body := map[string]any{
 		"vector":       vector,
-		"filter":       filter,
 		"limit":        limit,
 		"with_payload": false,
 		"with_vector":  false,
+	}
+	if len(filter) > 0 {
+		body["filter"] = filter
 	}
 	var parsed struct {
 		Result []struct {

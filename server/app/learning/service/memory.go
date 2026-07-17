@@ -17,8 +17,7 @@ type memoryWriter interface {
 
 type memoryReader interface {
 	FindItemsByDocument(ctx context.Context, documentID string, limit int) ([]*learning_db.LearningMemoryItem, error)
-	FindItemsByUser(ctx context.Context, folderID string, limit int) ([]*learning_db.LearningMemoryItem, error)
-	FindItemsByFolders(ctx context.Context, folderIDs []string, limit int) ([]*learning_db.LearningMemoryItem, error)
+	FindItemsByDocuments(ctx context.Context, documentIDs []string, limit int) ([]*learning_db.LearningMemoryItem, error)
 }
 
 type memoryDocumentFinder interface {
@@ -27,8 +26,6 @@ type memoryDocumentFinder interface {
 
 type memoryFolderScope interface {
 	FindOne(ctx context.Context, id string) (*wiki_db.Folder, error)
-	List(ctx context.Context, filters map[string]interface{}) ([]*wiki_db.Folder, error)
-	GetAllSubFolderIDs(ctx context.Context, parentID string) ([]string, error)
 }
 
 type MemoryService struct {
@@ -53,38 +50,18 @@ func newMemoryService(repository memoryWriter, documents memoryDocumentFinder, f
 	return service
 }
 
-func (s *MemoryService) FindCoachItems(ctx context.Context, rootFolderID string, limit int) ([]*learning_db.LearningMemoryItem, error) {
-	if s == nil || s.reader == nil {
-		return nil, errors.New("memory repository is not configured")
-	}
-	rootFolderID = strings.TrimSpace(rootFolderID)
-	if rootFolderID == "" {
-		return s.reader.FindItemsByUser(ctx, "", limit)
-	}
-	if s.folders == nil {
-		return nil, errors.New("memory folder scope is not configured")
-	}
-	descendantIDs, err := s.folders.GetAllSubFolderIDs(ctx, rootFolderID)
-	if err != nil {
-		return nil, err
-	}
-	allowedIDs := make([]string, 0, len(descendantIDs))
-	seen := make(map[string]struct{}, len(descendantIDs))
-	for _, folderID := range descendantIDs {
-		if _, ok := seen[folderID]; ok {
-			continue
-		}
-		seen[folderID] = struct{}{}
-		allowedIDs = append(allowedIDs, folderID)
-	}
-	return s.reader.FindItemsByFolders(ctx, allowedIDs, limit)
-}
-
 func (s *MemoryService) FindDocumentItems(ctx context.Context, documentID string, limit int) ([]*learning_db.LearningMemoryItem, error) {
 	if s == nil || s.reader == nil {
 		return nil, errors.New("memory repository is not configured")
 	}
 	return s.reader.FindItemsByDocument(ctx, documentID, limit)
+}
+
+func (s *MemoryService) FindDocumentItemsBatch(ctx context.Context, documentIDs []string, limit int) ([]*learning_db.LearningMemoryItem, error) {
+	if s == nil || s.reader == nil {
+		return nil, errors.New("memory repository is not configured")
+	}
+	return s.reader.FindItemsByDocuments(ctx, documentIDs, limit)
 }
 
 func (s *MemoryService) RecordExplanationReview(ctx context.Context, session *learning_db.LearningSession, review *learning_db.LearningExplanationReview) error {

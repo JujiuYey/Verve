@@ -74,6 +74,27 @@ func (r *MemoryRepository) FindItemsByDocument(ctx context.Context, documentID s
 	return items, nil
 }
 
+func (r *MemoryRepository) FindItemsByDocuments(ctx context.Context, documentIDs []string, limit int) ([]*learning_db.LearningMemoryItem, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	documentIDs = uniqueNonEmptyIDs(documentIDs)
+	items := make([]*learning_db.LearningMemoryItem, 0)
+	if len(documentIDs) == 0 {
+		return items, nil
+	}
+	err := r.db.NewSelect().
+		Model(&items).
+		Where("document_id IN (?)", bun.In(documentIDs)).
+		Order("last_seen_at DESC").
+		Limit(limit).
+		Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 func (r *MemoryRepository) FindItemsByFolders(ctx context.Context, folderIDs []string, limit int) ([]*learning_db.LearningMemoryItem, error) {
 	if limit <= 0 {
 		limit = 20
@@ -92,6 +113,23 @@ func (r *MemoryRepository) FindItemsByFolders(ctx context.Context, folderIDs []s
 		return nil, err
 	}
 	return items, nil
+}
+
+func uniqueNonEmptyIDs(ids []string) []string {
+	result := make([]string, 0, len(ids))
+	seen := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		if _, exists := seen[id]; exists {
+			continue
+		}
+		seen[id] = struct{}{}
+		result = append(result, id)
+	}
+	return result
 }
 
 func (r *MemoryRepository) FindSummaryByFolder(ctx context.Context, folderID string) (*learning_db.LearningMemorySummary, error) {

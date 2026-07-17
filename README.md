@@ -146,7 +146,7 @@ pnpm dev
 ### 前端 (`web/.env`)
 
 ```
-VITE_API_BASE_URL=http://localhost:8080/api
+VITE_API_BASE_URL=http://localhost:8080
 ```
 
 ## 📡 API 速查
@@ -161,7 +161,7 @@ VITE_API_BASE_URL=http://localhost:8080/api
 | GET | `/api/wiki/documents/:id` | 文档详情 / 内容 |
 | POST | `/api/rag/chat` | RAG 问答 |
 | POST | `/api/learning/sessions` | 启动 Feynman 学习会话 |
-| POST | `/api/learning/coach/chat` | 陪练对话 (SSE) |
+| POST | `/api/learning/ask` | 全库知识问答 (SSE) |
 | GET/POST | `/api/system/platforms` | 模型平台配置 |
 | GET/POST | `/api/system/models` | 可用模型列表 |
 

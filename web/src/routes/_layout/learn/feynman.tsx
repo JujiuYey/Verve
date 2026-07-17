@@ -1,16 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
-
-import { FeynmanExercisePage } from "@/pages/learning/feynman";
-
-interface SearchSchema {
-  rootFolderId?: string;
-  rootFolderName?: string;
-}
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_layout/learn/feynman")({
-  component: FeynmanExercisePage,
-  validateSearch: (search: Record<string, unknown>): SearchSchema => ({
-    rootFolderId: search.rootFolderId as string | undefined,
-    rootFolderName: search.rootFolderName as string | undefined,
-  }),
+  beforeLoad: () => {
+    throw redirect({ to: "/learn/ask", replace: true });
+  },
 });

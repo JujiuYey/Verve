@@ -6,13 +6,12 @@ import (
 	"verve/infrastructure/llm/prompts"
 
 	"github.com/cloudwego/eino/adk"
-	"github.com/cloudwego/eino/components/tool"
-	"github.com/cloudwego/eino/compose"
 )
 
 // agent_key / scene_key 映射,与前端 Agent 配置页对齐。
 const (
-	AgentKeyCoach           = "coach"
+	// AgentKeyKnowledgeQA retains the persisted "coach" key for model-config compatibility.
+	AgentKeyKnowledgeQA     = "coach"
 	AgentKeyLearningTeacher = "learning_teacher"
 	AgentKeyFeynmanReviewer = "feynman_reviewer"
 	AgentKeyWikiCurator     = "wiki_curator"
@@ -60,25 +59,4 @@ func NewWikiCuratorAgent(ctx context.Context, resolver AgentModelResolver) (adk.
 		Name: "WikiCurator", Description: "根据用户要求提出完整 Wiki Markdown 修改建议",
 		Instruction: prompts.WikiCuratorPrompt(prompts.Input{}), Model: chatModel,
 	})
-}
-
-// NewCoachAgent 学习调度 agent
-func NewCoachAgent(ctx context.Context, resolver AgentModelResolver, tools []tool.BaseTool) (adk.Agent, error) {
-	chatModel, err := NewChatModel(ctx, resolver, AgentKeyCoach, SceneKeyDefault)
-	if err != nil {
-		return nil, err
-	}
-	a, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
-		Name:        "LearningCoach",
-		Description: "根据 Wiki 资料、学习画像和学习记录决定下一步",
-		Instruction: prompts.CoachPrompt(prompts.Input{}),
-		Model:       chatModel,
-		ToolsConfig: adk.ToolsConfig{
-			ToolsNodeConfig: compose.ToolsNodeConfig{Tools: tools},
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-	return a, nil
 }

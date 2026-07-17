@@ -17,6 +17,7 @@ import { Route as LayoutSystemAgentConfigRouteImport } from './routes/_layout/sy
 import { Route as LayoutLearnProfileRouteImport } from './routes/_layout/learn/profile'
 import { Route as LayoutLearnJournalRouteImport } from './routes/_layout/learn/journal'
 import { Route as LayoutLearnFeynmanRouteImport } from './routes/_layout/learn/feynman'
+import { Route as LayoutLearnAskRouteImport } from './routes/_layout/learn/ask'
 import { Route as LayoutCommonAppSettingRouteImport } from './routes/_layout/common/app-setting'
 import { Route as LayoutLearnSessionSessionIdRouteImport } from './routes/_layout/learn/session/$sessionId'
 import { Route as LayoutLearnFeynmanPracticeDocumentIdRouteImport } from './routes/_layout/learn/feynman-practice/$documentId'
@@ -64,6 +65,11 @@ const LayoutLearnFeynmanRoute = LayoutLearnFeynmanRouteImport.update({
   path: '/learn/feynman',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutLearnAskRoute = LayoutLearnAskRouteImport.update({
+  id: '/learn/ask',
+  path: '/learn/ask',
+  getParentRoute: () => LayoutRoute,
+} as any)
 const LayoutCommonAppSettingRoute = LayoutCommonAppSettingRouteImport.update({
   id: '/common/app-setting',
   path: '/common/app-setting',
@@ -109,6 +115,7 @@ const LayoutLearnFeynmanPracticeDocumentIdCuratorRoute =
 export interface FileRoutesByFullPath {
   '/': typeof LayoutIndexRoute
   '/common/app-setting': typeof LayoutCommonAppSettingRoute
+  '/learn/ask': typeof LayoutLearnAskRoute
   '/learn/feynman': typeof LayoutLearnFeynmanRoute
   '/learn/journal': typeof LayoutLearnJournalRoute
   '/learn/profile': typeof LayoutLearnProfileRoute
@@ -125,6 +132,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof LayoutIndexRoute
   '/common/app-setting': typeof LayoutCommonAppSettingRoute
+  '/learn/ask': typeof LayoutLearnAskRoute
   '/learn/feynman': typeof LayoutLearnFeynmanRoute
   '/learn/journal': typeof LayoutLearnJournalRoute
   '/learn/profile': typeof LayoutLearnProfileRoute
@@ -142,6 +150,7 @@ export interface FileRoutesById {
   '/_layout': typeof LayoutRouteWithChildren
   '/_layout/': typeof LayoutIndexRoute
   '/_layout/common/app-setting': typeof LayoutCommonAppSettingRoute
+  '/_layout/learn/ask': typeof LayoutLearnAskRoute
   '/_layout/learn/feynman': typeof LayoutLearnFeynmanRoute
   '/_layout/learn/journal': typeof LayoutLearnJournalRoute
   '/_layout/learn/profile': typeof LayoutLearnProfileRoute
@@ -160,6 +169,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/common/app-setting'
+    | '/learn/ask'
     | '/learn/feynman'
     | '/learn/journal'
     | '/learn/profile'
@@ -176,6 +186,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/common/app-setting'
+    | '/learn/ask'
     | '/learn/feynman'
     | '/learn/journal'
     | '/learn/profile'
@@ -192,6 +203,7 @@ export interface FileRouteTypes {
     | '/_layout'
     | '/_layout/'
     | '/_layout/common/app-setting'
+    | '/_layout/learn/ask'
     | '/_layout/learn/feynman'
     | '/_layout/learn/journal'
     | '/_layout/learn/profile'
@@ -266,6 +278,13 @@ declare module '@tanstack/react-router' {
       path: '/learn/feynman'
       fullPath: '/learn/feynman'
       preLoaderRoute: typeof LayoutLearnFeynmanRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/learn/ask': {
+      id: '/_layout/learn/ask'
+      path: '/learn/ask'
+      fullPath: '/learn/ask'
+      preLoaderRoute: typeof LayoutLearnAskRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/common/app-setting': {
@@ -347,6 +366,7 @@ const LayoutLearnFeynmanPracticeDocumentIdRouteWithChildren =
 interface LayoutRouteChildren {
   LayoutIndexRoute: typeof LayoutIndexRoute
   LayoutCommonAppSettingRoute: typeof LayoutCommonAppSettingRoute
+  LayoutLearnAskRoute: typeof LayoutLearnAskRoute
   LayoutLearnFeynmanRoute: typeof LayoutLearnFeynmanRoute
   LayoutLearnJournalRoute: typeof LayoutLearnJournalRoute
   LayoutLearnProfileRoute: typeof LayoutLearnProfileRoute
@@ -360,6 +380,7 @@ interface LayoutRouteChildren {
 const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutIndexRoute: LayoutIndexRoute,
   LayoutCommonAppSettingRoute: LayoutCommonAppSettingRoute,
+  LayoutLearnAskRoute: LayoutLearnAskRoute,
   LayoutLearnFeynmanRoute: LayoutLearnFeynmanRoute,
   LayoutLearnJournalRoute: LayoutLearnJournalRoute,
   LayoutLearnProfileRoute: LayoutLearnProfileRoute,

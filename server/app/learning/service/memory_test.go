@@ -11,16 +11,20 @@ import (
 )
 
 type fakeMemoryWriter struct {
-	event          *learning_db.LearningMemoryEvent
-	items          []*learning_db.LearningMemoryItem
-	readItems      []*learning_db.LearningMemoryItem
-	readDocumentID string
-	readFolderIDs  []string
-	readFolderID   string
+	event           *learning_db.LearningMemoryEvent
+	items           []*learning_db.LearningMemoryItem
+	readItems       []*learning_db.LearningMemoryItem
+	readDocumentID  string
+	readDocumentIDs []string
 }
 
 func (f *fakeMemoryWriter) FindItemsByDocument(_ context.Context, documentID string, _ int) ([]*learning_db.LearningMemoryItem, error) {
 	f.readDocumentID = documentID
+	return f.readItems, nil
+}
+
+func (f *fakeMemoryWriter) FindItemsByDocuments(_ context.Context, documentIDs []string, _ int) ([]*learning_db.LearningMemoryItem, error) {
+	f.readDocumentIDs = append([]string(nil), documentIDs...)
 	return f.readItems, nil
 }
 
@@ -35,25 +39,6 @@ func (f *fakeMemoryWriter) CreateItem(_ context.Context, item *learning_db.Learn
 	return nil
 }
 
-func (f *fakeMemoryWriter) FindItemsByUser(_ context.Context, _ string, _ int) ([]*learning_db.LearningMemoryItem, error) {
-	return f.items, nil
-}
-
-func (f *fakeMemoryWriter) FindItemsByFolders(_ context.Context, folderIDs []string, _ int) ([]*learning_db.LearningMemoryItem, error) {
-	f.readFolderIDs = append([]string(nil), folderIDs...)
-	allowed := make(map[string]bool, len(folderIDs))
-	for _, folderID := range folderIDs {
-		allowed[folderID] = true
-	}
-	items := make([]*learning_db.LearningMemoryItem, 0)
-	for _, item := range f.items {
-		if item.FolderID != nil && allowed[*item.FolderID] {
-			items = append(items, item)
-		}
-	}
-	return items, nil
-}
-
 type fakeMemoryDocuments struct {
 	documents map[string]*wiki_db.Document
 }
@@ -66,8 +51,7 @@ func (f fakeMemoryDocuments) FindOne(_ context.Context, id string) (*wiki_db.Doc
 }
 
 type fakeMemoryFolders struct {
-	folders       []*wiki_db.Folder
-	descendantIDs []string
+	folders []*wiki_db.Folder
 }
 
 func (f fakeMemoryFolders) FindOne(_ context.Context, id string) (*wiki_db.Folder, error) {
@@ -79,14 +63,6 @@ func (f fakeMemoryFolders) FindOne(_ context.Context, id string) (*wiki_db.Folde
 	return nil, sql.ErrNoRows
 }
 
-func (f fakeMemoryFolders) List(context.Context, map[string]interface{}) ([]*wiki_db.Folder, error) {
-	return f.folders, nil
-}
-
-func (f fakeMemoryFolders) GetAllSubFolderIDs(context.Context, string) ([]string, error) {
-	return append([]string(nil), f.descendantIDs...), nil
-}
-
 func TestRecordExplanationReviewStoresEvidenceAndMisconceptionsWithoutMastery(t *testing.T) {
 	writer := &fakeMemoryWriter{}
 	documents := fakeMemoryDocuments{documents: map[string]*wiki_db.Document{"doc-1": {ID: "doc-1", FolderID: "folder-child"}}}
@@ -94,12 +70,12 @@ func TestRecordExplanationReviewStoresEvidenceAndMisconceptionsWithoutMastery(t 
 	service := newMemoryService(writer, documents, folders)
 	session := &learning_db.LearningSession{ID: "session-1", DocumentID: "doc-1"}
 	review := &learning_db.LearningExplanationReview{
-		ID: "review-1",
-		HeardSummary:        "解释了值与类型",
-		ClearPoints:         []string{"值有具体类型", "类型决定可用操作"},
-		Misconceptions:      []string{"把动态类型说成变量声明类型"},
-		FollowUpQuestion:    "接口值的动态类型是什么？",
-		ExplanationSummary:  "值和类型存在约束关系",
+		ID:                 "review-1",
+		HeardSummary:       "解释了值与类型",
+		ClearPoints:        []string{"值有具体类型", "类型决定可用操作"},
+		Misconceptions:     []string{"把动态类型说成变量声明类型"},
+		FollowUpQuestion:   "接口值的动态类型是什么？",
+		ExplanationSummary: "值和类型存在约束关系",
 	}
 
 	if err := service.RecordExplanationReview(context.Background(), session, review); err != nil {
@@ -166,43 +142,17 @@ func TestMemoryServiceFindDocumentItemsForwardsDocumentScope(t *testing.T) {
 	}
 }
 
-func TestMemoryServiceReturnsChildReviewMemoryForRootTreeAndIgnoresUnrelatedFolders(t *testing.T) {
-	rootID := "root"
-	childID := "child"
-	writer := &fakeMemoryWriter{}
-	documents := fakeMemoryDocuments{documents: map[string]*wiki_db.Document{
-		"doc-child": {ID: "doc-child", FolderID: childID},
-	}}
-	folders := fakeMemoryFolders{
-		folders: []*wiki_db.Folder{
-			{ID: rootID},
-			{ID: childID, ParentID: &rootID},
-			{ID: "unrelated"},
-		},
-		descendantIDs: []string{rootID, childID},
-	}
-	service := newMemoryService(writer, documents, folders)
-	session := &learning_db.LearningSession{ID: "session-1", DocumentID: "doc-child"}
-	review := &learning_db.LearningExplanationReview{
-		ID:          "review-1",
-		ClearPoints: []string{"能解释子文档概念"},
-	}
-	if err := service.RecordExplanationReview(context.Background(), session, review); err != nil {
-		t.Fatal(err)
-	}
-	unrelatedFolderID := "unrelated"
-	writer.items = append(writer.items, &learning_db.LearningMemoryItem{
-		ID: "unrelated-memory", FolderID: &unrelatedFolderID, Statement: "不应被根目录召回",
-	})
-
-	items, err := service.FindCoachItems(context.Background(), rootID, 20)
+func TestMemoryServiceFindDocumentItemsBatchForwardsDocumentScope(t *testing.T) {
+	writer := &fakeMemoryWriter{readItems: []*learning_db.LearningMemoryItem{{ID: "memory-1"}}}
+	service := newMemoryService(writer, nil, nil)
+	items, err := service.FindDocumentItemsBatch(context.Background(), []string{"doc-1", "doc-2"}, 20)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(items) != 1 || items[0].Statement != "能解释子文档概念" {
-		t.Fatalf("items = %#v", items)
+	if strings.Join(writer.readDocumentIDs, ",") != "doc-1,doc-2" {
+		t.Fatalf("document scope = %v", writer.readDocumentIDs)
 	}
-	if strings.Join(writer.readFolderIDs, ",") != "root,child" {
-		t.Fatalf("folder scope = %v", writer.readFolderIDs)
+	if len(items) != 1 || items[0].ID != "memory-1" {
+		t.Fatalf("items = %#v", items)
 	}
 }

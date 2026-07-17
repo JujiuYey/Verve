@@ -14,6 +14,40 @@ type fakeEmbedder struct {
 	result EmbeddingResult
 }
 
+func TestRetrieverSearchAllRejectsBlankQuery(t *testing.T) {
+	retriever := NewRetriever(&fakeChunkFinder{}, fakeEmbedder{}, &fakeVectorStore{})
+
+	_, err := retriever.SearchAll(context.Background(), "  ", 8)
+	if err == nil || !strings.Contains(err.Error(), "query is required") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestRetrieverSearchAllUsesNoVectorFilter(t *testing.T) {
+	store := &fakeVectorStore{searchResults: []vector.ScoredPoint{{PointID: "p1", Score: 0.9}}}
+	retriever := NewRetriever(
+		&fakeChunkFinder{chunks: []*rag_db.WikiChunk{{
+			ID: "c1", VectorPointID: "p1", DocumentID: "doc-1", DocumentTitle: "notes.md",
+		}}},
+		fakeEmbedder{result: EmbeddingResult{Embeddings: [][]float32{{0.1, 0.2}}}},
+		store,
+	)
+
+	results, err := retriever.SearchAll(context.Background(), " channel ", 8)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if store.filter != nil {
+		t.Fatalf("filter = %#v, want nil", store.filter)
+	}
+	if store.limit != 32 {
+		t.Fatalf("candidate limit = %d, want 32", store.limit)
+	}
+	if len(results) != 1 || results[0].DocumentID != "doc-1" || results[0].DocumentTitle != "notes.md" {
+		t.Fatalf("results = %#v", results)
+	}
+}
+
 func TestRetrieverSearchDocumentRejectsBlankDocumentID(t *testing.T) {
 	retriever := NewRetriever(
 		&fakeChunkFinder{},

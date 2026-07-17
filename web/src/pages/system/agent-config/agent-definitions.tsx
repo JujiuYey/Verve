@@ -2,7 +2,7 @@ import {
   IconChecks,
   IconChalkboardTeacher,
   IconEdit,
-  IconRoute,
+  IconMessageQuestion,
   IconStack2,
 } from "@tabler/icons-react";
 import type { ComponentType, SVGProps } from "react";
@@ -34,17 +34,17 @@ export type SceneConfigState = {
 export const AGENTS: AgentDefinition[] = [
   {
     key: "coach",
-    name: "学习调度 Agent",
-    shortName: "调度",
-    description: "查询学习上下文并决定下一步学习动作。",
-    runtime: "LearningCoach",
-    icon: IconRoute,
+    name: "知识问答",
+    shortName: "问答",
+    description: "检索全部 Wiki，并结合相关学习记录生成结构化回答。",
+    runtime: "KnowledgeQAService",
+    icon: IconMessageQuestion,
     scenes: [
       {
         key: "default",
         name: "默认模型",
         required: true,
-        description: "用于对话、工具调用决策和下一步动作规划。",
+        description: "用于生成知识回答和学习建议。",
       },
     ],
   },

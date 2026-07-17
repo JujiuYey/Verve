@@ -44,6 +44,25 @@ func TestQdrantSearchRequestShape(t *testing.T) {
 	}
 }
 
+func TestQdrantSearchOmitsEmptyFilter(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if _, exists := body["filter"]; exists {
+			t.Fatalf("request contains filter: %#v", body["filter"])
+		}
+		_, _ = w.Write([]byte(`{"result":[]}`))
+	}))
+	defer server.Close()
+
+	store := NewQdrantStoreWithClient(server.URL, server.Client())
+	if _, err := store.Search(context.Background(), WikiChunkCollection, []float32{0.1}, nil, 8); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestQdrantEnsureCollectionAllowsExistingMatchingCollection(t *testing.T) {
 	requests := make([]string, 0, 2)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

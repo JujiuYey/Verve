@@ -1,17 +1,14 @@
 package handlers
 
 import (
-	"bufio"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"io"
 	"log"
 	"strings"
 	"time"
 
-	"github.com/cloudwego/eino/adk"
 	"github.com/gofiber/fiber/v2"
 
 	learning_db "verve/app/learning/models/db"
@@ -418,42 +415,4 @@ func (s *feynmanDocumentSource) SearchDocument(ctx context.Context, documentID, 
 
 func (s *feynmanDocumentSource) FindNeighbors(ctx context.Context, documentID string, indexes []int, radius int) ([]*rag_db.WikiChunk, error) {
 	return s.chunks.FindNeighbors(ctx, documentID, indexes, radius)
-}
-
-// writeLearningSSEContent is retained for the Coach stream.
-func writeLearningSSEContent(w *bufio.Writer, iter *adk.AsyncIterator[*adk.AgentEvent]) string {
-	var content strings.Builder
-	state := &thinkParseState{}
-	for {
-		event, ok := iter.Next()
-		if !ok {
-			break
-		}
-		if event.Err != nil {
-			_ = writeSSEEvent(w, SSEError, map[string]interface{}{"content": event.Err.Error()})
-			break
-		}
-		if event.Output == nil || event.Output.MessageOutput == nil {
-			continue
-		}
-		mo := event.Output.MessageOutput
-		if mo.MessageStream != nil {
-			for {
-				chunk, err := mo.MessageStream.Recv()
-				if errors.Is(err, io.EOF) {
-					break
-				}
-				if err != nil {
-					_ = writeSSEEvent(w, SSEError, map[string]interface{}{"content": err.Error()})
-					return content.String()
-				}
-				if chunk != nil {
-					dispatchMessageChunk(w, chunk, event.AgentName, &content, state)
-				}
-			}
-		} else if mo.Message != nil {
-			dispatchMessageChunk(w, mo.Message, event.AgentName, &content, state)
-		}
-	}
-	return content.String()
 }
